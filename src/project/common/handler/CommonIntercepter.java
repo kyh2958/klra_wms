@@ -75,6 +75,10 @@ public class CommonIntercepter extends HandlerInterceptorAdapter{
 				if (params != null && !params.isEmpty()) {
 					sqlUtil.setRangeSql(params);
 				}
+			} catch (IllegalArgumentException e) {
+				log.warn("Invalid range parameter format. uri={}", request.getRequestURI(), e);
+				response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid range search parameters.");
+				return false;
 			} catch (StringIndexOutOfBoundsException e) {
 				// SqlUtil 내부 substring() 예외 방어
 				// 잘못된 range 포맷으로 전체 요청이 죽지 않도록 차단

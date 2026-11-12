@@ -321,6 +321,42 @@ public class SqlUtil {
 		return newRangeMap;
 	}
 	
+	private String normalizeLogicalOperator(String value){
+		return "AND".equals(value) || "OR".equals(value) ? value : "OR";
+	}
+
+	private String requireRangeValue(String value){
+		if(value == null || value.isEmpty()){
+			throw new IllegalArgumentException("Range search value must not be empty.");
+		}
+		return value;
+	}
+
+	private String[] splitRangeRows(String value){
+		String[] rows = requireRangeValue(value).split(CommonConfig.DATA_ROW_SEPARATOR);
+		if(rows.length == 0){
+			throw new IllegalArgumentException("Invalid range search format.");
+		}
+		return rows;
+	}
+
+	private String[] parseRangeRow(String row, boolean single){
+		String[] cols = row.split(CommonConfig.DATA_COL_SEPARATOR, -1);
+		if(single && cols.length == 2){
+			cols = new String[] {cols[0], cols[1], "OR"};
+		}
+		if(cols.length != 3){
+			throw new IllegalArgumentException("Invalid range search format.");
+		}
+		requireRangeValue(cols[1]);
+		if(single){
+			cols[2] = normalizeLogicalOperator(cols[2]);
+		}else{
+			requireRangeValue(cols[2]);
+		}
+		return cols;
+	}
+
 	public DataMap setRangeParamSql(String key, DataMap rParam){
 		DataMap rangeData = new DataMap();
 		StringBuilder sb = new StringBuilder(10000);
@@ -331,32 +367,26 @@ public class SqlUtil {
 		if(key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE) != -1){
 			List sList = new ArrayList();
 			key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE));
-			String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+			String[] rows = splitRangeRows(val);
 			
 			sb.append(" ( ");
 			paramSb.append(" ( ");
 			
 			for(int i=0;i<rows.length;i++){		
 				DataMap sMap = new DataMap();
-				String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-				if(cols.length != 3){
-					continue;
-				}
-				if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-					cols[2] = "OR";
-				}
+				String[] cols = parseRangeRow(rows[i], true);
 				if(i!=0){
 					sb.append(' ').append(cols[2]).append(' ');
 					paramSb.append(' ').append(cols[2]).append(' ');
 				}
 				String fromVal = cols[1];
-				fromVal = rangeData.sqlFilter(fromVal);
+				fromVal = requireRangeValue(rangeData.sqlFilter(fromVal));
 				String operVal = operMap.getString(cols[0]);
 				sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 				sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 				sMap.put(CommonConfig.RNAGE_SINGLE_DATA_KEY, fromVal);
 				sList.add(sMap);
-				if(fromVal.substring(fromVal.length()-1).equals("%")){
+				if(fromVal.endsWith("%")){
 					if(cols[0].equals("N")) {
 						sb.append(" ( ").append(key).append(" not like '").append(fromVal).append("' ) ");
 						paramSb.append(" ( ").append(key).append(" not like '%' || ").append(CommonConfig.DATA_CELL_SEPARATOR).append(" || '%' ) ");
@@ -378,25 +408,22 @@ public class SqlUtil {
 		}else if(key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE) != -1){
 			List sList = new ArrayList();
 			key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE));
-			String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+			String[] rows = splitRangeRows(val);
 			
 			sb.append(" ( ");
 			paramSb.append(" ( ");
 			
 			for(int i=0;i<rows.length;i++){
 				DataMap sMap = new DataMap();
+				String[] cols = parseRangeRow(rows[i], false);
 				if(i!=0){
 					sb.append(" OR ");
 					paramSb.append(" OR ");
 				}
-				String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-				if(cols.length != 3){
-					continue;
-				}
 				String fromVal = cols[1];
-				fromVal = rangeData.sqlFilter(fromVal);
+				fromVal = requireRangeValue(rangeData.sqlFilter(fromVal));
 				String toVal = cols[2];
-				toVal = rangeData.sqlFilter(toVal);
+				toVal = requireRangeValue(rangeData.sqlFilter(toVal));
 				String operVal = cols[0];
 				sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 				sMap.put(CommonConfig.RNAGE_FROM_KEY, fromVal);
@@ -542,7 +569,7 @@ public class SqlUtil {
 				if(key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE) != -1){
 					List sList = new ArrayList();
 					key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE));
-					String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+					String[] rows = splitRangeRows(val);
 					if(sb.length() > 0){
 						sb.append(" AND ( ");
 						paramSb.append(" AND ( ");
@@ -552,30 +579,19 @@ public class SqlUtil {
 					}						
 					for(int i=0;i<rows.length;i++){		
 						DataMap sMap = new DataMap();
-						String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-						if(cols.length < 2){
-							continue;
-						}else if(cols.length == 2){
-							rows[i] = rows[i] + "OR";
-							cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-						}
-						
-						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-							cols[2] = "OR";
-						}
+						String[] cols = parseRangeRow(rows[i], true);
 						if(i!=0){
 							sb.append(' ').append(cols[2]).append(' ');
 							paramSb.append(' ').append(cols[2]).append(' ');
 						}
 						String fromVal = cols[1];
-						fromVal = rangeData.sqlFilter(fromVal);
+						fromVal = requireRangeValue(rangeData.sqlFilter(fromVal));
 						String operVal = operMap.getString(cols[0]);
 						sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 						sMap.put(CommonConfig.RNAGE_SINGLE_DATA_KEY, fromVal);
 						sList.add(sMap);
-						//if(fromVal.substring(fromVal.length()-1).equals("%")){ //YSO 2022-08-12 YSO 수정전
-						if(fromVal.substring(fromVal.length()-1).equals("%") || fromVal.substring(0, 1).equals("%")){
+						if(fromVal.endsWith("%") || fromVal.startsWith("%")){
 							if(cols[0].equals("N")) {
 								sb.append(" ( ").append(key).append(" not like '").append(fromVal).append("' ) ");
 								paramSb.append(" ( ").append(key).append(" not like '%' || ").append(CommonConfig.DATA_CELL_SEPARATOR).append(" || '%' ) ");
@@ -597,7 +613,7 @@ public class SqlUtil {
 				}else if(key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE) != -1){
 					List sList = new ArrayList();
 					key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE));
-					String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+					String[] rows = splitRangeRows(val);
 					if(sb.length() > 0){
 						sb.append(" AND ( ");
 						paramSb.append(" AND ( ");
@@ -607,22 +623,18 @@ public class SqlUtil {
 					}
 					for(int i=0;i<rows.length;i++){
 						DataMap sMap = new DataMap();
+						String[] cols = parseRangeRow(rows[i], false);
 						if(i!=0){
 							sb.append(" OR ");
 							paramSb.append(" OR ");
 						}
-						String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-						if(cols.length != 3){
-							continue;
-						}
-						
 						if(cols[0].equals("")){
 							cols[0] = "E";
 						}
 						String fromVal = cols[1];
-						fromVal = rangeData.sqlFilter(fromVal);
+						fromVal = requireRangeValue(rangeData.sqlFilter(fromVal));
 						String toVal = cols[2];
-						toVal = rangeData.sqlFilter(toVal);
+						toVal = requireRangeValue(rangeData.sqlFilter(toVal));
 						String operVal = cols[0];
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 						sMap.put(CommonConfig.RNAGE_FROM_KEY, fromVal);
@@ -675,7 +687,7 @@ public class SqlUtil {
 				if(key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE) != -1){
 					List sList = new ArrayList();
 					key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_SINGLE));
-					String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+					String[] rows = splitRangeRows(val);
 					if(sb.length() > 0){
 						sb.append(" AND ( ");
 					}else{
@@ -683,15 +695,12 @@ public class SqlUtil {
 					}						
 					for(int i=0;i<rows.length;i++){		
 						DataMap sMap = new DataMap();
-						String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
-						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-							cols[2] = "OR";
-						}
+						String[] cols = parseRangeRow(rows[i], true);
 						if(i!=0){
 							sb.append(" ").append(cols[2]).append(" ");
 						}
 						String fromVal = cols[1];
-						fromVal = sqlFilter(fromVal);
+						fromVal = requireRangeValue(sqlFilter(fromVal));
 						String operVal = operMap.getString(cols[0]);
 						sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
@@ -708,7 +717,7 @@ public class SqlUtil {
 				}else if(key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE) != -1){
 					List sList = new ArrayList();
 					key = key.substring(0, key.indexOf("_"+CommonConfig.RANGE_TYPE_RANGE));
-					String[] rows = val.split(CommonConfig.DATA_ROW_SEPARATOR);
+					String[] rows = splitRangeRows(val);
 					if(sb.length() > 0){
 						sb.append(" AND ( ");
 					}else{
@@ -716,20 +725,20 @@ public class SqlUtil {
 					}
 					for(int i=0;i<rows.length;i++){
 						DataMap sMap = new DataMap();
+						String[] cols = parseRangeRow(rows[i], false);
 						if(i!=0){
 							sb.append(" OR ");
 						}
-						String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
 						String fromVal = cols[1];
-						fromVal = sqlFilter(fromVal);
+						fromVal = requireRangeValue(sqlFilter(fromVal));
 						String toVal = cols[2];
-						toVal = sqlFilter(toVal);
+						toVal = requireRangeValue(sqlFilter(toVal));
 						String operVal = cols[0];
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 						sMap.put(CommonConfig.RNAGE_FROM_KEY, fromVal);
 						sMap.put(CommonConfig.RNAGE_TO_KEY, toVal);
 						sList.add(sMap);
-						if(operVal == "N"){
+						if("N".equals(operVal)){
 							sb.append(" ( ").append(key).append(" < '").append(fromVal).append("' OR ").append(key).append(" > '").append(toVal).append("' ) ");
 						}else{
 							sb.append(" ( ").append(key).append(" >= \u0027").append(fromVal).append("\u0027 AND ").append(key).append(" <= \u0027").append(toVal).append("\u0027 ) ");
@@ -846,10 +855,9 @@ public class SqlUtil {
 				for(int i=0;i<sList.size();i++){
 					smap = sList.get(i);
 					if(i!=0){
-						if(!smap.containsKey(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY)){
-							smap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, "OR");
-						}
-						sb.append(" ").append(smap.getString(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY)).append(" ");
+						String logicalOperator = normalizeLogicalOperator(smap.getString(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY));
+						smap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, logicalOperator);
+						sb.append(' ').append(logicalOperator).append(' ');
 					}
 					String fromVal = smap.getString(CommonConfig.RNAGE_SINGLE_DATA_KEY);
 					fromVal = sqlFilter(fromVal);
@@ -880,7 +888,7 @@ public class SqlUtil {
 					String toVal = smap.getString(CommonConfig.RNAGE_TO_KEY);
 					toVal = sqlFilter(toVal);
 					String operVal = smap.getString(CommonConfig.RNAGE_OPERATOR_KEY);
-					if(operVal == "N"){
+					if("N".equals(operVal)){
 						sb.append(" ( ").append(key).append(" < '").append(fromVal).append("' OR ").append(key).append(" > '").append(toVal).append("' ) ");
 					}else{
 						sb.append(" ( ").append(key).append(" >= \u0027").append(fromVal).append("\u0027 AND ").append(key).append(" <= \u0027").append(toVal).append("\u0027 ) ");
