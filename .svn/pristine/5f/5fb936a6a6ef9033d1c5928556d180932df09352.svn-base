@@ -1,0 +1,105 @@
+package project.common.task;
+
+import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import project.common.bean.DataMap;
+
+public class SseEventManager {
+
+    private static final Logger LOG = Logger.getLogger(SseEventManager.class.getName());
+
+    // 토픽별 클라이언트(PrintWriter) 목록
+    // - ConcurrentHashMap : 토픽 단위 동시 접근 안전
+    // - CopyOnWriteArraySet : add/remove가 반복(iteration) 중에도 안전
+    private static final Map<String, Set<PrintWriter>> clients =
+            new ConcurrentHashMap<>();
+
+    // ObjectMapper는 thread-safe (설정 변경 안 하면)
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    // ★ 개선 4: 호출마다 생성하지 않도록 static 상수화
+    private static final DateTimeFormatter TIME_FORMAT =
+            DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+
+    // 클라이언트 등록
+    public static void addClient(String topic, PrintWriter writer) {
+        clients
+            .computeIfAbsent(topic, k -> new CopyOnWriteArraySet<>())
+            .add(writer);
+    }
+
+    // 클라이언트 제거
+    // ★ 개선 1: 빈 토픽 Set을 함께 정리해 메모리 누수 방지
+    public static void removeClient(String topic, PrintWriter writer) {
+        Set<PrintWriter> set = clients.get(topic);
+        if (set != null) {
+            set.remove(writer);
+            if (set.isEmpty()) {
+                // remove(key, value)는 현재 값이 일치할 때만 제거 → 동시성 안전
+                clients.remove(topic, set);
+            }
+        }
+    }
+
+    /**
+     * List<DataMap>을 받아서 JSON 문자열로 직렬화 후 SSE 전송
+     */
+    public static void sendEvent(String topic, String event, List<DataMap> data) {
+        Set<PrintWriter> set = clients.get(topic);
+        if (set == null || set.isEmpty()) {
+            return;
+        }
+
+        try {
+            // time 생성 (서버 기준)
+            String time = LocalDateTime.now().format(TIME_FORMAT);
+
+            // payload 구성 (JSON 구조)
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("time", time);     // 메타 정보
+            payload.put("data", data);     // 실제 List<DataMap>
+
+            // JSON 문자열 직렬화 (한 줄)
+            String jsonData = objectMapper.writeValueAsString(payload);
+
+            // SSE 전송
+            for (PrintWriter w : set) {
+                // ★ 개선 3: heartbeat 스레드와 동시에 쓰지 않도록 동기화
+                // (PrintWriter는 thread-safe하지 않아 프레임이 섞일 수 있음)
+                synchronized (w) {
+                    w.write("event: " + event + "\n");
+                    w.write("data: " + jsonData + "\n\n");
+                    w.flush();
+                }
+
+                // ★ 핵심 개선 2: PrintWriter는 write 실패 시 예외를 던지지 않고
+                // 내부 에러 플래그만 세운다. 반드시 checkError()로 확인해야
+                // 끊긴 연결을 실제로 정리할 수 있다.
+                // (기존 코드는 catch 블록이 사실상 실행되지 않아
+                //  죽은 연결이 계속 남아 세션/스레드가 누적됨)
+                if (w.checkError()) {
+                    set.remove(w);
+                    if (set.isEmpty()) {
+                        clients.remove(topic, set);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            // ★ 개선 5: 직렬화 실패 시 로그
+            LOG.log(Level.WARNING, "SSE 이벤트 전송 실패 topic=" + topic, e);
+        }
+    }
+}

@@ -1,0 +1,156 @@
+		<table style="width: 100%">
+			<colgroup>
+				<col width="44px" />
+				<col width="106px" />
+				<col width="130px" />
+				<col width="70px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="120px" />
+				<col width="80px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="60px" />
+				<col width="50px" />
+				<col width="90px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="60px" />
+				<col width="80px" />
+			</colgroup>
+			<thead>
+				<tr>
+					<th CL="STD_NUMBER">1</th>
+					<th CL="STD_SKUKEY">품목코드</th>
+					<th CL="STD_DESC01">품목명</th>
+					<th CL="STD_LOCAKY">지번</th>
+					<th CL='STD_BOXQT'>BAG/BOX</th>
+					<th CL='STD_PLTQT'>BOX/Pallet</th>
+					<th CL="STD_LOTA06">재고상태</th>
+					<th CL="STD_LOTA14">개별바코드</th>
+					<th CL="STD_USEQTY">가용수량</th>
+					<th CL="STD_QTSCNU">불용수량</th> <!-- Can Not Use -->
+					<th CL="STD_QTSIQT">품질수량</th> <!-- Inspection QuanTity -->
+					<th CL="STD_QTSWQT">폐기수량</th> <!-- Wasted     QuanTity -->
+					<th CL='STD_QTSHQT'>보류수량</th> <!-- Hold       QuanTity -->
+					<th CL="STD_QTSALO">할당수량</th>
+					<th CL="STD_QTSOALO">OMS 할당</th>
+					<th CL='STD_TOTWG'>총중량</th>
+					<th CL="STD_QTSPMO">이동OUT</th>
+					<th CL="STD_QTSPMI">이동IN</th>
+					<th CL="STD_SKUL01">품목구분</th>
+					<th CL="STD_WAREKY">거점</th>
+					<th CL="STD_WARENM">거점명</th>
+					<th CL="STD_LOTA02">플랜트</th>
+					<th CL="STD_ZONEKY">구역</th>
+					<th CL='STD_BAGQT'>EA/BAG</th>
+					<th CL='STD_SOKQT'>속(개/BALE)</th>
+					<th CL='STD_EAQTY'>매(sheet/속)</th>
+				</tr>
+			</thead>
+			<tbody id="gridListSkuSum">
+				<tr CGRow="true">
+					<td GCol="rownum">1</td>
+					<td GCol="text,SKUKEY">품목코드</td>
+					<td GCol="text,DESC01">품목명</td>
+					<td GCol="text,LOCAKY">지번</td>
+					<td Gcol="text,BOXQT" GF="N 20,1">BOXQT</td>
+					<td Gcol="text,PLTQT" GF="N 20,1">BOX/Pallet</td>
+					<td Gcol="text,LOTA06NM">재고상태</td>
+					<td GCol="text,LOTA14">개별바코드</td>
+					<td GCol="text,USEQTY" GF="N 20,1">가용수량</td>
+					<td GCol="text,QTSCNU" GF="N 20,1">불용수량</td>
+					<td GCol="text,QTSIQT" GF="N 20,1">품질수량</td>
+					<td GCol="text,QTSWQT" GF="N 20,1">폐기수량</td>
+					<td GCol="text,QTSHQT" GF="N 20,1">보류수량</td>
+					<td GCol="text,QTSALO" GF="N 20,1">할당수량</td>
+					<td GCol="text,QTSOALO" GF="N 20,1">OMS 할당</td>
+					<td Gcol="text,TOTWG">총중량</td>
+					<td GCol="text,QTSPMO" GF="N 20,1">이동OUT</td>
+					<td GCol="text,QTSPMI" GF="N 20,1">이동IN</td>
+					<td GCol="text,SKUL01NM">품목구분</td>
+					<td Gcol="text,WAREKY">거점</td>
+					<td Gcol="text,WARENM">거점명</td>
+					<td Gcol="text,LOTA02">플랜트</td>
+					<td GCol="text,ZONEKY">구역</td>
+					<td Gcol="text,BAGQT">EA/BAG</td>
+					<td Gcol="text,EAQTY" GF="N 20,1">매(sheet/속)</td>
+					<td Gcol="text,SOKQT" GF="N 20,1">속(개/BALE)</td>
+				</tr>
+			</tbody>
+		</table>
+
+	</div>
+</div>
+<div class="tableWrap_search section">
+	<div class="tableBody">
+		<table style="width: 100%">
+			<colgroup>
+				<col width="44px" />
+				<col width="106px" />
+				<col width="130px" />
+				<col width="70px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="120px" />
+				<col width="80px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="60px" />
+				<col width="50px" />
+				<col width="90px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="60px" />
+				<col width="80px" />
+			</colgroup>
+			<tbody id="gridList">
+				<tr CGRow="true">
+					<td GCol="rownum">1</td>
+					<td GCol="text,SKUKEY">품목코드</td>
+					<td GCol="text,DESC01">품목명</td>
+					<td GCol="text,LOCAKY">지번</td>
+					<td Gcol="text,BOXQT" GF="N 20,1">BOXQT</td>
+					<td Gcol="text,PLTQT" GF="N 20,1">BOX/Pallet</td>
+					<td Gcol="text,LOTA06NM">재고상태</td>
+					<td GCol="text,LOTA14">개별바코드</td>
+					<td GCol="text,USEQTY" GF="N 20,1">가용수량</td>
+					<td GCol="text,QTSCNU" GF="N 20,1">불용수량</td>
+					<td GCol="text,QTSIQT" GF="N 20,1">품질수량</td>
+					<td GCol="text,QTSWQT" GF="N 20,1">폐기수량</td>
+					<td GCol="text,QTSHQT" GF="N 20,1">보류수량</td>
+					<td GCol="text,QTSALO" GF="N 20,1">할당수량</td>
+					<td GCol="text,QTSOALO" GF="N 20,1">OMS 할당</td>
+					<td Gcol="text,TOTWG">총중량</td>
+					<td GCol="text,QTSPMO" GF="N 20,1">이동OUT</td>
+					<td GCol="text,QTSPMI" GF="N 20,1">이동IN</td>
+					<td GCol="text,SKUL01NM">품목구분</td>
+					<td Gcol="text,WAREKY">거점</td>
+					<td Gcol="text,WARENM">거점명</td>
+					<td Gcol="text,LOTA02">플랜트</td>
+					<td GCol="text,ZONEKY">구역</td>
+					<td Gcol="text,BAGQT">EA/BAG</td>
+					<td Gcol="text,EAQTY" GF="N 20,1">매(sheet/속)</td>
+					<td Gcol="text,SOKQT">속(개/BALE)</td>
+				</tr>
+			</tbody>
+		</table>
+		

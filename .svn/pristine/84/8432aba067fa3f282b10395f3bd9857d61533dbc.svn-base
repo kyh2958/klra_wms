@@ -1,0 +1,229 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	String isMV = request.getParameter("isMV");
+	isMV = isMV == null ? "" : isMV.trim();
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button{ vertical-align: bottom; height: 37px; }
+input:read-only{ background-color: #e2e2e2; }
+select:DISABLED{ background-color: #e2e2e2; }
+.tem5_content .tableWrap_search{ overflow: hidden; }
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	$(document).ready(function () {
+		init();
+		
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			gridMobileType : true,
+		});
+
+		var param = searchedParam == null ? mobile.getLinkPopData() : searchedParam;
+		searchList(param);
+	})
+	
+	var searchedParam = null;
+	
+	function init() {
+		searchedParam  = null;
+	}
+	
+	function searchList(param) {
+		var json = param.get('json');
+		var viewList = json.data;
+		var jsonObj = {data: viewList};
+		
+		gridList.appendJson('gridList', jsonObj);
+		searchedParam = new DataMap();
+		searchedParam.putObject(structuredClone(param.map));
+	}
+	
+	// 더블클릭 이벤트
+	function gridListEventRowDblclick(gridId, rowNum) {
+		var dataList = [];
+		var data = gridList.getRowData("gridList", rowNum);
+		dataList.push(data);
+		callback(dataList);
+	}
+	
+	// 선택버튼 클릭 이벤트
+	function onClickChooseBtn() {
+		var dataList = gridList.getSelectData("gridList");
+		callback(dataList);
+	}
+	
+	function callback (data) {
+		if (data && data.length > 0) {
+			
+			var jsonArr = [];
+			
+			for (var i in data) {
+				// GRowState, GRowNum 미삭제 시 appendJson 호출 시 데이터 바인딩 이상하게 됨.
+				data[i].remove("GRowState");
+				data[i].remove("GRowNum");
+				jsonArr.push(JSON.parse(data[i]));
+			}
+			
+			var jsonObj = {
+				data : jsonArr,
+				param: mobile.getLinkPopData()
+			};
+			
+			window.opener.StkLotaPopCallback(jsonObj);
+			self.close();
+		}
+	}
+	
+	function isSearched() {
+		return searchedParam != null;
+	}
+	
+</script>
+</head>
+<body>
+	<div id="menu-container">
+		<div class="menu-item"></div>
+	</div>
+	<div class="main_wrap" id="paramArea">
+		<div class="tem4_content">
+			<div class="tableWrap_search section">
+				<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="50px;" />
+							<col width="50px;" />
+						<% if (!"".equals(isMV)) { %>
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="150px;" />
+						<% } else {%>
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+						<% } %>
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL='STD_NO'>순번</th>
+								<th GBtnCheck="true"></th>
+							<% if (!"".equals(isMV)) { %>
+								<th CL='STD_LOCASR'>from 지번</th>
+								<th CL='STD_SKUKEY'>품목코드</th>
+								<%
+						         	if(mtype.equals("P")){
+						      	%>
+					        		<th CL='STD_QTSIWH'>재고수량</th>
+									<th CL='STD_USEQTY'>가용수량</th>
+						      	<%
+						         	}else {
+				      	 		%>
+					            	<th CL="STD_QTSIWHBOX"	>재고수량BOX</th>
+									<th CL="STD_USEQTYBOX"	>가용수량BOX</th>
+						      	<% 
+						         	}
+								%>												
+								<th CL='STD_LOTA06'>재고상태</th>
+								<th CL='STD_LOTA02'>플랜트</th>
+								<th CL='STD_LOTA01'>저장위치</th>
+								<th CL='STD_LOTA07'>MTO판매번호</th>
+							<% } else { %>
+								<th CL='STD_SKUKEY'>품목코드</th>
+								<th CL='STD_QTSIWH'>재고수량</th>
+								<th CL='STD_USEQTY'>가용수량</th>
+								<th CL='STD_LOTA06'>재고상태</th>
+								<th CL='STD_LOTA02'>플랜트</th>
+							<% } %>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="50px;" />
+							<col width="50px;" />
+						<% if (!"".equals(isMV)) { %>
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="150px;" />
+						<% }else { %>
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+							<col width="100px;" />
+						<% } %>
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								<td	GCol="rowCheck">V</td>
+							<% if (!"".equals(isMV)) { %>
+								<td GCol="text,LOCASR"></td>
+								<td GCol="text,SKUKEY"></td>
+							<%
+					         	if(mtype.equals("P")){
+					      	%>
+				        		<td GCol="text,QTSIWH"	GF="N 20,3"></td>
+								<td GCol="text,USEQTY"	GF="N 20,3"></td>
+					      	<%
+					         	}else {
+			      	 		%>
+				            	<td GCol="text,QTSIWHBOX"	GF="N 20,0">재고수량BOX</td>
+								<td GCol="text,USEQTYBOX"	GF="N 20,0">가용수량BOX</td>
+					      	<% 
+					         	}
+							%>	
+								<td GCol="text,LOTA06NM"></td>
+								<td GCol="text,LOTA02"></td>
+								<td GCol="text,LOTA01"></td>
+								<td GCol="text,LOTA07"></td>
+							<% } else { %>
+								<td GCol="text,SKUKEY"></td>
+								<td GCol="text,QTSIWH"	GF="N 20,3"></td>
+								<td GCol="text,USEQTY"	GF="N 20,3"></td>
+								<td GCol="text,LOTA06NM"></td>
+								<td GCol="text,LOTA02"></td>
+							<% } %>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="50%" onclick="self.close()">
+							<label CL='BTN_CLOSE'></label>
+						</td>
+						<td class=f_1 width="50%" onclick ="onClickChooseBtn()" >
+							<label CL='BTN_CHOOSE'></label>
+						</td>
+					</tr>
+				</table>
+			</div>
+			<!-- end footer_5 -->
+		</div>
+	</div>
+</body>

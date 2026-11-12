@@ -1,0 +1,3505 @@
+<?xml version="1.0" encoding="UTF-8"?><!--Converted at: Wed Feb 23 09:49:03 KST 2022-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="DL042">
+	<select id="DL042_SHPDH_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT 'S/O 수량이 변경되어 할당할 수 없습니다 [' || IF.VBELN || '-' || IF.POSNR || ']' AS MSG
+		  FROM ( ${VALIDATION_SQL} ) QT
+		       INNER JOIN IFWMS113 IF
+		               ON IF.MANDT = QT.SMANDT
+		              AND IF.VBELN = QT.SVBELN
+		              AND IF.POSNR = QT.SPOSNR
+		              AND IF.IFFLG IN ('Y','N')
+			      AND IF.WERKS = (SELECT DISTINCT ADDR05 FROM WAHMA WHERE WAREKY = #{WAREKY} AND ROWNUM = 1)
+		 WHERE QT.QTSHPO &gt; IF.LFIMG - IF.N00101 - IF.QTSHP
+		   AND ROWNUM = 1
+	</select>
+	
+	<insert id="DL042_SHPDI_INSERT" parameterType="Map">
+		INSERT INTO SHPDI(
+				SHPOKY,
+				SHPOIT,
+				STATIT,
+				SKUKEY,
+				QTYORG,
+			 	QTSHPO,
+				QTYREF,
+				QTAPPO,
+				QTALOC,
+				QTJCMP,
+				
+				QTSHPD,
+				QTSHPC,
+				QTYUOM,
+				MEASKY,
+				UOMKEY,
+				QTPUOM,
+				DUOMKY,
+				QTDUOM,
+				SASTKY,
+				ALSTKY,
+				
+				TKFLKY,
+				ESHPKY,
+				ESHPIT,
+				OPURKY,
+				REFDKY,
+				REFDIT,
+				REFCAT,
+				REFDAT,
+				EXSUBS,
+				DESC01,
+				
+				DESC02,
+				ASKU01,
+				ASKU02,
+				ASKU03,
+				ASKU04,
+				ASKU05,
+				EANCOD,
+				GTINCD,
+				SKUG01,
+				SKUG02,
+				
+				SKUG03,
+				SKUG04,
+				SKUG05,
+				GRSWGT,
+				NETWGT,
+				WGTUNT,
+				LENGTH,
+				WIDTHW,
+				HEIGHT,
+				CUBICM,
+				
+				CAPACT,
+				PROCHA,
+				AREAKY,
+				LOTA01,
+				LOTA02,
+				LOTA03,
+				LOTA04,
+				LOTA05,
+				LOTA06,
+				LOTA07,
+				
+				LOTA08,
+				LOTA09,
+				LOTA10,
+				LOTA11,
+				LOTA12,
+				LOTA13,
+				LOTA14,
+				LOTA15,
+				LOTA16,
+				LOTA17,
+				
+				LOTA18,
+				LOTA19,
+				LOTA20,
+				AWMSNO,
+				SMANDT,
+				SEBELN,
+				SEBELP,
+				SZMBLNO,
+				SZMIPNO,
+				STRAID,
+				
+				SVBELN,
+				SPOSNR,
+				STKNUM,
+				STPNUM,
+				SWERKS,
+				SLGORT,
+				SDATBG,
+				STDLNR,
+				SSORNU,
+				SSORIT,
+				SMBLNR,
+				
+				SZEILE,
+				SMJAHR,
+				SXBLNR,
+				SAPSTS,
+				PTNRKY,
+				NAME01,
+				SLAND1,
+				SBKTXT,
+				CREDAT,
+				CRETIM,
+				CREUSR,
+				
+				LMODAT,
+				LMOTIM,
+				LMOUSR,
+				INDBZL,
+				INDARC,
+				UPDCHK
+			)VALUES(
+				#{SHPOKY},
+				#{SHPOIT},
+				' ',
+				NVL(#{SKUKEY}, ' '),
+				TO_NUMBER(NVL(#{QTYORG}, 0)),
+				TO_NUMBER(NVL(#{QTSHPO}, 0)),
+				TO_NUMBER(NVL(#{QTYREF}, 0)),
+				TO_NUMBER(NVL(#{QTAPPO}, 0)),
+				TO_NUMBER(NVL(#{QTALOC}, 0)),
+				TO_NUMBER(NVL(#{QTJCMP}, 0)),
+				
+				TO_NUMBER(NVL(#{QTSHPD}, 0)),
+				TO_NUMBER(NVL(#{QTSHPC}, 0)),
+				TO_NUMBER(NVL(#{QTYUOM}, 0)),
+				NVL(#{MEASKY}, ' '),
+				NVL(#{UOMKEY}, ' '),
+				TO_NUMBER(NVL(#{QTPUOM}, 0)),
+				NVL(#{DUOMKY}, ' '),
+				TO_NUMBER(NVL(#{QTDUOM}, 0)),
+				NVL(#{SASTKY}, ' '),
+				NVL(#{ALSTKY}, ' '),
+				
+				NVL(#{TKFLKY}, ' '),
+				NVL(#{ESHPKY}, ' '),
+				NVL(#{ESHPIT}, ' '),
+				NVL(#{OPURKY}, ' '),
+				NVL(#{REFDKY}, ' '),
+				NVL(#{REFDIT}, ' '),
+				NVL(#{REFCAT}, ' '),
+				NVL(#{REFDAT}, ' '),
+				NVL(#{EXSUBS}, ' '),
+				NVL(#{DESC01}, ' '),
+				
+				NVL(#{DESC02}, ' '),
+				NVL(#{ASKU01}, ' '),
+				NVL(#{ASKU02}, ' '),
+				NVL(#{ASKU03}, ' '),
+				NVL(#{ASKU04}, ' '),
+				NVL(#{ASKU05}, ' '),
+				NVL(#{EANCOD}, ' '),
+				NVL(#{GTINCD}, ' '),
+				NVL(#{SKUG01}, ' '),
+				NVL(#{SKUG02}, ' '),
+				
+				NVL(#{SKUG03}, ' '),
+				NVL(#{SKUG04}, ' '),
+				NVL(#{SKUG05}, ' '),
+				TO_NUMBER(NVL(#{GRSWGT}, 0)),
+				TO_NUMBER(NVL(#{NETWGT}, 0)),
+				NVL(#{WGTUNT}, ' '),
+				TO_NUMBER(NVL(#{LENGTH}, 0)),
+				TO_NUMBER(NVL(#{WIDTHW}, 0)),
+				TO_NUMBER(NVL(#{HEIGHT}, 0)),
+				TO_NUMBER(NVL(#{CUBICM}, 0)),
+				
+				TO_NUMBER(NVL(#{CAPACT}, 0)),
+				NVL(#{PROCHA}, ' '),
+				NVL(#{AREAKY}, ' '),
+				NVL(#{LOTA01}, ' '),
+				NVL(#{LOTA02}, ' '),
+				NVL(#{LOTA03}, ' '),
+				NVL(#{LOTA04}, ' '),
+				NVL(#{LOTA05}, ' '),
+				NVL(#{LOTA06}, ' '),
+				NVL(#{LOTA07}, ' '),
+				
+				NVL(#{LOTA08}, ' '),
+				NVL(#{LOTA09}, ' '),
+				NVL(#{LOTA10}, ' '),
+				NVL(#{LOTA11}, ' '),
+				NVL(#{LOTA12}, ' '),
+				NVL(#{LOTA13}, ' '),
+				NVL(#{LOTA14}, ' '),
+				NVL(#{LOTA15}, ' '),
+				TO_NUMBER(NVL(#{LOTA16}, 0)),
+				NVL(#{LOTA17}, ' '),
+				
+				TO_NUMBER(NVL(#{LOTA18}, 0)),
+				TO_NUMBER(NVL(#{LOTA19}, 0)),
+				TO_NUMBER(NVL(#{LOTA20}, 0)),
+				NVL(#{AWMSNO}, ' '),
+				NVL(#{SMANDT}, ' '),
+				NVL(#{SEBELN}, ' '),
+				NVL(#{SEBELP}, ' '),
+				NVL(#{SZMBLNO}, ' '),
+				NVL(#{SZMIPNO}, ' '),
+				NVL(#{STRAID}, ' '),
+				
+				NVL(#{SVBELN}, ' '),
+				NVL(#{SPOSNR}, ' '),
+				NVL(#{STKNUM}, ' '),
+				NVL(#{STPNUM}, ' '),
+				NVL(#{SWERKS}, ' '),
+				NVL(#{SLGORT}, ' '),
+				NVL(#{SDATBG}, ' '),
+				NVL(#{STDLNR}, ' '),
+				NVL(#{SSORNU}, ' '),
+				NVL(#{SSORIT}, ' '),
+				
+				NVL(#{SMBLNR}, ' '),
+				NVL(#{SZEILE}, ' '),
+				NVL(#{SMJAHR}, ' '),
+				NVL(#{SXBLNR}, ' '),
+				NVL(#{SAPSTS}, ' '),
+				NVL(#{PTNRKY}, ' '),
+				NVL(#{NAME01}, ' '),
+				NVL(#{SLAND1}, ' '),
+				NVL(#{SBKTXT}, ' '),
+				TO_CHAR(SYSDATE,'YYYYMMDD'),
+				
+				TO_CHAR(SYSDATE,'HH24MISS'),
+				NVL(#{SES_USER_ID}, 'DEV'),
+				TO_CHAR(SYSDATE,'YYYYMMDD'),
+				TO_CHAR(SYSDATE,'HH24MISS'),
+				NVL(#{SES_USER_ID}, 'DEV'),
+				NVL(#{INDBZL}, ' '),
+				NVL(#{INDARC}, ' '),
+				0
+		)
+	</insert>
+	
+	<delete id="DL042_SHPDI_DELETE" parameterType="Map">
+		DELETE FROM SHPDI
+		WHERE SHPOKY = #{SHPOKY}
+		  AND QTALOC = 0
+		  AND QTJCMP = 0
+		  AND QTSHPC = 0
+		  AND NOT EXISTS (SELECT 1
+		                   FROM TASDI
+		                  WHERE TASDI.SHPOKY = SHPDI.SHPOKY)
+	</delete>
+	
+		<select id="DL042_SHPDH_LIST" parameterType="Map" resultType="DataMap">
+		SELECT 
+			 SHPOKY,
+			 WAREKY,
+			 SHPMTY,
+			 ALSTKY,
+			 STATDO,
+			 DOCDAT,
+			 DOCCAT,
+			 PRORTY,
+			 DOCUTY,
+			 OWNRKY,
+			 DRELIN,
+			 RQSHPD,
+			 RQARRD,
+			 RQARRT,
+			 LSHPCD,
+			 DPTNKY,
+			 PTRCVR,
+			 PGRC01,
+			 PGRC02,
+			 PGRC03,
+			 PGRC04,
+			 PGRC05,
+			 VEHINO,
+			 DRIVER,
+			 ESHPKY,
+			 OPURKY,
+			 LOCADT,
+			 LOCADK,
+			 INDDCL,
+			 RSNCOD,
+			 RSNRET,
+			 QTSHPO,
+			 QTYREF,
+			 QTAPPO,
+			 QTALOC,
+			 QTJCMP,
+			 QTSHPD,
+			 QTSHPC,
+			 USRID1,
+			 UNAME1,
+			 DEPTID1,
+			 DNAME1,
+			 USRID2,
+			 UNAME2,
+			 DEPTID2,
+			 DNAME2,
+			 USRID3,
+			 UNAME3,
+			 DEPTID3,
+			 DNAME3,
+			 USRID4,
+			 UNAME4,
+			 DEPTID4,
+			 DNAME4,
+			 DOCTXT,
+			 CREDAT,
+			 CRETIM,
+			 CREUSR,
+			 LMODAT,
+			 LMOTIM,
+			 LMOUSR,
+			 INDBZL,
+			 INDARC,
+			 UPDCHK,
+			 KEEPTS
+		 FROM SHPDH
+		 WHERE 
+			 SHPOKY in (${SHPOKY}) 
+	</select>
+	
+	<delete id="DL042_SHPDH_DELETE" parameterType="Map">
+		DELETE FROM SHPDH
+		WHERE SHPOKY = #{SHPOKY}
+		  AND NOT EXISTS (SELECT 1
+		                    FROM SHPDI
+		                   WHERE SHPDI.SHPOKY = SHPDH.SHPOKY)
+	</delete>
+	
+	<insert id="DL042_SHPDH_INSERT" parameterType="Map">
+		INSERT INTO SHPDH (
+					SHPOKY,
+					WAREKY,
+					SHPMTY,
+					ALSTKY,
+					STATDO,
+					DOCDAT,
+					DOCCAT,
+					PRORTY,
+					DOCUTY,
+					OWNRKY,
+					DRELIN,
+					RQSHPD,
+					RQARRD,
+					RQARRT,
+					LSHPCD,
+					DPTNKY,
+					PTRCVR,
+					PGRC01,
+					PGRC02,
+					PGRC03,
+					PGRC04,
+					PGRC05,
+					VEHINO,
+					DRIVER,
+					ESHPKY,
+					OPURKY,
+					LOCADT,
+					LOCADK,
+					INDDCL,
+					RSNCOD,
+					RSNRET,
+					QTSHPO,
+					QTYREF,
+					QTAPPO,
+					QTALOC,
+					QTJCMP,
+					QTSHPD,
+					QTSHPC,
+					USRID1,
+					UNAME1,
+					DEPTID1,
+					DNAME1,
+					USRID2,
+					UNAME2,
+					DEPTID2,
+					DNAME2,
+					USRID3,
+					UNAME3,
+					DEPTID3,
+					DNAME3,
+					USRID4,
+					UNAME4,
+					DEPTID4,
+					DNAME4,
+					DOCTXT,
+					CREDAT,
+					CRETIM,
+					CREUSR,
+					LMODAT,
+					LMOTIM,
+					LMOUSR,
+					INDBZL,
+					INDARC,
+					UPDCHK,
+					KEEPTS
+				) VALUES (
+					#{SHPOKY},
+					#{WAREKY},
+					NVL(#{SHPMTY}, ' '),
+					NVL(#{ALSTKY}, ' '),
+					NVL(#{STATDO}, ' '),
+					NVL(#{DOCDAT}, ' '),
+					NVL(#{DOCCAT}, ' '),
+					NVL(#{PRORTY}, ' '),
+					NVL(#{DOCUTY}, ' '),
+					NVL(#{OWNRKY}, ' '),
+					NVL(#{DRELIN}, ' '),
+					NVL(#{RQSHPD}, ' '),
+					NVL(#{RQARRD}, ' '),
+					NVL(#{RQARRT}, ' '),
+					NVL(#{LSHPCD}, ' '),
+					NVL(#{DPTNKY}, ' '),
+					NVL(#{PTRCVR}, ' '),
+					NVL(#{PGRC01}, ' '),
+					NVL(#{PGRC02}, ' '),
+					NVL(#{PGRC03}, ' '),
+					NVL(#{PGRC04}, ' '),
+					NVL(#{PGRC05}, ' '),
+					NVL(#{VEHINO}, ' '),
+					NVL(#{DRIVER}, ' '),
+					NVL(#{ESHPKY}, ' '),
+					NVL(#{OPURKY}, ' '),
+					NVL(#{LOCADT}, ' '),
+					NVL(#{LOCADK}, ' '),
+					NVL(#{INDDCL}, ' '),
+					NVL(#{RSNCOD}, ' '),
+					NVL(#{RSNRET}, ' '),
+					NVL(#{QTSHPO}, 0),
+					NVL(#{QTYREF}, 0),
+					NVL(#{QTAPPO}, 0),
+					NVL(#{QTALOC}, 0),
+					NVL(#{QTJCMP}, 0),
+					NVL(#{QTSHPD}, 0),
+					NVL(#{QTSHPC}, 0),
+					NVL(#{USRID1}, ' '),
+					NVL(#{UNAME1}, ' '),
+					NVL(#{DEPTID1}, ' '),
+					NVL(#{DNAME1}, ' '),
+					NVL(#{USRID2}, ' '),
+					NVL(#{UNAME2}, ' '),
+					NVL(#{DEPTID2}, ' '),
+					NVL(#{DNAME2}, ' '),
+					NVL(#{USRID3}, ' '),
+					NVL(#{UNAME3}, ' '),
+					NVL(#{DEPTID3}, ' '),
+					NVL(#{DNAME3}, ' '),
+					NVL(#{USRID4}, ' '),
+					NVL(#{UNAME4}, ' '),
+					NVL(#{DEPTID4}, ' '),
+					NVL(#{DNAME4}, ' '),
+					NVL(#{DOCTXT}, ' '),
+					TO_CHAR(SYSDATE,'YYYYMMDD'),
+					TO_CHAR(SYSDATE,'HH24MISS'),
+					NVL(#{SES_USER_ID}, 'DEV'),
+					TO_CHAR(SYSDATE,'YYYYMMDD'),
+					TO_CHAR(SYSDATE,'HH24MISS'),
+					NVL(#{SES_USER_ID}, 'DEV'),
+					NVL(#{INDBZL}, ' '),
+					NVL(#{INDARC}, ' '),
+					0,
+					NVL(#{KEEPTS}, ' ')
+				)
+	</insert>
+	
+	<!-- Head List 조회 -->
+	<select id="DL042_HEAD_LIST" parameterType="Map" resultType="DataMap">
+	/* DL042_HEAD_LIST */
+        SELECT
+                 STKNUM             --선적번호
+              <!--   ,TOTPICKNUM -->
+                , ( CASE 
+					WHEN COUNT(DISTINCT(CDESC1)) = 1 THEN MAX(CDESC1)
+					ELSE SUBSTR(LISTAGG(DISTINCT(CDESC1), ',') WITHIN GROUP (ORDER BY USARG1), 0, INSTR(LISTAGG(DISTINCT(CDESC1), ',') WITHIN GROUP (ORDER BY USARG1), ',') - 1) 
+				END
+				) STATDONM
+				, MAX(USARG1) AS STATDONO 
+				, CASE 
+					WHEN COUNT(DISTINCT(SHPMTY)) = 1 THEN MAX(SHPMTY) 
+					WHEN COUNT(DISTINCT(SHPMTY)) > 1 THEN MAX(SHPMTY)||' 외 '|| TO_CHAR(COUNT(DISTINCT(SHPMTY))-1, '9,999')||'건'  
+					ELSE ' ' 
+				  END AS SHPMTY
+                ,MAX(DPTNKY)   AS DPTNKY           /*납품처 관련*/
+                ,CASE WHEN COUNT(DISTINCT DPTNKYNM) = 1 THEN MAX(DPTNKYNM)
+				 ELSE MAX(DPTNKYNM)||' 외 '|| TO_CHAR(COUNT(DISTINCT DPTNKYNM)-1, '9,999')||'건'
+				 END AS DPTNKYNM
+				,CASE WHEN COUNT(DISTINCT DPTNKY) > 1 THEN 'V'
+					ELSE ' '
+				END AS DYNAMIC
+                ,VEHINO
+                ,MAX(CARNO)		AS CARNO              --차량번호
+                ,MAX(TDLNR)		AS TDLNR              --운송사코드
+                ,MAX(CARART)	AS CARART              --차종
+                ,MAX(CARTON)	AS CARTON              --톤수
+                ,MAX(DRIVER)	AS DRIVER
+                ,MAX(DRIVERCEL)	AS DRIVERCEL          --연락처
+                ,WAREKY             --거점
+                ,WAREKYNM
+                ,SAP2             	--항차번호
+                ,SIGNI              --컨테이너NO
+                ,SUM(TOT) TOT       --총중량
+                ,SUM(BOXBAG) BOXBAG --BOX/BAG
+                ,SUM(BAG) BAG       --EA/BAG
+                ,SUM(BOX) BOX       --BAG/BOX
+                ,SUM(PLT) PLT       --OX/Pallet
+                ,SUM(SOK) SOK       --속(개/BALE)
+                ,SUM(EA)  EA        --매(sheet/속)
+                ,CASE WHEN COUNT(*) - COUNT(PRTCHK) = 0 THEN 'V' ELSE NULL END AS PRTCHK            --출력여부
+                ,INDCHK
+        FROM
+        	(
+                SELECT   /*+  use_nl(SHPDH  ct vd )  */ 
+                         NVL(DECODE(SI.STKNUM, ' ', NULL, SI.STKNUM), '*'||SH.SHPOKY)  AS STKNUM        --선적번호
+                       <!--  ,NVL(TP.STKNUM, ' ')                                        AS TOTPICKNUM -->
+                        ,SH.STATDO                                                                      --문서상태      /*Detail*/
+                        ,ST.CDESC1                                                  AS CDESC1         --문서상태명    /*Detail*/
+                        ,ST.USARG1
+                        ,SH.RQSHPD                                                                      --출고예정일자
+                        ,SH.SHPMTY                                                                      --출고유형
+                        ,NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ')   AS DPTNKY           --납품처
+                        ,NVL(DECODE(SH.SHPMTY, '231', VD.NAME01, CT.NAME01), ' ')   AS DPTNKYNM         --납품처명 
+                        ,SH.VEHINO
+                        ,SH.CARNO                                                                       --차량번호
+                        ,SH.TDLNR                                                                       --운송사코드
+                        ,SH.DRIVER
+                        ,SH.DRIVERCEL                                                                   --연락처
+                        ,SH.CARART                                                                   --차량구분
+                        ,NVL(CC.CMCDVL, SH.CARTON) AS CARTON                                         --차량톤수
+                        
+                        ,SH.WAREKY                                                                      --거점
+                        ,WH.NAME01                                                  AS WAREKYNM
+                        ,DECODE(SHPMTY, '208', NVL(TRIM(SH.SAP2), ' '), ' ')		AS SAP2             --항차번호
+                        ,NVL(TRIM(SH.SIGNI), ' ')                                   AS SIGNI            --컨테이너NO
+                        , CASE WHEN COUNT(*) - COUNT(SH.PRTCHK) = 0 THEN 'V' ELSE NULL END AS PRTCHK    --출력여부
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'KG')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'KG')),'0') 
+                          END AS TOT            --총중량
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = 0 THEN 0 
+                               WHEN SUM(SI.QTALOC) = 0 THEN 0 
+                               WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BOX')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'BOX')),'0') 
+                          END AS BOXBAG			--BOX/BAG
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BAG')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'BAG')),'0') 
+                          END AS BAG            --EA/BAG
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BOX')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'BOX')),'0') 
+                          END AS BOX            --BAG/BOX
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'PAL')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'PAL')),'0') 
+                          END AS PLT            --OX/Pallet
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'SOK')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'SOK')),'0') 
+                          END AS SOK            --속(개/BALE)
+                        , CASE WHEN SUM(SI.QTSHPO-SI.QTALOC) = SUM(SI.QTSHPO) AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'EA')),'0')
+                                ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SUM(SI.QTALOC), SI.DUOMKY, 'EA')),'0') 
+                          END AS EA             --매(sheet/속)
+                        ,DT.INDCHK AS INDCHK
+               FROM SHPDH SH
+                    INNER JOIN SHPDI SI ON SI.SHPOKY = SH.SHPOKY 
+                    LEFT OUTER JOIN DOCCM DC ON DC.DOCCAT = '200'
+                    LEFT OUTER JOIN DOCTM DT ON DT.DOCCAT = DC.DOCCAT AND DT.DOCUTY = SH.SHPMTY
+                    LEFT OUTER JOIN CMCDV ST ON ST.CMCDKY = 'STATDO' AND ST.CMCDVL = SH.STATDO 
+                    LEFT OUTER JOIN CMCDV CC ON CC.CMCDKY = 'TMS_CARCLASS' AND CC.CDESC1 = SH.CARTON
+                    LEFT OUTER JOIN WAHMA WH ON WH.WAREKY = SH.WAREKY 
+                    LEFT OUTER JOIN BZPTN CT ON CT.OWNRKY = SH.OWNRKY AND CT.PTNRTY  = 'CT' AND CT.PTNRKY  = SH.DPTNKY
+                    LEFT OUTER JOIN BZPTN VD ON VD.OWNRKY = SH.OWNRKY AND VD.PTNRTY  = 'VD' AND VD.PTNRKY  = SH.PTRCVR
+                    <!-- LEFT OUTER JOIN TASTP TP ON TP.WAREKY = SH.WAREKY
+                                             AND TP.SHPOKY = SH.SHPOKY
+                                             AND TP.OWNRKY = SH.OWNRKY -->
+                WHERE	SH.WAREKY = #{WAREKY}
+                   AND  SH.OWNRKY = #{OWNRKY}
+                   -- AND	SI.SKUG05 = '20'    /* CODE:10 PS CODE:20 HL CODE:00 OT */
+                <if test="PROGID == &quot;DL041&quot;">
+				   AND SI.SKUG05 = '10'    /* CODE:10 PS CODE:00 OT */
+				</if>
+				<if test="PROGID == &quot;DL042&quot;">	
+				   AND SI.SKUG05 = '20'    /* CODE:20 HL CODE:00 OT */
+				</if>
+                   AND  SI.STATIT NOT IN('FCO')
+                <if test="PROGID == &quot;DL042&quot;">	
+                   AND   DT.DOCGRP != 'V'
+                </if>
+                <if test="SKUL01 != null and SKUL01 != ''">
+                    AND SM.SKUL01 = #{SKUL01}
+               	</if>
+                <if test="STKNUM != null and STKNUM != ''">
+                    AND SI.STKNUM = #{STKNUM}
+               	</if>
+                <if test="RANGE_SQL_1 != null and RANGE_SQL_1 != ''">
+                   AND	${RANGE_SQL_1}
+                </if>
+                   AND	SH.STATDO IN ( 'DUMMY'
+                        <if test="STAT01 == &quot;V&quot;">, 'NEW' /*미작업*/ </if>
+                        <if test="STAT02 == &quot;V&quot;">, 'PAL' /*부분할당*/</if>
+                        <if test="STAT03 == &quot;V&quot;">, 'FAL' /*할당완료*/</if>
+                        <if test="STAT04 == &quot;V&quot;">, 'PPC' /*부분피킹*/</if>
+                        <if test="STAT05 == &quot;V&quot;">, 'FPC' /*피킹완료*/</if>
+                        <if test="STAT06 == &quot;V&quot;">, 'PCK' /*부분상차*/</if>
+                        <if test="STAT07 == &quot;V&quot;">, 'FCK' /*상차완료*/</if>
+                        <if test="STAT08 == &quot;V&quot;">, 'PSH' /*부분출고*/</if>
+                        <if test="STAT09 == &quot;V&quot;">, 'FSH' /*출고완료*/</if>
+                   )
+                <if test="RCPTTY_LIST != null and RCPTTY_LIST != ''">
+                    AND SH.SHPMTY IN(${RCPTTY_LIST})
+               	</if>
+                <if test="LOTA02 != null and LOTA02 != ''">
+                    AND SI.LOTA02 = #{LOTA02}
+               	</if>
+                <if test="RQSHPDFROM != null and RQSHPDFROM != ''">
+                    AND SH.RQSHPD >= #{RQSHPDFROM}
+               	</if>
+               GROUP BY SH.SHPOKY 
+                        --,SI.SVBELN
+                        ,SI.STATIT
+                        ,SI.SKUKEY
+                        ,SI.DUOMKY
+                        
+                        ,SI.STKNUM
+                       <!--  ,TP.STKNUM -->
+                        ,SH.STATDO ,ST.CDESC1,ST.USARG1				/*Detail*/
+                        ,SH.RQSHPD
+                        ,SH.SHPMTY
+                        ,NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ')   /*납품처 관련*/
+                        ,NVL(DECODE(SH.SHPMTY, '231', VD.NAME01, CT.NAME01), ' ')   /*납품처 관련*/
+                        ,SH.VEHINO ,SH.CARNO, SH.TDLNR, SH.DRIVER, SH.DRIVERCEL, NVL(CC.CMCDVL, SH.CARTON), SH.CARART
+                        ,SH.WAREKY ,WH.NAME01
+                        ,SI.TLOTA01 ,SI.TLOTA02 ,SH.OWNRKY
+                        ,NVL(TRIM(SH.SAP2), ' ')                                    --항차번호
+                        ,SH.SIGNI
+                        ,DT.INDCHK
+            ) T
+        GROUP BY STKNUM             --선적번호
+               <!--  ,TOTPICKNUM -->
+                ,VEHINO
+                ,WAREKY             --거점
+                ,WAREKYNM
+                ,SAP2
+                ,SIGNI              --컨테이너NO
+                ,INDCHK
+        ORDER BY STKNUM DESC 
+	</select>
+	
+	<!-- Detail List 조회 -->
+	<select id="DL042_SUB_LIST" parameterType="Map" resultType="DataMap">
+	/* DL042Sub_LIST */
+        SELECT    STKNUM                            --선적번호
+                , SVBELN                            --출고오더번호/납품문서번호
+                , SHPOKY                            --출고문서번호
+                , RQSHPD                            --출하요청일자
+                , STATDO                            --문서상태      /*Detail*/
+                , STATDONM                          --문서상태명    /*Detail*/
+                , STATDONO 
+                , SHPOIT                            --아이템번호
+                , STATIT                            --아이템상태코드
+                , STATNM                            --아이템상태
+                , APPOINTPICKING                    --미작업A
+                , CHGFLG                            --미작업C
+                , STATUS_NEW                        --미작업S
+                , STATUS_ALO                        --할당
+                , STATUS_PCK                        --피킹
+                , STATUS_SHP                        --출고
+                , SKUG05                            --제품군
+                , SKUG05NM                          --제품군명
+                , SKUKEY                            --품목코드
+                , DESC01                            --품목명
+                , DPTNKY                            --납품처        /*Detail*/
+                , DPTNKYNM                          --납품처명      /*Detail*/
+                , SAPSTS                            --SAP문서유형   /*Detail*/
+                , SUM(QTSHPO) AS QTSHPO             --출고지시수량
+                , SUM(QTYORG)     AS QTYORG         --오더수량
+                , UOMKEY                            --단위
+                , SUM(QTALOC)     AS QTALOC         --할당수량
+                , SUM(QTUALO)   AS QTUALO           --미할당수량
+                , SUM(QTJCMP)     AS QTJCMP         --피킹수량
+                , SUM(QTSHPD)     AS QTSHPD         --출고수량
+                , DUOMKY
+                , NAME01
+                , SUM(TOT)       AS TOT             --총중량
+                , BOXBAG							--BOX/BAG
+                , BAG                               --EA/BAG
+                , BOX                               --BAG/BOX
+                , PLT                               --OX/Pallet
+                , SOK                               --속(개/BALE)
+                , EA                                --매(sheet/속)
+                , SKUL01                            --품목구분
+                , LOTA02                            --플랜트
+                , LOTA02NM
+                , LOTA01							--저장위치
+                , LOTA01NM
+                , SAP2								--항차번호      /*Detail*/
+                , LOTA08                            --국가코드
+                , LOTA08NM                          --국가명
+                , LOTA07                            --MTO판매번호
+                , LOTA15                            --LOT번호
+                , LOTA17                            --컨테이너유형
+                , LOTA09NM                          --거래처명MTO
+                , DOCTXT                            --비고
+                , ALSTKY                            --할당전략키
+                , PRTCHK                            --출력여부        /*Detail*/
+                , CREDAT                            --생성일자
+                , CRETIM                            --생성시간
+                , CREUSR                            --생성자ID
+                , CUSRNM                            --생성자명
+                , LMODAT                            --수정일자
+                , LMOTIM                            --수정시간
+                , LMOUSR                            --수정자ID
+                , LUSRNM                            --수정자명
+                , TLOTA01                           --TO저장위치
+                , TLOTA01NM                         --TO저장위치명
+                , TLOTA02                        	--TO플랜트
+                , TLOTA02NM                         --TO플랜트명 
+                , DOCUTYNM							--문서유형명
+                , QTUALOBOX							--미할당박스
+                , QTALOCBOX							--할당박스
+                , QTJCMPBOX							--피킹박스
+                , QTSHPDBOX							--출고박스
+FROM
+(
+        SELECT    SI.STKNUM                                                                         AS STKNUM            --선적번호
+                , SI.SVBELN                                                                         AS SVBELN            --출고오더번호/납품문서번호
+                , SI.SHPOKY                                                                         AS SHPOKY            --출고문서번호
+                , SH.RQSHPD                                                                         AS RQSHPD            --출하요청일자
+                , SH.STATDO                                                                         AS STATDO            --문서상태      /*Detail*/
+                , ST.CDESC1                                                                         AS STATDONM          --문서상태명    /*Detail*/
+                , ST.USARG1																			AS STATDONO 
+                , SI.SHPOIT                                                                         AS SHPOIT            --아이템번호
+                , SI.STATIT                                                                                              --아이템상태코드
+                , NVL((SELECT CDESC1 FROM CMCDV WHERE CMCDKY = 'STATIT' AND CMCDVL = SI.STATIT),' ') AS STATNM           --아이템상태
+                , NVL(TRIM(SI.APPOINTPICKING), ' ')                                                 AS APPOINTPICKING    --미작업A
+                , SI.CHGFLG                                                                         AS CHGFLG            --미작업C
+                , CASE WHEN SI.STATIT='NEW' THEN 'V'
+                    ELSE '' END                                                                     AS STATUS_NEW        --미작업S
+                , CASE WHEN SI.STATIT='FAL' OR SI.STATIT='PAL' THEN 'V'
+                    ELSE '' END                                                                     AS STATUS_ALO        --할당
+                , CASE WHEN SI.STATIT='FPC' OR SI.STATIT='PPC' THEN 'V'
+                    ELSE '' END                                                                     AS STATUS_PCK        --피킹
+                , CASE WHEN SI.STATIT='FSH' OR SI.STATIT='PSH' THEN 'V'
+                    ELSE '' END                                                                     AS STATUS_SHP        --출고
+                , SI.SKUG05                                                                         AS SKUG05            --제품군
+                , CD.CDESC1                                                                         AS SKUG05NM          --제품군명
+                , SI.SKUKEY                                                                         AS SKUKEY            --품목코드
+                , SI.DESC01                                                                         AS DESC01            --품목명
+                , NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ')                          AS DPTNKY            --납품처        /*Detail*/
+                , NVL(DECODE(SH.SHPMTY, '231', VD.NAME01, CT.NAME01), ' ')                          AS DPTNKYNM          --납품처명      /*Detail*/
+                , SI.SAPSTS                                                                         AS SAPSTS             --SAP문서유형  /*Detail*/
+                , SI.QTSHPO                                                                         AS QTSHPO            --출고지시수량
+                , SI.QTYORG                                                                         AS QTYORG            --오더수량
+                , SI.UOMKEY                                                                         AS UOMKEY            --단위
+                , SI.QTALOC                                                                         AS QTALOC            --할당수량
+                , (SI.QTSHPO-SI.QTALOC)                                                             AS QTUALO            --미할당수량
+                , SI.QTJCMP                                                                         AS QTJCMP            --피킹수량
+                , SI.QTSHPD                                                                         AS QTSHPD            --출고수량
+                , SI.DUOMKY                                                                         AS DUOMKY
+                , SI.NAME01                                                                         AS NAME01
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'KG')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'KG')),'0') 
+                  END AS TOT            --총중량
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = 0 THEN 0 
+              		   WHEN SI.QTALOC = 0 THEN 0 
+                	   WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BOX')),'0')
+                	   ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'BOX')),'0') 
+               	  END AS BOXBAG			--BOX/BAG
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BAG')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'BAG')),'0') 
+                  END AS BAG            --EA/BAG
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'BOX')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'BOX')),'0') 
+                  END AS BOX            --BAG/BOX
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'PAL')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'PAL')),'0') 
+                  END AS PLT            --OX/Pallet
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'SOK')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'SOK')),'0') 
+                  END AS SOK            --속(개/BALE)
+                , CASE WHEN (SI.QTSHPO-SI.QTALOC) = SI.QTSHPO AND SI.STATIT = 'NEW' THEN NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.DUOMKY, 'EA')),'0')
+                        ELSE NVL(TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.DUOMKY, 'EA')),'0') 
+                  END AS EA             --매(sheet/속)
+                , M.SKUL01 AS SKUL01                                                         --품목구분
+                , SI.LOTA02 AS LOTA02                                                        --플랜트
+                , SZF_GET_CMCDV_CDESC1_TEXT(SH.OWNRKY, 'LOTA02',SI.LOTA02)      AS LOTA02NM
+                , SI.LOTA01 AS LOTA01														--저장위치
+                , NVL(TRIM((SELECT STLNM FROM STLMA WHERE STLKY = SI.LOTA01 AND PLNTKY = SI.LOTA02 AND WAREKY = SH.WAREKY)), ' ') AS LOTA01NM
+                , NVL(TRIM(SH.SAP2), ' ')										AS SAP2		--항차번호        /*Detail*/
+                , SI.LOTA08														AS LOTA08	--국가코드
+                , SZF_GET_CMCDV_CDESC1_TEXT(SH.OWNRKY, 'NATNKY',SI.LOTA08)		AS LOTA08NM	--국가명
+                , SI.LOTA07														AS LOTA07	--MTO판매번호
+                , SI.LOTA15														AS LOTA15	--LOT번호
+                , SI.LOTA17														AS LOTA17	--컨테이너유형
+                , NVL((SELECT NAME01 FROM BZPTN WHERE OWNRKY = SH.OWNRKY AND PTNRTY = 'CT' AND PTNRKY= SI.LOTA09), ' ') AS LOTA09NM   --거래처명MTO
+                , SH.DOCTXT AS DOCTXT                                                        --비고
+                , SI.ALSTKY AS ALSTKY                                                        --할당전략키
+                , SH.PRTCHK                                                                  --출력여부
+                , SI.CREDAT AS CREDAT                                                        --생성일자
+                , SI.CRETIM AS CRETIM                                                        --생성시간
+                , SI.CREUSR AS CREUSR                                                        --생성자ID
+                , (SELECT NMLAST FROM USRMA WHERE USERID = SI.CREUSR)          AS CUSRNM     --생성자명
+                , SI.LMODAT AS LMODAT                                                        --수정일자
+                , SI.LMOTIM AS LMOTIM                                                        --수정시간
+                , SI.LMOUSR AS LMOUSR                                                        --수정자ID
+                , (SELECT NMLAST FROM USRMA WHERE USERID = SI.LMOUSR)          AS LUSRNM     --수정자명
+                , SI.TLOTA01                                                                     --TO저장위치
+                , NVL(TRIM((SELECT STLNM FROM STLMA WHERE STLKY = SI.TLOTA01 AND PLNTKY = SI.TLOTA02)), ' ') AS TLOTA01NM    --TO저장위치명
+                , SI.TLOTA02                                                                     --TO플랜트
+                , SZF_GET_CMCDV_CDESC1_TEXT(SH.OWNRKY, 'LOTA02', SI.TLOTA02) AS TLOTA02NM        --TO플랜트
+                ,(SELECT SHORTX FROM DOCTM WHERE DOCUTY = SH.DOCUTY) AS DOCUTYNM			 --문서유형명
+                ,CASE WHEN (SI.QTSHPO-SI.QTALOC) = 0  OR SI.DUOMKY != 'BAG' THEN 0 
+					  ELSE (SI.QTSHPO-SI.QTALOC) / NVL((TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.UOMKEY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, (SI.QTSHPO-SI.QTALOC), SI.UOMKEY, 'BOX'))),'0')
+				      END AS QTUALOBOX --미할당박스
+				,CASE WHEN SI.QTALOC = 0 OR SI.DUOMKY != 'BAG' THEN 0 
+		              ELSE SI.QTALOC/ NVL((TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.UOMKEY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTALOC, SI.UOMKEY, 'BOX'))),'0')
+				      END AS QTALOCBOX --할당박스
+				,CASE WHEN SI.QTJCMP = 0 OR SI.DUOMKY != 'BAG' THEN 0 
+		    		  ELSE SI.QTJCMP/ NVL((TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTJCMP, SI.UOMKEY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTJCMP, SI.UOMKEY, 'BOX'))),'0')
+				      END AS QTJCMPBOX --피킹박스
+				,CASE WHEN SI.QTSHPD = 0 OR SI.DUOMKY != 'BAG' THEN 0 
+					  ELSE SI.QTSHPD/ NVL((TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTSHPD, SI.UOMKEY, 'BAG')) / TRIM(SZF_GET_CONVERT_QTY(SH.WAREKY, SI.SKUKEY, SI.QTSHPD, SI.UOMKEY, 'BOX'))),'0')
+				       END AS QTSHPDBOX --출고박스
+        FROM SHPDI SI
+            INNER JOIN SHPDH SH ON SH.SHPOKY = SI.SHPOKY
+            LEFT OUTER JOIN BZPTN CT ON CT.OWNRKY = SH.OWNRKY 
+                                    AND CT.PTNRTY  = 'CT' 
+                                    AND CT.PTNRKY  = SH.DPTNKY
+            LEFT OUTER JOIN BZPTN VD ON VD.OWNRKY = SH.OWNRKY 
+                                    AND VD.PTNRTY  = 'VD' 
+                                    AND VD.PTNRKY  = SH.PTRCVR
+            LEFT OUTER JOIN CMCDV ST ON ST.CMCDKY = 'STATDO'
+                                    AND ST.CMCDVL = SH.STATDO
+            LEFT OUTER JOIN CMCDV CD ON CD.CMCDKY = 'SKUG05'
+                                    AND CD.CMCDVL = SI.SKUG05
+            INNER JOIN SKUMA M ON SI.SKUKEY = M.SKUKEY
+                              AND SH.OWNRKY = M.OWNRKY
+        WHERE 1=1
+        <if test="PROGID == &quot;DL041&quot;">
+		   AND SI.SKUG05 = '10'    /* CODE:10 PS CODE:00 OT */
+		</if>
+		<if test="PROGID == &quot;DL042&quot;">	
+		   AND SI.SKUG05 = '20'    /* CODE:20 HL CODE:00 OT */
+		</if>
+        --- AND SI.STATIT NOT IN('FCO')  --주문취소 제외
+        --- AND SUBSTR(SI.SHPOIT, 0, 1) != 1
+        AND SH.WAREKY = #{WAREKY}
+
+		<if test="STKNUM != null and STKNUM != ''">	
+	        <choose>
+				<when test="STKNUM != null and STKNUM != '' and STKNUM.indexOf('*') > -1">
+					AND SI.SHPOKY = REPLACE(#{STKNUM}, '*')
+				</when>
+				<otherwise>
+					AND SI.STKNUM = #{STKNUM}
+				</otherwise>
+			</choose>
+		</if>
+		<if test="SVBELN != null and SVBELN != ''">	
+		    AND SI.SVBELN = #{SVBELN}
+		</if>
+        <if test="RANGE_SQL_1 != null and RANGE_SQL_1 != ''">
+            AND ${RANGE_SQL_1}
+        </if>
+) A
+        GROUP BY (
+                  STKNUM                            --선적번호
+                , SVBELN                            --출고오더번호/납품문서번호
+                , SHPOKY                            --출고문서번호
+                , RQSHPD                            --출하요청일자
+                , STATDO                            --문서상태      /*Detail*/
+                , STATDONM                          --문서상태명    /*Detail*/
+                , STATDONO 
+                , SHPOIT                            --아이템번호
+                , STATIT                            --아이템상태코드
+                , STATNM                            --아이템상태
+                , APPOINTPICKING                    --미작업A
+                , CHGFLG                            --미작업C
+                , STATUS_NEW                        --미작업S
+                , STATUS_ALO                        --할당
+                , STATUS_PCK                        --피킹
+                , STATUS_SHP                        --출고
+                , SKUG05                            --제품군
+                , SKUG05NM                          --제품군명
+                , SKUKEY                            --품목코드
+                , DESC01                            --품목명
+                , DPTNKY                            --납품처        /*Detail*/
+                , DPTNKYNM                          --납품처명      /*Detail*/
+                , SAPSTS                            --SAP문서유형   /*Detail*/
+                , UOMKEY                              --단위
+                , DUOMKY
+                , NAME01
+				, BOXBAG							--BOX/BAG
+                , BAG                               --EA/BAG
+                , BOX                               --BAG/BOX
+                , PLT                               --OX/Pallet
+                , SOK								--속(개/BALE)
+                , EA								--매(sheet/속)
+                , SKUL01							--품목구분
+                , LOTA02							--플랜트
+                , LOTA02NM
+                , LOTA01							--저장위치
+                , LOTA01NM
+                , SAP2								--향차번호		/*Detail*/
+                , LOTA08                            --국가코드
+                , LOTA08NM                          --국가명
+                , LOTA07                            --MTO판매번호
+                , LOTA15                            --LOT번호
+                , LOTA17                            --컨테이너유형
+                , LOTA09NM                          --거래처명MTO
+                , DOCTXT                            --비고
+                , ALSTKY                            --할당전략키
+                , PRTCHK                            --출력여부		/*Detail*/
+                , CREDAT                            --생성일자
+                , CRETIM                            --생성시간
+                , CREUSR                            --생성자ID
+                , CUSRNM                            --생성자명
+                , LMODAT                            --수정일자
+                , LMOTIM                            --수정시간
+                , LMOUSR                            --수정자ID
+                , LUSRNM                            --수정자명
+                , TLOTA01                           --TO저장위치
+                , TLOTA01NM                         --TO저장위치명
+                , TLOTA02                        	--TO플랜트
+                , TLOTA02NM                         --TO플랜트명 
+                , DOCUTYNM							--문서유형명
+                , QTUALOBOX							--미할당박스
+                , QTALOCBOX							--할당박스
+                , QTJCMPBOX							--피킹박스
+                , QTSHPDBOX							--출고박스 
+        )
+        ORDER BY SVBELN, SHPOKY, SHPOIT ASC
+	</select>
+	
+	<select id="DL042POP_LIST" parameterType="Map" resultType="DataMap">
+		SELECT      A.STKNUM
+          , A.ORDCNT
+          , A.SKUCNT          
+          , A.CREDAT
+          , A.CRETIM
+          , A.CREUSR
+          , A.CUSRNM
+          , (SELECT CDESC1         
+                FROM CMCDV WHERE CMCDKY = 'STATDO' AND CMCDVL = 
+           CASE 
+           		WHEN A.STATDO LIKE '%NEW%'
+                    THEN 'NEW'
+           		WHEN A.STATDO LIKE '%PPC%' AND A.STATDO LIKE '%FPC%' 
+                    THEN 'PPC'
+                WHEN A.STATDO LIKE '%PPC%'
+                    THEN 'PPC'
+                WHEN A.STATDO LIKE '%FPC%'
+                    THEN 'FPC'
+           		WHEN A.STATDO LIKE '%PSH%' AND A.STATDO LIKE '%FSH%' 
+                    THEN 'PSH'                            
+                WHEN A.STATDO LIKE '%PSH%' 
+                    THEN 'PSH'
+                WHEN A.STATDO LIKE '%FSH%' 
+                    THEN 'FSH'
+           		WHEN A.STATDO LIKE '%PAL%' AND A.STATDO LIKE '%FAL%' 
+                    THEN 'PAL'
+                WHEN A.STATDO LIKE '%PAL%' 
+                    THEN 'PAL'
+                WHEN A.STATDO LIKE '%FAL%' 
+                    THEN 'FAL'       
+                ELSE A.STATDO    
+            END) AS STATNM
+         ,    CASE 
+           		WHEN A.STATDO LIKE '%NEW%'                 
+                    THEN 'NEW'
+           		WHEN A.STATDO LIKE '%PPC%' AND A.STATDO LIKE '%FPC%' 
+                    THEN 'PPC'
+                WHEN A.STATDO LIKE '%PPC%'
+                    THEN 'PPC'
+                WHEN A.STATDO LIKE '%FPC%'
+                    THEN 'FPC'
+           		WHEN A.STATDO LIKE '%PSH%' AND A.STATDO LIKE '%FSH%' 
+                    THEN 'PSH'                            
+                WHEN A.STATDO LIKE '%PSH%' 
+                    THEN 'PSH'
+                WHEN A.STATDO LIKE '%FSH%' 
+                    THEN 'FSH'
+           		WHEN A.STATDO LIKE '%PAL%' AND A.STATDO LIKE '%FAL%' 
+                    THEN 'PAL'
+                WHEN A.STATDO LIKE '%PAL%' 
+                    THEN 'PAL'
+                WHEN A.STATDO LIKE '%FAL%' 
+                    THEN 'FAL'       
+                ELSE A.STATDO
+            END AS STATDO   
+          
+    FROM(
+            SELECT      TP.STKNUM                                            
+                      , COUNT(DISTINCT SI.SHPOKY) OVER(PARTITION BY TP.STKNUM) AS ORDCNT
+					  , COUNT(DISTINCT SI.SKUKEY) OVER(PARTITION BY TP.STKNUM) AS SKUCNT                      , TP.CREDAT
+                      , TP.CRETIM
+                      , TP.CREUSR
+                      , (SELECT NMLAST FROM USRMA WHERE USERID =TP.CREUSR) AS CUSRNM  
+                      , LISTAGG(SH.STATDO,',') WITHIN GROUP (ORDER BY NULL) OVER (PARTITION BY  TP.STKNUM) AS STATDO
+             FROM  TASTP TP                        
+                        INNER JOIN SHPDH SH
+                        ON TP.SHPOKY = SH.SHPOKY
+                        INNER JOIN SHPDI SI
+                        ON SI.SHPOKY = TP.SHPOKY
+             WHERE 1=1           
+             	  AND SH.WAREKY = #{WAREKY}
+              <if test="SHPOKY != null and SHPOKY != ''">
+				  AND TP.SHPOKY IN (${SHPOKY})
+			  </if>
+			  
+			  <if test="RANGE_SQL != null and RANGE_SQL != ''">
+				${RANGE_SQL}
+			  </if>
+			                                  
+            ) A
+    
+    	        
+    GROUP BY    A.STKNUM
+              , A.ORDCNT
+              , A.SKUCNT
+              , A.STATDO
+              , A.CREDAT
+              , A.CRETIM
+              , A.CREUSR
+              , A.CUSRNM
+              , A.STATDO
+                
+     ORDER BY STKNUM ASC
+	</select>
+	
+	<select id="DL042H_LIST" parameterType="Map" resultType="DataMap">	<!-- reSearch -->
+		SELECT MAX(SI.SVBELN) AS SVBELN
+			    ,SH.SHPOKY AS SHPOKY
+			    ,SH.QTSHPO AS QTSHPO
+			    ,SH.QTSHPD AS QTSHPD
+			    ,SH.WAREKY
+			    ,WH.NAME01 AS WAREKYNM
+			    ,SH.STATDO
+			    ,ST.CDESC1 AS STATDONM
+			  --,' 'ALSTKY
+			    , NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ') AS DPTNKY
+			    , NVL(DECODE(SH.SHPMTY, '231', VD.NAME01, CT.NAME01), ' ') AS DPTNKYNM
+			    , SH.PTRCVR AS PTRCVR
+			    , NVL(CT.TELN01, '') AS TELNO1			    
+			  --,(SELECT NAME01 FROM BZPTN BZ WHERE PTNRTY = 'CT' AND BZ.PTNRKY = SH.DPTNKY AND BZ.OWNRKY = SH.OWNRKY AND ROWNUM = 1) AS DPTNKYNM
+			    ,SH.PTRCVR
+			    ,(SELECT NAME01 FROM BZPTN BZ WHERE PTNRTY = 'CT' AND BZ.PTNRKY = SH.PTRCVR AND BZ.OWNRKY = SH.OWNRKY AND ROWNUM = 1) AS PTRCVRNM
+			    ,SH.VEHINO
+			    ,SH.CARNO
+			    ,SH.DRIVER
+			    ,SH.DRIVERCEL
+			    ,SH.PGRC01
+			    ,SH.PGRC02
+			    ,SH.PGRC03
+			    ,SH.PGRC04
+			    ,SH.PGRC05
+			    ,' ' AS PTNBLK
+			    ,SH.OWNRKY
+			    ,(SELECT NAME01 FROM OWNER WHERE OWNER.OWNRKY = SH.OWNRKY) AS OWNRKYNM 
+			    ,SH.DOCDAT
+			    ,SH.DOCCAT
+			    ,DC.SHORTX AS DOCCATNM
+			    ,SH.SHPMTY
+			    , (SELECT SHORTX FROM DOCTM WHERE DOCUTY = SH.SHPMTY) AS SHPMTYNM
+			    ,SH.DOCUTY
+			    , (SELECT SHORTX FROM DOCTM WHERE DOCUTY = SH.DOCUTY) AS DOCUTYNM
+			    ,SH.RQSHPD
+			    ,SH.RQARRD
+			    ,SH.RQARRT
+			    ,SH.OPURKY
+			    ,SH.DOCTXT
+			    ,SH.CREDAT
+			    ,SH.CRETIM
+			    ,SH.CREUSR
+			    ,(SELECT NMLAST FROM USRMA WHERE USERID = 'DEV' AND ROWNUM =1 ) AS CUSRNM
+			    ,SH.LMODAT
+			    ,SH.LMOTIM
+			    ,SH.LMOUSR
+			    ,(SELECT NMLAST FROM USRMA WHERE USERID = 'DEV' AND ROWNUM =1 ) AS LUSRNM
+			    ,SH.USRID1
+			    ,SH.UNAME1
+			    ,SH.DEPTID1
+			    ,SH.DNAME1
+			    ,SH.USRID2
+			    ,SH.UNAME2
+			    ,SH.DEPTID2
+			    ,SH.USRID3
+			    ,SH.UNAME3
+			    ,SH.DEPTID3
+			    ,SH.USRID4
+			    ,SH.UNAME4
+			    ,SH.DEPTID4
+			    ,DT.DOCGRP AS DOCGRP
+			    ,DT.INDCHK AS INDCHK
+			    ,SI.STKNUM
+			    ,NVL(TP.STKNUM, ' ') AS TOTPICKNUM
+			    ,SI.SAPSTS
+			    ,SI.TLOTA01
+			    ,NVL(TRIM((SELECT STLNM FROM STLMA WHERE STLKY = SI.TLOTA01 AND PLNTKY = SI.TLOTA02 )), ' ') AS TLOTA01NM
+		        ,SI.TLOTA02
+		        ,SZF_GET_CMCDV_CDESC1_TEXT(SH.OWNRKY, 'LOTA02', SI.TLOTA02) AS TLOTA02NM
+			    , NVL(TRIM(SH.SAP2), ' ') AS SAP2
+		        , NVL(TRIM(SH.SIGNI), ' ') AS SIGNI
+		  FROM SHPDH SH
+				INNER JOIN SHPDI SI ON SI.SHPOKY = SH.SHPOKY
+				INNER JOIN SKUMA SM ON SI.SKUKEY = SM.SKUKEY AND SH.OWNRKY = SM.OWNRKY		
+				LEFT OUTER JOIN DOCCM DC ON DC.DOCCAT = '200'
+				LEFT OUTER JOIN DOCTM DT ON DT.DOCCAT = DC.DOCCAT 
+										AND DT.DOCUTY = SH.SHPMTY
+				LEFT OUTER JOIN CMCDV ST ON ST.CMCDKY = 'STATDO' AND ST.CMCDVL = SH.STATDO
+				LEFT OUTER JOIN WAHMA WH ON WH.WAREKY = SH.WAREKY 
+				LEFT OUTER JOIN BZPTN CT ON CT.OWNRKY = SH.OWNRKY 
+										AND CT.PTNRTY  = 'CT' 
+										AND CT.PTNRKY  = SH.DPTNKY
+			   LEFT OUTER JOIN BZPTN VD ON VD.OWNRKY = SH.OWNRKY 
+										AND VD.PTNRTY  = 'VD' 
+										AND VD.PTNRKY  = SH.PTRCVR											
+				LEFT OUTER JOIN TASTP TP
+                               ON  TP.SHPOKY =  SH.SHPOKY
+                               AND TP.OWNRKY = SH.OWNRKY   
+                               AND TP.WAREKY = SH.WAREKY
+		 WHERE	SH.WAREKY = #{WAREKY}
+		   AND  SH.OWNRKY = #{OWNRKY}
+		   AND  SI.STATIT NOT IN('FCO')
+		<if test="SHPOKY != null and SHPOKY != ''">
+		   AND SH.SHPOKY IN (${SHPOKY})
+		</if>
+		
+		<if test="PROGID == &quot;DL04&quot;">	
+		   AND   DT.DOCGRP != 'V'
+		</if>
+		
+		<if test="SKUG01 != null and SKUG01 != ''">
+            AND SM.SKUG01 = #{SKUG01}
+        </if>
+         				          
+        <if test="SKUL01 != null and SKUL01 != ''">
+            AND SM.SKUL01 = #{SKUL01}
+       	</if>	
+       	
+		<if test="RANGE_SQL != null and RANGE_SQL != ''">
+			${RANGE_SQL}
+		</if>
+		
+		   AND	SH.STATDO IN ( 'DUMMY'
+                        <if test="STAT01 == &quot;V&quot;">, 'NEW' /*미작업*/ </if>
+                        <if test="STAT02 == &quot;V&quot;">, 'PAL' /*부분할당*/</if>
+                        <if test="STAT03 == &quot;V&quot;">, 'FAL' /*할당완료*/</if>
+                        <if test="STAT04 == &quot;V&quot;">, 'PPC' /*부분피킹*/</if>
+                        <if test="STAT05 == &quot;V&quot;">, 'FPC' /*피킹완료*/</if>
+                        <if test="STAT06 == &quot;V&quot;">, 'PCK' /*부분상차*/</if>
+                        <if test="STAT07 == &quot;V&quot;">, 'FCK' /*상차완료*/</if>
+                        <if test="STAT08 == &quot;V&quot;">, 'PSH' /*부분출고*/</if>
+                        <if test="STAT09 == &quot;V&quot;">, 'FSH' /*출고완료*/</if>
+			  )
+		GROUP BY SH.SHPOKY,  SH.QTSHPO,  SH.QTSHPD,  SH.WAREKY,  WH.NAME01,
+		         SH.STATDO,  ST.CDESC1,  SH.DPTNKY,  SH.PTRCVR,  SH.VEHINO,
+		         SH.DRIVER,  SH.PGRC01,  SH.PGRC02,  SH.PGRC03,  SH.PGRC04,
+		         SH.PGRC05,  SH.OWNRKY,  SH.DOCDAT,  SH.DOCCAT,  DC.SHORTX,
+		         SH.SHPMTY,  SH.DOCUTY,  SH.RQSHPD,  SH.RQARRD,  SH.RQARRT,
+		         SH.OPURKY,  SH.DOCTXT,  SH.CREDAT,  SH.CRETIM,  SH.CREUSR,
+		         SH.LMODAT,  SH.LMOTIM,  SH.LMOUSR,  SH.USRID1,  SH.UNAME1,
+		         SH.DEPTID1, SH.DNAME1,  SH.USRID2,  SH.UNAME2,  SH.DEPTID2,
+		         SH.USRID3,  SH.UNAME3,  SH.DEPTID3, SH.USRID4,  SH.UNAME4,
+		         SH.DEPTID4, CT.NAME01,  VD.NAME01,  CT.TELN01,  DT.DOCGRP,
+		         DT.INDCHK,  SH.CARNO, SH.DRIVERCEL, SI.STKNUM,  TP.STKNUM, 
+		         SI.TLOTA01, SI.TLOTA02,  SI.SAPSTS, SH.PTRCVR, SH.SAP2, SH.SIGNI
+		ORDER BY SHPOKY DESC			
+	</select>
+	
+	<select id="DL042I_LIST" parameterType="Map" resultType="DataMap">
+		SELECT	  I.SHPOKY AS SHPOKY
+				, I.SHPOIT AS SHPOIT
+				, I.SMANDT AS SMANDT
+				, I.SVBELN AS SVBELN
+				, I.SPOSNR AS SPOSNR
+				, H.SHPMTY AS SHPMTY
+				, I.STATIT AS STATIT
+				, NVL((SELECT CDESC1 FROM CMCDV WHERE CMCDKY = 'STATIT' AND CMCDVL = I.STATIT),' ') AS STATNM
+				, I.ALSTKY AS ALSTKY
+				, H.WAREKY AS WAREKY
+				, H.OWNRKY AS OWNRKY
+				, I.STKNUM AS STKNUM
+				, I.QTYORG AS QTYORG
+				, I.QTSHPO AS QTSHPO
+				, (I.QTSHPO-I.QTALOC) AS QTUALO
+				, I.QTALOC AS QTALOC
+				, I.QTSHPD AS QTSHPD
+				, I.QTSHPC AS QTSHPC
+				, I.QTJCMP AS QTJCMP
+				, I.MEASKY AS MEASKY
+				, I.SKUKEY AS SKUKEY
+				, I.DESC01 AS DESC01
+				, I.DESC02 AS DESC02
+				, I.UOMKEY AS UOMKEY
+				, I.QTPUOM AS QTPUOM
+				, I.DUOMKY AS DUOMKY
+				, I.QTDUOM AS QTDUOM
+				, I.REFDKY AS REFDKY
+				, I.REFDIT AS REFDIT
+				, I.REFCAT AS REFCAT
+				, I.REFDAT AS REFDAT
+				, I.ASKU01 AS ASKU01
+				, I.ASKU02 AS ASKU02
+				, I.ASKU03 AS ASKU03
+				, I.ASKU04 AS ASKU04
+				, I.ASKU05 AS ASKU05
+				, I.EANCOD AS EANCOD
+				, I.GTINCD AS GTINCD
+				, I.SKUG01 AS SKUG01
+				, I.SKUG02 AS SKUG02
+				, I.SKUG03 AS SKUG03
+				, I.SKUG04 AS SKUG04
+				, I.SKUG05 AS SKUG05
+				, I.GRSWGT AS GRSWGT
+				, I.NETWGT AS NETWGT
+				, I.WGTUNT AS WGTUNT
+				, I.LENGTH AS LENGTH
+				, I.WIDTHW AS WIDTHW
+				, I.HEIGHT AS HEIGHT
+				, I.CUBICM AS CUBICM
+				, I.CAPACT AS CAPACT
+				, I.LOTA01 AS LOTA01
+				, NVL(TRIM((SELECT STLNM FROM STLMA WHERE STLKY = I.LOTA01 AND PLNTKY = I.LOTA02 AND WAREKY = H.WAREKY)), ' ') AS LOTA01NM				
+				, I.LOTA02 AS LOTA02
+				, SZF_GET_CMCDV_CDESC1_TEXT(H.OWNRKY, 'LOTA02',I.LOTA02) AS LOTA02NM				
+				, I.LOTA03 AS LOTA03
+				, I.LOTA04 AS LOTA04
+				, I.LOTA05 AS LOTA05
+				, I.LOTA06 AS LOTA06
+				, I.LOTA07 AS LOTA07
+				, I.LOTA08 AS LOTA08
+				, SZF_GET_CMCDV_CDESC1_TEXT(H.OWNRKY, 'NATNKY',I.LOTA08) AS LOTA08NM								
+				, I.LOTA09 AS LOTA09
+				, NVL((SELECT NAME01 FROM BZPTN WHERE OWNRKY = H.OWNRKY AND PTNRTY = 'CT' AND PTNRKY= I.LOTA09), ' ') AS LOTA09NM
+				, I.LOTA10 AS LOTA10
+				, I.LOTA11 AS LOTA11
+				, I.LOTA12 AS LOTA12
+				, I.LOTA13 AS LOTA13
+				, I.LOTA14 AS LOTA14
+				, I.LOTA15 AS LOTA15
+				, I.LOTA16 AS LOTA16
+				, I.LOTA17 AS LOTA17
+				, I.LOTA18 AS LOTA18
+				, I.LOTA19 AS LOTA19
+				, I.LOTA20 AS LOTA20
+				, I.ESHPKY AS ESHPKY
+				, I.ESHPIT AS ESHPIT
+				, I.REFDKY AS GRPOKY
+				, I.REFDIT AS GRPOIT
+				, CASE WHEN I.STATIT='NEW' THEN 'V'
+					ELSE ''
+					END AS STATUS_NEW
+				, CASE WHEN I.STATIT='FAL' OR I.STATIT='PAL' THEN 'V'
+					ELSE ''
+					END AS STATUS_ALO
+				, CASE WHEN I.STATIT='FPC' OR I.STATIT='PPC' THEN 'V'
+					ELSE ''
+					END AS STATUS_PCK
+				, CASE WHEN I.STATIT='FSH' OR I.STATIT='PSH' THEN 'V'
+					ELSE ''
+					END AS STATUS_SHP								 
+				, M.SKUL01 AS SKUL01
+				, H.DOCTXT AS DOCTXT							
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'KG')),'0') AS TOT
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'BAG')),'0') AS BAG
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'BOX')),'0') AS BOX
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'PAL')),'0') AS PLT
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'SOK')),'0') AS SOK
+                , NVL(TRIM(SZF_GET_CONVERT_QTY(H.WAREKY, I.SKUKEY, I.QTALOC, I.DUOMKY, 'EA')),'0') AS EA
+                , I.CREDAT AS CREDAT
+		        , I.CRETIM AS CRETIM
+		        , I.CREUSR AS CREUSR
+		        , (SELECT NMLAST FROM USRMA WHERE USERID = I.CREUSR) AS CUSRNM
+		        , I.LMODAT AS LMODAT
+		        , I.LMOTIM AS LMOTIM
+		        , I.LMOUSR AS LMOUSR
+		        , (SELECT NMLAST FROM USRMA WHERE USERID = I.LMOUSR) AS LUSRNM
+		FROM SHPDI I
+			INNER JOIN SHPDH H 
+					ON H.SHPOKY = I.SHPOKY
+			INNER JOIN SKUMA M
+                    ON I.SKUKEY = M.SKUKEY
+                    AND H.OWNRKY = M.OWNRKY
+		WHERE I.SHPOKY = #{SHPOKY}
+		AND (SUBSTR(I.SHPOIT, 0, 1) != 1)
+	</select>
+	
+	<update id="DL042_UPDATE" parameterType="Map">
+		UPDATE SHPDH SET 
+			DOCDAT = #{DOCDAT} 
+ 		WHERE 
+			SHPOKY = #{SHPOKY}
+	</update>
+	
+	<update id="DL042Sub_UPDATE" parameterType="Map">
+		UPDATE SHPDI SET 
+	 		ALSTKY = #{ALSTKY} 
+		WHERE 
+			SHPOKY = #{SHPOKY} 
+		AND SHPOIT = #{SHPOIT} 
+	</update>
+	
+	<update id="DL042HEAD_UPDATE" parameterType="Map">
+		UPDATE SHPDI
+		   SET STKNUM = #{STKNUM}
+		 WHERE SHPOKY = #{SHPOKY} 
+	</update>
+	
+	<select id="DL042HEAD_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SH.SHPOKY AS KEY,
+		       SH.SHPOKY AS SHPOKY,
+		       SIC.ITEMCNT  AS ITEMCOUNT,
+		       SH.DPTNKY AS SHIPTO,
+		       (SELECT NAME01 FROM BZPTN WHERE PTNRTY = 'CT' AND PTNRKY = SH.DPTNKY AND ROWNUM =1)  AS SHIPTONM,
+		       SH.WAREKY AS WAREKY,
+		       WH.NAME01 AS WAREKYNM,
+		       SH.STATDO AS STATDO,
+		       CV.CDESC1 AS STATDONM,
+		       SH.DRELIN AS DRELIN,
+		       SH.INDDCL AS INDDCL,
+		       SH.ALSTKY AS ALSTKY,		      
+		       NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ') AS DPTNKY,              
+			   NVL(DECODE(SH.SHPMTY, '231', VD.NAME01, CT.NAME01), ' ') AS DPTNKYNM, 										
+		       SH.PTRCVR AS PTRCVR,
+		       (SELECT NAME01 FROM BZPTN WHERE PTNRTY = 'CT' AND PTNRKY = SH.PTRCVR AND ROWNUM =1)  AS PTRCVRNM,
+		       SH.PGRC01 AS PGRC01,
+		       SH.PGRC02 AS PGRC02,
+		       SH.PGRC03 AS PGRC03,
+		       SH.PGRC04 AS PGRC04,
+		       SH.PGRC05 AS PGRC05,
+		       ' ' AS PTNBLK,
+		       SH.OWNRKY AS OWNRKY,
+		       (SELECT NAME01 FROM OWNER WHERE OWNER.OWNRKY = SH.OWNRKY) AS OWNRKYNM,
+		       SH.DOCDAT AS DOCDAT,
+		       SH.DOCCAT AS DOCCAT,
+		       DC.SHORTX AS DOCCATNM,
+		       SH.SHPMTY AS SHPMTY,
+		       (SELECT CDESC1 FROM CMCDV WHERE CMCDKY = 'SHPMTY' AND CMCDVL = SH.SHPMTY AND ROWNUM = 1) AS SHPMTYNM,
+		       SH.DOCUTY AS DOCUTY,
+		       DT.SHORTX AS DOCUTYNM,
+		       SH.RQSHPD AS RQSHPD,
+		       SH.RQARRD AS RQARRD,
+		       SH.RQARRT AS RQARRT,
+		       SH.OPURKY AS OPURKY,
+		       SI.SVBELN AS SVBELN,
+		       SH.QTAPPO AS QTAPPO,
+		       SH.LOCADT AS LOCADT,
+		       SH.LOCADK AS LOCADK,
+		       SI.TOTCBM AS TOTCBM,
+		       SH.VEHINO AS VEHINO,
+		       SH.DRIVER AS DRIVER,
+		       '' AS ALCCFM,
+		       SH.USRID1 AS USRID1,
+		       SH.UNAME1 AS UNAME1,
+		       SH.DEPTID1 AS DEPTID1,
+		       SH.DNAME1 AS DNAME1,
+		       SH.USRID2 AS USRID2,
+		       SH.UNAME2 AS UNAME2,
+		       SH.DEPTID2 AS DEPTID2,
+		       SH.DNAME2 AS DNAME2,
+		       SH.USRID3 AS USRID3,
+		       SH.UNAME3 AS UNAME3,
+		       SH.DEPTID3 AS DEPTID3,
+		       SH.DNAME3 AS DNAME3,
+		       SH.USRID4 AS USRID4,
+		       SH.UNAME4 AS UNAME4,
+		       SH.DEPTID4 AS DEPTID4,
+		       SH.DNAME4 AS DNAME4,
+		       SH.DOCTXT AS DOCTXT,
+		       SH.CREDAT AS CREDAT,
+		       SH.CRETIM AS CRETIM,
+		       SH.CREUSR AS CREUSR,
+		       (SELECT NMLAST FROM USRMA WHERE USERID = SH.CREUSR) AS CUSRNM,
+		       SH.LMODAT AS LMODAT,
+		       SH.LMOTIM AS LMOTIM,
+		       SH.LMOUSR AS LMOUSR,
+		       (SELECT NMLAST FROM USRMA WHERE USERID = SH.LMOUSR) AS LUSRNM,
+		       SI.TLOTA01,
+			   NVL(TRIM((SELECT STLNM FROM STLMA WHERE STLKY = SI.TLOTA01 AND PLNTKY = SI.TLOTA02 )), ' ') AS TLOTA01NM,
+		       SI.TLOTA02,
+		       SZF_GET_CMCDV_CDESC1_TEXT(SH.OWNRKY, 'LOTA02', SI.TLOTA02) AS TLOTA02NM,		       
+		       NVL(TRIM(SH.SAP2), ' ') AS SAP2,
+		       NVL(TRIM(SH.SIGNI), ' ') AS SIGNI
+		  FROM SHPDH SH
+		       INNER JOIN (SELECT SHPOKY AS SHPOKY,
+		                          SVBELN AS SVBELN,
+		                          STKNUM AS STKNUM,
+		                          SZMBLNO AS SZMBLNO,
+		                          SZMIPNO AS SZMIPNO,
+		                          TLOTA01 AS TLOTA01,
+		                          TLOTA02 AS TLOTA02,
+		                          ROUND(NVL(SUM(QTSHPD*CUBICM/DECODE(QTDUOM, 0, 9999999, QTDUOM)),0),3) AS TOTCBM
+		                     FROM SHPDI
+		                    GROUP BY SHPOKY, SVBELN, STKNUM, SZMBLNO, SZMIPNO, TLOTA01, TLOTA02) SI
+		               ON SH.SHPOKY = SI.SHPOKY
+		       INNER JOIN (SELECT SHPOKY, COUNT(*) AS ITEMCNT FROM SHPDI GROUP BY SHPOKY) SIC
+		               ON SH.SHPOKY = SIC.SHPOKY
+		       INNER JOIN WAHMA WH
+		               ON SH.WAREKY = WH.WAREKY
+		       INNER JOIN CMCDV CV
+		                     ON SH.STATDO = CV.CMCDVL
+		                    AND CV.CMCDKY = 'STATDO'
+		       INNER JOIN DOCCM DC
+		                     ON SH.DOCCAT = DC.DOCCAT
+		       INNER JOIN DOCTM DT
+		                     ON SH.DOCUTY = DT.DOCUTY
+		       LEFT OUTER JOIN BZPTN CT ON CT.OWNRKY = SH.OWNRKY 
+										AND CT.PTNRTY  = 'CT' 
+										AND CT.PTNRKY  = SH.DPTNKY
+			   LEFT OUTER JOIN BZPTN VD ON VD.OWNRKY = SH.OWNRKY 
+										AND VD.PTNRTY  = 'VD' 
+										AND VD.PTNRKY  = SH.PTRCVR						             
+		 WHERE SH.WAREKY = #{WAREKY}
+		<if test="PROGID == &quot;DL04&quot;">
+		   AND SH.STATDO NOT IN ('REF','PSH','FSH')
+		   AND SI.STATIT NOT IN('FCO')
+		   AND SH.INDDCL = ' '
+		</if>
+		
+		<if test="SHPOKY != null and SHPOKY != ''">
+			AND SH.SHPOKY IN ( ${SHPOKY} )
+		</if>
+		<if test="AREA != null and AREA != ''">
+		    AND SI.SZMBLNO = #{AREA}
+	    </if>
+<!-- 	    <isNotEqual property="MENUID" compareValue="DL01"> -->
+<!-- 		    <isNotEmpty property="ZONE"> -->
+<!-- 			    AND SI.SZMIPNO = #{ZONE} -->
+<!-- 		    </isNotEmpty> -->
+<!-- 	    </isNotEqual> -->
+		<if test="CLOSE == &quot;V&quot;">
+		   AND STATDO  &lt;&gt;  'REF'
+		</if>
+		<if test="RANGE_SQL != null and RANGE_SQL != ''">
+			${RANGE_SQL}
+		</if>
+		 ORDER BY SH.LOCADK, SH.SHPOKY
+	</select>
+
+	<select id="DL042_REMOVETASKKY_OBJECT" parameterType="Map" resultType="java.lang.String">
+		 SELECT TASKKY
+		  FROM TASDH
+		 WHERE TASKKY IN (SELECT TASKKY
+		                    FROM TASDI
+		                   WHERE SHPOKY = #{SHPOKY}
+		                   AND    TASKTY = 'PK'
+		                   GROUP BY TASKKY)
+		   AND TASOTY in ('210','208')
+		   AND EXISTS (SELECT 1
+		                 FROM TASDI
+		                WHERE TASDI.TASKKY = TASDH.TASKKY
+		                  AND TASDI.ACTCDT = '00000000'
+		                  AND TASKTY = 'PK')
+	</select>
+	
+	<update id="DL042_ALLOCATIONCANCLE_UPDATE" parameterType="Map">
+	<!-- 오더할당관리  -->
+		UPDATE SHPDH
+		   SET DRELIN = ' ',
+		       LMODAT = TO_CHAR(SYSDATE,'YYYYMMDD'),
+		       LMOTIM = TO_CHAR(SYSDATE,'HH24MISS'),
+		       LMOUSR = #{SES_USER_ID}
+		 WHERE 1 = 1
+		<if test="DOCUTY == 299">
+		   AND SHPOKY IN (SELECT DISTINCT SHPOKY FROM SHPDI WHERE STKNUM = #{STKNUM})
+		</if>
+		
+		   AND SHPOKY = #{SHPOKY}
+		
+	</update>
+	
+	<update id="DL042_TKNUMQNTSUB_UPDATE" parameterType="Map">
+		UPDATE IFWMS113
+		   SET N00101 = 0
+		 WHERE STKNUM = #{STKNUM}
+		   AND IFFLG IN ('Y','N')
+	</update>
+	
+	<delete id="DL042_REMOVETASDI_DELETE" parameterType="Map">
+		DELETE FROM TASDI
+		 WHERE TASKKY = #{TASKKY}
+		   AND ACTCDT = '00000000'
+		   AND TASKTY = 'PK'
+	</delete>
+	
+	<delete id="DL042_REMOVETASDH_DELETE" parameterType="Map">
+		DELETE FROM TASDH
+		 WHERE TASKKY = #{TASKKY}
+		   AND TASOTY = '210'
+		   AND NOT EXISTS (SELECT 1
+		                 FROM TASDI
+		                WHERE TASDI.TASKKY = TASDH.TASKKY
+		                  AND TASDI.ACTCDT = '00000000'
+		                  AND TASKTY = 'PK')
+	</delete>
+	
+	<select id="TMDOCCOMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT DOCUTY AS VALUE_COL 
+			 , SHORTX AS TEXT_COL
+		FROM DOCTM
+		WHERE 1 =1
+		AND DOCCAT = '200'
+		AND DOCUTY IN ('266','211','214','217','218','220')
+		ORDER BY DOCUTY	
+	</select>
+
+<!-- COMBO BOX -->
+    <select id="BWARTCOMBO_LIST" parameterType="Map" resultType="DataMap">
+	SELECT 
+		DOCUTY AS VALUE_COL
+		,SHORTX AS TEXT_COL
+	FROM 
+		DOCTM
+	WHERE  1 =1 
+	AND DOCCAT = '200'
+	AND DOCUTY IN ('211','212','214','215','216','217','218')
+	ORDER BY DOCUTY
+    </select>
+    
+    <select id="BWARTCOMBO2_LIST" parameterType="Map" resultType="DataMap">
+	SELECT DOCUTY AS VALUE_COL
+		  ,SHORTX AS TEXT_COL
+	  FROM DOCTM
+	 WHERE  1 =1 
+	   AND DOCCAT = '100'
+	   AND DOCUTY IN ('101','102')
+	ORDER BY DOCUTY
+    </select>
+    
+    <select id="BWARTCOMBO3_LIST" parameterType="Map" resultType="DataMap">
+	SELECT 
+		DOCUTY AS VALUE_COL
+		,SHORTX AS TEXT_COL
+	FROM 
+		DOCTM
+	WHERE  1 =1 
+	AND DOCCAT = '200'
+	AND DOCUTY IN ('266')
+	ORDER BY DOCUTY
+    </select>
+   
+    <select id="WARETGCOMBO3_LIST" parameterType="Map" resultType="DataMap">
+	SELECT WAREKY AS VALUE_COL ,
+			NAME01 AS TEXT_COL
+	FROM   WAHMA 
+    </select>
+    
+    <select id="LOTA05COMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SUBSTR(CMCDVL,1,2) AS VALUE_COL,
+		       CDESC1 AS TEXT_COL
+		FROM CMCDV
+		WHERE CMCDKY = 'LOTA05'
+		AND 'WSH1' LIKE USARG1
+	</select>
+	<select id="LOTA02COMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT CMCDVL AS VALUE_COL,
+		       CDESC1 AS TEXT_COL
+		FROM CMCDV
+		WHERE CMCDKY = 'LOTA02'
+		AND 'WSH1' LIKE USARG1
+		<if test="ASNDKY != null and ASNDKY != ''">
+			AND WAREKY = #{WAREKY}
+		</if>
+	</select>
+
+	<select id="WARETGval_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(*)CNT
+		FROM BZPTN
+		WHERE PTNRKY= #{PTNRKY}
+	</select>
+	
+	<select id="WARETGNAME_MAP" parameterType="Map" resultType="DataMap">
+	    SELECT NAME01 AS NAME01
+	    FROM BZPTN
+	    WHERE 1 = 1 
+	  	AND PTNRKY = #{PTNRKY}
+	  	AND ROWNUM = 1
+	</select>
+	
+	<select id="SKUCODE_MAP" parameterType="Map" resultType="DataMap">
+	    SELECT DESC01 AS DESC01 
+	   		 , DUOMKY AS UOMKEY
+	    FROM SKUMA 
+	    WHERE 1 = 1 
+	  	AND SKUKEY = #{SKUKEY}
+	  	AND OWNRKY = 'SM'
+	  	AND ROWNUM = 1
+	</select>
+	<select id="SKUval_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(*)CNT
+		  FROM SKUMA
+		   WHERE SKUKEY = #{SKUKEY}
+	</select>
+
+	<select id="DL042_ALSTKYval_MAP" parameterType="Map" resultType="DataMap">
+		SELECT  COUNT(*) CNT
+		FROM	ALSTH
+		WHERE	1 = 1
+		AND		WAREKY = #{WAREKY}
+		<!-- <isNotEmpty property="LOCAKY"> -->
+		AND		ALSTKY = #{ALSTKY}
+		<!-- </isNotEmpty> -->
+	</select>
+	
+	<select id="DL042_ALCUSval_MAP" parameterType="Map" resultType="DataMap">
+	<!-- 할당전략규칙 문서번호 조회 -->
+		SELECT  ALSTKY,
+				DOCUTY 
+	     FROM ALCUS
+		 WHERE 1 = 1
+			   AND WAREKY = #{WAREKY}
+			   AND ALSTKY = #{ALSTKY}
+		 ORDER BY ALSTKY
+	</select>
+	
+	<select id="DL042_SEARCHITEM_LIST" parameterType="Map" resultType="DataMap">
+		<!-- SELECT S.OWNRKY AS OWNRKY
+		     , S.WAREKY AS WAREKY
+		     , S.AREAKY AS AREAKY
+		     , S.ZONEKY AS ZONEKY
+		     , S.LOCAKY AS LOCAKY
+		     , S.STOKKY AS STOKKY 
+		     , S.SKUKEY AS SKUKEY 
+		     , S.ASKU01 AS ASKU01 
+		     , S.DESC01 AS DESC01 
+		     , S.DESC02 AS DESC02 
+		     , NVL(SUM(S.QTSIWH), 0) AS QTSIWH
+		     , NVL(SUM(S.QTSALO), 0) AS QTSALO
+		     , NVL(SUM(S.QTSALO), 0) AS QTINIT
+		     , S.MEASKY AS MEASKY 
+		     , S.UOMKEY AS UOMKEY 
+		     , S.TRNUID AS TRNUID 
+		     , S.LOTNUM as LOTNUM
+		     , S.LOTA01 AS LOTA01
+		     , S.LOTA02 AS LOTA02
+		     , S.LOTA03 AS LOTA03
+		     , S.LOTA04 AS LOTA04
+		     , S.LOTA05 AS LOTA05
+		     , S.LOTA06 AS LOTA06
+		     , S.LOTA07 AS LOTA07
+		     , S.LOTA08 AS LOTA08
+		     , S.LOTA09 AS LOTA09
+		     , S.LOTA10 AS LOTA10
+		     , S.LOTA11 AS LOTA11
+		     , S.LOTA12 AS LOTA12
+		     , S.LOTA13 AS LOTA13
+		     , S.LOTA14 AS LOTA14
+		     , S.LOTA15 AS LOTA15
+		     , S.LOTA16 AS LOTA16
+		     , S.LOTA17 AS LOTA17
+		     , S.LOTA18 AS LOTA18
+		     , S.LOTA19 AS LOTA19
+		     , S.LOTA20 AS LOTA20
+		     , NVL(MAX(S.QTPUOM), 0) AS QTPUOM
+		     , NVL(MAX(S.DUOMKY), ' ') AS DUOMKY
+		     , NVL(MAX(S.QTDUOM), 0) AS QTDUOM
+		     , NVL(MAX(S.PURCKY), ' ') AS PURCKY
+		     , NVL(MAX(S.PURCIT), ' ') AS PURCIT
+		     , NVL(MAX(S.ASNDKY), ' ') AS ASNDKY
+		     , NVL(MAX(S.ASNDIT), ' ') AS ASNDIT
+		     , NVL(MAX(S.RECVKY), ' ') AS RECVKY
+		     , NVL(MAX(S.RECVIT), ' ') AS RECVIT
+		     , NVL(MAX(S.GRPOKY), ' ') AS GRPOKY
+		     , NVL(MAX(S.GRPOIT), ' ') AS GRPOIT
+		     , NVL(MAX(S.SADJKY), ' ') AS SADJKY
+		     , NVL(MAX(S.SADJIT), ' ') AS SADJIT
+		     , NVL(MAX(S.SDIFKY), ' ') AS SDIFKY
+		     , NVL(MAX(S.SDIFIT), ' ') AS SDIFIT
+		     , NVL(MAX(S.PHYIKY), ' ') AS PHYIKY
+		     , NVL(MAX(S.PHYIIT), ' ') AS PHYIIT
+		     , NVL(MAX(S.ASKU02), ' ') AS ASKU02
+		     , NVL(MAX(S.ASKU03), ' ') AS ASKU03
+		     , NVL(MAX(S.ASKU04), ' ') AS ASKU04
+		     , NVL(MAX(S.ASKU05), ' ') AS ASKU05
+		     , NVL(MAX(S.EANCOD), ' ') AS EANCOD
+		     , NVL(MAX(S.GTINCD), ' ') AS GTINCD
+		     , NVL(MAX(S.SKUG01), ' ') AS SKUG01
+		     , NVL(MAX(S.SKUG02), ' ') AS SKUG02
+		     , NVL(MAX(S.SKUG03), ' ') AS SKUG03
+		     , NVL(MAX(S.SKUG04), ' ') AS SKUG04
+		     , NVL(MAX(S.SKUG05), ' ') AS SKUG05
+		     , NVL(MAX(S.GRSWGT), 0) AS GRSWGT
+		     , NVL(MAX(S.NETWGT), 0) AS NETWGT
+		     , NVL(MAX(S.WGTUNT), ' ') AS WGTUNT
+		     , NVL(MAX(S.LENGTH), 0) AS LENGTH
+		     , NVL(MAX(S.WIDTHW), 0) AS WIDTHW
+		     , NVL(MAX(S.HEIGHT), 0) AS HEIGHT
+		     , NVL(MAX(S.CUBICM), 0) AS CUBICM
+		     , NVL(MAX(S.CAPACT), 0) AS CAPACT   -->
+		SELECT DISTINCT S.OWNRKY AS OWNRKY
+		 , S.WAREKY AS WAREKY
+		 , S.AREAKY AS AREAKY
+		 , S.ZONEKY AS ZONEKY
+		 , S.LOCAKY AS LOCAKY
+		 , S.STOKKY AS STOKKY 
+		 , S.SKUKEY AS SKUKEY 
+		 , S.ASKU01 AS ASKU01 
+		 , S.DESC01 AS DESC01 
+		 , S.DESC02 AS DESC02 
+         , S.SHPOKY
+         , S.SHPOIT
+         
+		 , S.QTSIWH AS QTSIWH
+		 , S.QTSALO AS QTSALO
+		 , S.QTSALO AS QTINIT
+         , S.MEASKY AS MEASKY 
+		 , S.UOMKEY AS UOMKEY 
+		 , S.TRNUID AS TRNUID 
+		 , S.LOTNUM as LOTNUM
+		 , S.LOTA01 AS LOTA01
+		 , S.LOTA02 AS LOTA02
+		 , S.LOTA03 AS LOTA03
+		 , S.LOTA04 AS LOTA04
+		 , S.LOTA05 AS LOTA05
+		 , S.LOTA06 AS LOTA06
+		 , S.LOTA07 AS LOTA07
+		 , S.LOTA08 AS LOTA08
+		 , S.LOTA09 AS LOTA09
+		 , S.LOTA10 AS LOTA10
+		 , S.LOTA11 AS LOTA11
+		 , S.LOTA12 AS LOTA12
+		 , S.LOTA13 AS LOTA13
+		 , S.LOTA14 AS LOTA14
+		 , S.LOTA15 AS LOTA15
+		 , S.LOTA16 AS LOTA16
+		 , S.LOTA17 AS LOTA17
+		 , S.LOTA18 AS LOTA18
+		 , S.LOTA19 AS LOTA19
+		 , S.LOTA20 AS LOTA20
+		 , S.QTPUOM AS QTPUOM
+		 , S.DUOMKY AS DUOMKY
+		 , S.QTDUOM AS QTDUOM
+		 , S.PURCKY AS PURCKY
+		 , S.PURCIT AS PURCIT
+		 , S.ASNDKY AS ASNDKY
+		 , S.ASNDIT AS ASNDIT
+		 , S.RECVKY AS RECVKY
+		 , S.RECVIT AS RECVIT
+		 , S.GRPOKY AS GRPOKY
+		 , S.GRPOIT AS GRPOIT
+		 , S.SADJKY AS SADJKY
+		 , S.SADJIT AS SADJIT
+		 , S.SDIFKY AS SDIFKY
+		 , S.SDIFIT AS SDIFIT
+		 , S.PHYIKY AS PHYIKY
+		 , S.PHYIIT AS PHYIIT
+		 , S.ASKU02 AS ASKU02
+		 , S.ASKU03 AS ASKU03
+		 , S.ASKU04 AS ASKU04
+		 , S.ASKU05 AS ASKU05
+		 , S.EANCOD AS EANCOD
+		 , S.GTINCD AS GTINCD
+		 , S.SKUG01 AS SKUG01
+		 , S.SKUG02 AS SKUG02
+		 , S.SKUG03 AS SKUG03
+		 , S.SKUG04 AS SKUG04
+		 , S.SKUG05 AS SKUG05
+		 , S.GRSWGT AS GRSWGT
+		 , S.NETWGT AS NETWGT
+		 , S.WGTUNT AS WGTUNT
+		 , S.LENGTH AS LENGTH
+		 , S.WIDTHW AS WIDTHW
+		 , S.HEIGHT AS HEIGHT
+		 , S.CUBICM AS CUBICM
+		 , S.CAPACT AS CAPACT 
+		 ,(SELECT NAME01 FROM BZPTN WHERE PTNRTY = 'VD' AND PTNRKY = S.LOTA01) PTNRKY4
+         ,S.SKUG04
+		FROM   STKKY S 
+		       INNER JOIN LOCMA L ON L.WAREKY = S.WAREKY
+		                         AND L.LOCAKY = S.LOCAKY
+				INNER JOIN SHPDI DI ON DI.SKUKEY = S.SKUKEY
+		WHERE  S.WAREKY = #{WAREKY}
+		AND    S.OWNRKY = #{OWNRKY}
+		AND		S.SKUKEY = #{SKUKEY}
+		AND		S.AREAKY = #{AREA}
+		
+		AND    ( 
+					(S.QTSIWH &gt; 0 AND    S.QTSALO = 0 AND    QTSPMO = 0 AND    QTSPMI = 0 AND    QTSBLK = 0)
+		       OR   ( S.QTSIWH &gt; 0 AND    S.QTSALO &gt; 0 AND     S.SHPOKY = #{SHPOKY} AND    S.SHPOIT = #{SHPOIT}) )
+		AND    L.INDUPK = 'V'
+		
+			AND    L.STATUS = '00'
+<!-- 		AND    S.LOTA02 = #{LOTA02} -->
+<!-- 		AND    S.LOTA05 = #{LOTA05} -->
+		<if test="DOCUTY == 203">	AND    S.LOTA06 = '10'	</if>
+		<if test="DOCUTY == 204">	AND    S.LOTA06 = '10'	</if>
+		
+			
+			AND    S.LOTA06 = '00'
+			
+		
+		<if test="ASKU04 == &quot;S&quot;">
+			AND		S.LOTA02 = #{LOTA02}
+		</if>
+		<!-- GROUP BY S.OWNRKY, S.WAREKY, S.AREAKY, S.ZONEKY, S.LOCAKY, S.SKUKEY, S.ASKU01, S.DESC01
+		       , S.DESC02, S.MEASKY, S.UOMKEY, S.TRNUID, S.LOTNUM, S.LOTA01, S.LOTA02, S.LOTA03
+		       , S.LOTA04, S.LOTA05, S.LOTA06, S.LOTA07, S.LOTA08, S.LOTA09, S.LOTA10, S.LOTA11
+		       , S.LOTA12, S.LOTA13, S.LOTA14, S.LOTA15, S.LOTA16, S.LOTA17, S.LOTA18, S.LOTA19
+		       , S.LOTA20, S.STOKKY
+		ORDER BY  (CASE WHEN NVL(SUM(S.QTSALO), 0)  > 0 THEN 1 ELSE 0 END) DESC , S.LOCAKY -->
+		ORDER BY (CASE WHEN S.QTSALO &gt; 0 THEN 1 ELSE 0 END) DESC , S.LOCAKY 
+	</select>
+	
+	<select id="DL042_SEARCHITEM_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT S.STOKKY  AS STOKKY  
+		     , S.WAREKY  AS WAREKY  
+		     , S.LOTNUM  AS LOTNUM  
+		     , S.LOCAKY  AS LOCAKY  
+		     , S.TRNUID  AS TRNUID  
+		     , S.SECTID  AS SECTID  
+		     , S.PACKID  AS PACKID  
+		     , S.QTSIWH  AS QTSIWH  
+		     , S.QTSALO  AS QTSALO  
+		     , S.QTSPMO  AS QTSPMO  
+		     , S.QTSPMI  AS QTSPMI  
+		     , S.QTSBLK  AS QTSBLK  
+		     , S.QTYUOM  AS QTYUOM  
+		     , S.TRUNTY  AS TRUNTY  
+		     , S.MEASKY  AS MEASKY  
+		     , S.UOMKEY  AS UOMKEY  
+		     , S.QTPUOM  AS QTPUOM  
+		     , S.DUOMKY  AS DUOMKY  
+		     , S.QTDUOM  AS QTDUOM  
+		     , S.TKFLKY  AS TKFLKY  
+		     , S.STEPNO  AS STEPNO  
+		     , S.LSTTFL  AS LSTTFL  
+		     , S.SRCSKY  AS SRCSKY  
+		     , S.UOMDOC  AS UOMDOC  
+		     , S.CNTBSK  AS CNTBSK  
+		     , S.NUPDPS  AS NUPDPS  
+		     , S.REFDKY  AS REFDKY  
+		     , S.REFDIT  AS REFDIT  
+		     , S.REFCAT  AS REFCAT  
+		     , S.REFDAT  AS REFDAT  
+		     , S.PURCKY  AS PURCKY  
+		     , S.PURCIT  AS PURCIT  
+		     , S.ASNDKY  AS ASNDKY  
+		     , S.ASNDIT  AS ASNDIT  
+		     , S.RECVKY  AS RECVKY  
+		     , S.RECVIT  AS RECVIT  
+		     , S.SHPOKY  AS SHPOKY  
+		     , S.SHPOIT  AS SHPOIT  
+		     , S.GRPOKY  AS GRPOKY  
+		     , S.GRPOIT  AS GRPOIT  
+		     , S.TASKKY  AS TASKKY  
+		     , S.TASKIT  AS TASKIT  
+		     , S.SADJKY  AS SADJKY  
+		     , S.SADJIT  AS SADJIT  
+		     , S.SDIFKY  AS SDIFKY  
+		     , S.SDIFIT  AS SDIFIT  
+		     , S.PHYIKY  AS PHYIKY  
+		     , S.PHYIIT  AS PHYIIT  
+		     , S.OWNRKY  AS OWNRKY  
+		     , S.SKUKEY  AS SKUKEY  
+		     , S.LOTA01  AS LOTA01  
+		     , S.LOTA02  AS LOTA02  
+		     , S.LOTA03  AS LOTA03  
+		     , S.LOTA04  AS LOTA04  
+		     , S.LOTA05  AS LOTA05  
+		     , S.LOTA06  AS LOTA06  
+		     , S.LOTA07  AS LOTA07  
+		     , S.LOTA08  AS LOTA08  
+		     , S.LOTA09  AS LOTA09  
+		     , S.LOTA10  AS LOTA10  
+		     , S.LOTA11  AS LOTA11  
+		     , S.LOTA12  AS LOTA12  
+		     , S.LOTA13  AS LOTA13  
+		     , S.LOTA14  AS LOTA14  
+		     , S.LOTA15  AS LOTA15  
+		     , S.LOTA16  AS LOTA16  
+		     , S.LOTA17  AS LOTA17  
+		     , S.LOTA18  AS LOTA18  
+		     , S.LOTA19  AS LOTA19  
+		     , S.LOTA20  AS LOTA20  
+		     , S.AWMSNO  AS AWMSNO  
+		     , S.DESC01  AS DESC01  
+		     , S.DESC02  AS DESC02  
+		     , S.ASKU01  AS ASKU01  
+		     , S.ASKU02  AS ASKU02  
+		     , S.ASKU03  AS ASKU03  
+		     , S.ASKU04  AS ASKU04  
+		     , S.ASKU05  AS ASKU05  
+		     , S.EANCOD  AS EANCOD  
+		     , S.GTINCD  AS GTINCD  
+		     , S.SKUG01  AS SKUG01  
+		     , S.SKUG02  AS SKUG02  
+		     , S.SKUG03  AS SKUG03  
+		     , S.SKUG04  AS SKUG04  
+		     , S.SKUG05  AS SKUG05  
+		     , S.GRSWGT  AS GRSWGT  
+		     , S.NETWGT  AS NETWGT  
+		     , S.WGTUNT  AS WGTUNT  
+		     , S.LENGTH  AS LENGTH  
+		     , S.WIDTHW  AS WIDTHW  
+		     , S.HEIGHT  AS HEIGHT  
+		     , S.CUBICM  AS CUBICM  
+		     , S.CAPACT  AS CAPACT  
+		     , S.ZONEKY  AS ZONEKY  
+		     , S.TKZONE  AS TKZONE  
+		     , S.AREAKY  AS AREAKY  
+		     , S.SMANDT  AS SMANDT  
+		     , S.SEBELN  AS SEBELN  
+		     , S.SEBELP  AS SEBELP  
+		     , S.SZMBLNO AS SZMBLNO 
+		     , S.SZMIPNO AS SZMIPNO 
+		     , S.STRAID  AS STRAID  
+		     , S.SVBELN  AS SVBELN  
+		     , S.SPOSNR  AS SPOSNR  
+		     , S.STKNUM  AS STKNUM  
+		     , S.STPNUM  AS STPNUM  
+		     , S.SWERKS  AS SWERKS  
+		     , S.SLGORT  AS SLGORT  
+		     , S.SDATBG  AS SDATBG  
+		     , S.STDLNR  AS STDLNR  
+		     , S.SSORNU  AS SSORNU  
+		     , S.SSORIT  AS SSORIT  
+		     , S.SMBLNR  AS SMBLNR  
+		     , S.SZEILE  AS SZEILE  
+		     , S.SMJAHR  AS SMJAHR  
+		     , S.SXBLNR  AS SXBLNR  
+		     , S.SAPSTS  AS SAPSTS  
+		     , S.SBKTXT  AS SBKTXT  
+		     , S.CREDAT  AS CREDAT  
+		     , S.CRETIM  AS CRETIM  
+		     , S.CREUSR  AS CREUSR  
+		     , S.LMODAT  AS LMODAT  
+		     , S.LMOTIM  AS LMOTIM  
+		     , S.LMOUSR  AS LMOUSR  
+		  FROM STKKY S
+		       INNER JOIN (${APPENDQRY}) A
+		               ON A.WAREKY = S.WAREKY
+		              AND A.AREAKY = S.AREAKY
+		              AND A.ZONEKY = S.ZONEKY
+		              AND A.LOCAKY = S.LOCAKY
+		              AND A.OWNRKY = S.OWNRKY
+		              AND A.SKUKEY = S.SKUKEY
+		              AND A.ASKU01 = S.ASKU01
+		              AND A.MEASKY = S.MEASKY
+		              AND A.UOMKEY = S.UOMKEY
+		              AND A.TRNUID = S.TRNUID
+		              AND A.LOTNUM = S.LOTNUM
+		       INNER JOIN LOCMA L
+		               ON L.WAREKY = S.WAREKY
+		              AND L.LOCAKY = S.LOCAKY
+		 WHERE S.WAREKY = #{WAREKY}
+		   AND S.OWNRKY = #{OWNRKY}
+		   AND S.SKUKEY = #{SKUKEY}
+		   AND ( 
+		   		   (S.QTSIWH &gt; 0 AND S.QTSALO = 0 AND S.QTSPMO = 0 AND S.QTSPMI = 0 AND S.QTSBLK = 0) 
+		        OR (S.QTSIWH &gt; 0 AND S.QTSALO &gt; 0 AND S.SHPOKY = #{SHPOKY} AND S.SHPOIT = #{SHPOIT})
+		        )
+		   AND S.QTSIWH &gt; 0
+		   AND S.QTSALO = 0
+		   AND S.QTSPMO = 0
+		   AND S.QTSPMI = 0
+		   AND S.QTSBLK = 0
+		   AND S.LOTA06 = '00'
+		   AND L.INDUPK = 'V'
+		 ORDER BY S.STOKKY
+	</select>
+	
+	
+	<select id="DL042_SEARCHSHPDH_MAP" parameterType="Map" resultType="DataMap">
+		SELECT S.SHPOKY AS SHPOKY
+		     , S.WAREKY AS WAREKY
+		     , S.SHPMTY AS SHPMTY
+		     , S.ALSTKY AS ALSTKY
+		     , S.STATDO AS STATDO
+		     , S.DOCDAT AS DOCDAT
+		     , S.DOCCAT AS DOCCAT
+		     , S.DOCUTY AS DOCUTY
+		     , S.OWNRKY AS OWNRKY
+		     , S.DRELIN AS DRELIN
+		     , S.RQSHPD AS RQSHPD
+		     , S.RQARRD AS RQARRD
+		     , S.RQARRT AS RQARRT
+		     , S.LSHPCD AS LSHPCD
+		     , S.DPTNKY AS DPTNKY 
+		     , S.PTRCVR AS PTRCVR
+		     , S.PGRC01 AS PGRC01
+		     , S.PGRC02 AS PGRC02
+		     , S.PGRC03 AS PGRC03
+		     , S.PGRC04 AS PGRC04
+		     , S.PGRC05 AS PGRC05
+		     , S.VEHINO AS VEHINO
+		     , S.DRIVER AS DRIVER
+		     , S.ESHPKY AS ESHPKY
+		     , S.OPURKY AS OPURKY
+		     , S.LOCADT AS LOCADT
+		     , S.LOCADK AS LOCADK
+		     , S.INDDCL AS INDDCL
+		     , S.RSNCOD AS RSNCOD
+		     , S.RSNRET AS RSNRET
+		     , S.KEEPTS AS KEEPTS
+		     , S.USRID1 AS USRID1
+		     , S.UNAME1 AS UNAME1
+		     , S.DEPTID1 AS DEPTID1
+		     , S.DNAME1 AS DNAME1
+		     , S.USRID2 AS USRID2
+		     , S.UNAME2 AS UNAME2
+		     , S.DEPTID2 AS DEPTID2
+		     , S.DNAME2 AS DNAME2
+		     , S.USRID3 AS USRID3
+		     , S.UNAME3 AS UNAME3
+		     , S.DEPTID3 AS DEPTID3
+		     , S.DNAME3 AS DNAME3
+		     , S.USRID4 AS USRID4
+		     , S.UNAME4 AS UNAME4
+		     , S.DEPTID4 AS DEPTID4
+		     , S.DNAME4 AS DNAME4
+		     , S.DOCTXT AS DOCTXT
+		     , S.CREDAT AS CREDAT
+		     , S.CRETIM AS CRETIM
+		     , S.CREUSR AS CREUSR
+		     , S.LMODAT AS LMODAT
+		     , S.LMOTIM AS LMOTIM
+		     , S.LMOUSR AS LMOUSR
+		     , S.INDBZL AS INDBZL
+		     , S.INDARC AS INDARC
+		     , S.UPDCHK AS UPDCHK
+		FROM   SHPDH S
+		WHERE  S.SHPOKY = #{SHPOKY} 
+	</select>
+	
+	<select id="DL042_SEARCHSHPDI_MAP" parameterType="Map" resultType="DataMap">
+		SELECT S.SHPOKY AS  SHPOKY 
+		    ,  S.SHPOIT AS  SHPOIT 
+		    ,  S.STATIT AS  STATIT 
+		    ,  S.SKUKEY AS  SKUKEY 
+		    ,  S.QTYORG AS  QTYORG 
+		    ,  S.QTSHPO AS  QTSHPO 
+		    ,  S.QTYREF AS  QTYREF 
+		    ,  S.QTAPPO AS  QTAPPO 
+		    ,  S.QTALOC AS  QTALOC 
+		    ,  S.QTJCMP AS  QTJCMP 
+		    ,  S.QTSHPD AS  QTSHPD 
+		    ,  S.QTSHPC AS  QTSHPC 
+		    ,  S.QTYUOM AS  QTYUOM 
+		    ,  S.MEASKY AS  MEASKY 
+		    ,  S.UOMKEY AS  UOMKEY 
+		    ,  S.QTPUOM AS  QTPUOM 
+		    ,  S.DUOMKY AS  DUOMKY 
+		    ,  S.QTDUOM AS  QTDUOM 
+		    ,  S.SASTKY AS  SASTKY 
+		    ,  S.ALSTKY AS  ALSTKY 
+		    ,  S.TKFLKY AS  TKFLKY 
+		    ,  S.ESHPKY AS  ESHPKY 
+		    ,  S.ESHPIT AS  ESHPIT 
+		    ,  S.OPURKY AS  OPURKY 
+		    ,  S.REFDKY AS  REFDKY 
+		    ,  S.REFDIT AS  REFDIT 
+		    ,  S.REFCAT AS  REFCAT 
+		    ,  S.REFDAT AS  REFDAT 
+		    ,  S.EXSUBS AS  EXSUBS 
+		    ,  S.DESC01 AS  DESC01 
+		    ,  S.DESC02 AS  DESC02 
+		    ,  S.ASKU01 AS  ASKU01 
+		    ,  S.ASKU02 AS  ASKU02 
+		    ,  S.ASKU03 AS  ASKU03 
+		    ,  S.ASKU04 AS  ASKU04 
+		    ,  S.ASKU05 AS  ASKU05 
+		    ,  S.EANCOD AS  EANCOD 
+		    ,  S.GTINCD AS  GTINCD 
+		    ,  S.SKUG01 AS  SKUG01 
+		    ,  S.SKUG02 AS  SKUG02 
+		    ,  S.SKUG03 AS  SKUG03 
+		    ,  S.SKUG04 AS  SKUG04 
+		    ,  S.SKUG05 AS  SKUG05 
+		    ,  S.GRSWGT AS  GRSWGT 
+		    ,  S.NETWGT AS  NETWGT 
+		    ,  S.WGTUNT AS  WGTUNT 
+		    ,  S.LENGTH AS  LENGTH 
+		    ,  S.WIDTHW AS  WIDTHW 
+		    ,  S.HEIGHT AS  HEIGHT 
+		    ,  S.CUBICM AS  CUBICM 
+		    ,  S.CAPACT AS  CAPACT 
+		    ,  S.PROCHA AS  PROCHA 
+		    ,  S.AREAKY AS  AREAKY 
+		    ,  S.LOTA01 AS  LOTA01 
+		    ,  S.LOTA02 AS  LOTA02 
+		    ,  S.LOTA03 AS  LOTA03 
+		    ,  S.LOTA04 AS  LOTA04 
+		    ,  S.LOTA05 AS  LOTA05 
+		    ,  S.LOTA06 AS  LOTA06 
+		    ,  S.LOTA07 AS  LOTA07 
+		    ,  S.LOTA08 AS  LOTA08 
+		    ,  S.LOTA09 AS  LOTA09 
+		    ,  S.LOTA10 AS  LOTA10 
+		    ,  S.LOTA11 AS  LOTA11 
+		    ,  S.LOTA12 AS  LOTA12 
+		    ,  S.LOTA13 AS  LOTA13 
+		    ,  S.LOTA14 AS  LOTA14 
+		    ,  S.LOTA15 AS  LOTA15 
+		    ,  S.LOTA16 AS  LOTA16 
+		    ,  S.LOTA17 AS  LOTA17 
+		    ,  S.LOTA18 AS  LOTA18 
+		    ,  S.LOTA19 AS  LOTA19 
+		    ,  S.LOTA20 AS  LOTA20 
+		    ,  S.AWMSNO AS  AWMSNO 
+		    ,  S.SMANDT AS  SMANDT 
+		    ,  S.SEBELN AS  SEBELN 
+		    ,  S.SEBELP AS  SEBELP 
+		    ,  S.SVBELN AS  SVBELN 
+		    ,  S.SPOSNR AS  SPOSNR 
+		    ,  S.SMBLNR AS  SMBLNR 
+		    ,  S.SMJAHR AS  SMJAHR 
+		    ,  S.SZEILE AS  SZEILE 
+		    ,  S.SZMBLNO AS SZMBLNO
+		    ,  S.SZMIPNO AS SZMIPNO
+		    ,  S.STKNUM AS  STKNUM 
+		    ,  S.STPNUM AS  STPNUM 
+		    ,  S.SLGORT AS  SLGORT 
+		    ,  S.SDATBG AS  SDATBG 
+		    ,  S.SWERKS AS  SWERKS 
+		    ,  S.STDLNR AS  STDLNR 
+		    ,  S.SXBLNR AS  SXBLNR 
+		    ,  S.STRAID AS  STRAID 
+		    ,  S.SSORNU AS  SSORNU 
+		    ,  S.SSORIT AS  SSORIT 
+		    ,  S.SAPSTS AS  SAPSTS 
+		    ,  S.PTNRKY AS  PTNRKY 
+		    ,  S.NAME01 AS  NAME01 
+		    ,  S.SLAND1 AS  SLAND1 
+		    ,  S.SBKTXT AS  SBKTXT 
+		    ,  S.CREDAT AS  CREDAT 
+		    ,  S.CRETIM AS  CRETIM 
+		    ,  S.CREUSR AS  CREUSR 
+		    ,  S.LMODAT AS  LMODAT 
+		    ,  S.LMOTIM AS  LMOTIM 
+		    ,  S.LMOUSR AS  LMOUSR 
+		    ,  S.INDBZL AS  INDBZL 
+		    ,  S.INDARC AS  INDARC 
+		    ,  S.UPDCHK AS  UPDCHK 
+		FROM   SHPDI S
+		WHERE  S.SHPOKY= #{SHPOKY}
+		AND    1=1
+		<choose>
+		<when test='SAMETYPE == "N"'> 
+			AND   S.SKUKEY= #{SKUKEY}
+			AND   ROWNUM = 1
+		</when>
+		<otherwise>
+			AND   S.SHPOIT= #{SHPOIT}
+		</otherwise> 	
+		</choose>	
+	</select>
+
+	<select id="DL042_SEARCHMAXTASDH_LIST" parameterType="Map" resultType="DataMap">
+		SELECT  MAX(TASDI.TASKKY) AS TASKKY
+	       	   ,MAX(TASDI.TASKIT) AS TASKIT
+		FROM	TASDI
+		    INNER JOIN TASDH ON TASDH.TASKKY = TASDI.TASKKY
+		WHERE	1 = 1
+		AND		TASDI.SHPOKY = #{SHPOKY}
+<!-- 		AND		TASDI.SHPOIT = #{SHPOIT} -->
+		AND		TASDH.WAREKY = #{WAREKY}
+		AND		TASDI.TASKKY= #{TASKKY}				
+	</select>
+	
+	<parameterMap id="ProcMap" type="java.util.Map">
+		<parameter property="TASKKY" javaType="java.lang.String" jdbcType="VARCHAR" mode="IN"/>
+		<parameter property="TASKIT" javaType="java.lang.String" jdbcType="VARCHAR" mode="IN"/>
+		<parameter property="ERRNUM" javaType="java.lang.Long" jdbcType="DECIMAL" mode="OUT"/>
+		<parameter property="ERRMSG" javaType="java.lang.String" jdbcType="VARCHAR" mode="OUT"/>
+	</parameterMap>
+	
+	<select id="DL042_SHPDPROCALL_MAP" parameterType="Map" resultType="DataMap">
+		{ call P_TASK_COMPLETE_BY_SHPD(#{SHPOKY}, #{SES_USER_ID}) }
+	</select>
+	
+	<resultMap id="DL042_ALLOC_PROCALL_RESULT" type="hashmap"></resultMap>
+	<select id="ALLOC_PROCALL_MAP" parameterType="Map" statementType="CALLABLE">
+		{ call SZP_BATCH_ALLOCATION(#{SHPOKY}, #{SES_USER_ID}, #{result, mode=OUT, jdbcType=VARCHAR, javaType=String, resultMap=ALLOC_PROCALL_RESULT}) }
+	</select>
+
+	<!-- 할당 : 선적번호를 출고문서 번호로 변경-->
+	<select id="CONVERT_STKNUM_TO_SHPOKY_LIST" parameterType="Map" resultType="DataMap">
+		SELECT	 SI.STKNUM			--선적번호
+				,SI.SHPOKY			--출고문서번호
+				,SI.SVBELN			--출고오더번호/납품문서번호
+				,SH.RQSHPD			--출하요청일자
+--				,SI.SHPOIT			--아이템번호
+				,SI.STATIT			--아이템상태코드
+				,SH.WAREKY 
+				,NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ') AS DPTNKY	--납품처코드
+		FROM SHPDI SI
+			INNER JOIN SHPDH SH ON SH.SHPOKY = SI.SHPOKY
+			INNER JOIN SKUMA M  ON SI.SKUKEY = M.SKUKEY
+								AND SH.OWNRKY = M.OWNRKY
+		WHERE 1=1
+		AND SI.STATIT NOT IN('FCO')  --주문취소 제외
+		AND SUBSTR(SI.SHPOIT, 0, 1) != 1
+		AND SH.WAREKY = #{WAREKY}
+		<if test="LOTA02 != null and LOTA02 != ''">
+			AND SI.LOTA02 IN ${LOTA02}
+		</if>
+		<choose>
+			<when test="STKNUM != null and STKNUM != '' and STKNUM.indexOf('*') > -1">
+				AND SI.SHPOKY = REPLACE(${STKNUM}, '*')
+			</when>
+			<otherwise>
+				AND SI.STKNUM IN (${STKNUM})
+			</otherwise>
+		</choose>
+		<if test="RQSHPD_FR != null and RQSHPD_FR != '' and RQSHPD_TO != null and RQSHPD_TO != ''">
+			AND SH.RQSHPD <![CDATA[>=]]> #{RQSHPD_FR}
+			AND SH.RQSHPD <![CDATA[<=]]> #{RQSHPD_TO} 
+		</if>
+		<if test="RQSHPD != null and RQSHPD != ''">
+			AND SH.RQSHPD <![CDATA[=]]> #{RQSHPD_FR}
+		</if>
+		<choose>
+			<when test="STATDOLIST != null and STATDOLIST != ''">
+			AND	SH.STATDO IN (${STATDOLIST})             
+			</when>
+			<otherwise>
+			</otherwise> 	
+	   	</choose>
+	   	<if test="STATITLIST != null and STATITLIST != ''">
+			AND SI.STATIT IN (${STATITLIST})       
+		</if>
+<!-- 		AND	SH.STATDO IN ( 'DUMMY'
+                        <if test="STAT01 == &quot;V&quot;">, 'NEW' /*미작업*/ </if>
+                        <if test="STAT02 == &quot;V&quot;">, 'PAL' /*부분할당*/</if>
+                        <if test="STAT03 == &quot;V&quot;">, 'FAL' /*할당완료*/</if>
+                        <if test="STAT04 == &quot;V&quot;">, 'PPC' /*부분피킹*/</if>
+                        <if test="STAT05 == &quot;V&quot;">, 'FPC' /*피킹완료*/</if>
+                        <if test="STAT06 == &quot;V&quot;">, 'PCK' /*부분상차*/</if>
+                        <if test="STAT07 == &quot;V&quot;">, 'FCK' /*상차완료*/</if>
+                        <if test="STAT08 == &quot;V&quot;">, 'PSH' /*부분출고*/</if>
+                        <if test="STAT09 == &quot;V&quot;">, 'FSH' /*출고완료*/</if>
+                        ) -->
+		GROUP BY SI.STKNUM
+				,SI.SVBELN
+				,SI.SHPOKY
+				,SH.RQSHPD
+--				,SI.SHPOIT
+				,SI.STATIT
+				,NVL(DECODE(SH.SHPMTY, '231', SH.PTRCVR, SH.DPTNKY), ' ') 
+				,SH.WAREKY
+		ORDER BY SI.STKNUM, SI.SHPOKY
+	</select>
+	
+	<!-- 할당 : 실제 할당 프로스저 호출-->
+	<resultMap id="DL042_CALL_ALLO_RESULT" type="hashmap"></resultMap>
+	<select id="DL042_CALL_ALLO_MAP" parameterType="Map" statementType="CALLABLE">
+		{ call SZP_CALL_ALLOCATION(#{SHPOKY}, #{SES_USER_ID}, #{EXCEPTBARCOD}, #{result, mode=OUT, jdbcType=VARCHAR, javaType=String, resultMap=CALL_ALLO_RESULT}) }
+	</select>
+	
+<!-- 	**프로시져 error 메세지 받기 -->
+<!-- 	<parameterMap class="java.util.Map" id="ProcMap"> -->
+<!-- 		<parameter property="TASKKY" javaType="java.lang.String" jdbcType="VARCHAR" mode="IN"/> -->
+<!-- 		<parameter property="TASKIT" javaType="java.lang.String" jdbcType="VARCHAR" mode="IN"/> -->
+<!-- 		<parameter property="STOKKY" javaType="java.lang.String" jdbcType="VARCHAR" mode="IN"/> -->
+<!-- 		<parameter property="QTTAOR" javaType="java.lang.Long" jdbcType="DECIMAL" mode="IN"/> -->
+<!-- 		<parameter property="QTCOMP" javaType="java.lang.Long" jdbcType="DECIMAL" mode="IN"/> -->
+<!-- 		<parameter property="ERRNUM" javaType="java.lang.Long"   jdbcType="DECIMAL" mode="OUT"/> -->
+<!-- 		<parameter property="ERRMSG" javaType="java.lang.String" jdbcType="VARCHAR" mode="OUT"/> -->
+<!-- 	</parameterMap> -->
+	
+<!-- 	<procedure id="TASDR_PROCALL_MAP" parameterMap="ProcMap"> -->
+<!-- 	<![CDATA[ -->
+<!-- 		 { call  SZP_INS_TASDR(?,?,?,?,?,?,?) } -->
+<!-- 	]]> -->
+<!-- 	</procedure> -->
+	
+	<select id="DL042_SELECT_TASKKY_LIST" parameterType="Map" resultType="DataMap">
+		SELECT DISTINCT TASKKY FROM TASDI WHERE SHPOKY = #{SHPOKY} AND TASKTY IN ('PK')
+	</select>
+	
+	<select id="DL042_REMOVE_CHECK_LIST" parameterType="Map" resultType="DataMap">
+		SELECT * FROM TASDI WHERE TASKKY = #{TASKKY} AND STATIT NOT IN('NEW','FCN', 'FIN') AND TASKTY IN ('PK')
+	</select>
+	
+	<delete id="DL042_OMSALOCANCEL_UPDATE" parameterType="Map">
+		UPDATE OMSALO
+		SET	ALOYN = 'N'
+		WHERE (EBELN, LOTA14) IN (
+			SELECT SEBELN, LOTA14 FROM TASDI WHERE SHPOKY = #{SHPOKY} 
+			<if test="SHPOIT != null and SHPOIT != ''">		   
+				AND SHPOIT = #{SHPOIT}
+		    </if>
+		    )
+	</delete>
+	
+	<delete id="DL042_REMOVE1_DELETE" parameterType="Map">
+		DELETE FROM TASDI
+		WHERE SHPOKY = #{SHPOKY}
+		  AND TASKTY = 'PK'
+		  AND SHPOIT = #{SHPOIT}
+		  AND STATIT IN('NEW', 'FCN', 'FIN')
+	</delete>
+	
+	<delete id="DL042_REMOVE2_DELETE" parameterType="Map">
+		DELETE FROM TASDI
+		WHERE SHPOKY = #{SHPOKY}
+		AND TASKTY = 'PK'
+		AND STATIT IN('NEW', 'FCN', 'FIN')
+	</delete>
+	
+	<delete id="DL042_REMOVE3_DELETE" parameterType="Map">
+		DELETE FROM TASDH
+		WHERE TASKKY = #{TASKKY}
+		AND STATDO = 'NEW'
+	</delete>
+	
+	<select id="DL04POPBAK_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SH.WAREKY
+			 , NVL((SELECT NAME01 FROM WAHMA WHERE WAREKY = SH.WAREKY),' ') AS WARENM
+		     , SH.OWNRKY
+		     , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = SH.OWNRKY),' ') AS OWNRNM
+		     , SH.PGRC04 AS AREAKY
+		     , NVL((SELECT SHORTX FROM AREMA WHERE WAREKY = SH.WAREKY AND AREAKY = SH.PGRC04),' ') AS AREANM
+		     , SI.SKUKEY
+		     , NVL(SM.DESC01, 'None existent SKU.') AS DESC01
+		     , SH.DPTNKY
+		     , NVL((SELECT NAME01 FROM BZPTN WHERE OWNRKY = SH.OWNRKY AND PTNRTY = SH.DPTNKY AND PTNRTY = 'CT'),' ') AS DPTNNM
+		     , SH.PTRCVR
+		     , NVL((SELECT NAME01 FROM BZPTN WHERE OWNRKY = SH.OWNRKY AND PTNRTY = SH.PTRCVR AND PTNRTY = 'CT'),' ') AS PTRCNM
+		     , SH.SHPOKY
+		     , SI.SHPOIT
+		     , SI.SVBELN
+		     , SI.SPOSNR
+		     , SI.ALSTKY
+		     , NVL(TRIM(SI.LOTA13),'10000101') AS LOTA13
+		     , SI.QTSHPO
+		     , SI.QTJCMP
+		     , SI.QTSHPO - SI.QTJCMP AS QTABLE
+		     , SI.QTALOC - SI.QTJCMP AS QTALOC
+		     , SI.QTSHPO - SI.QTJCMP - SI.QTALOC AS QTUALO
+		     , SI.UOMKEY
+		  FROM SHPDH SH
+		       INNER JOIN SHPDI SI ON SI.SHPOKY = SH.SHPOKY
+		       LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = SH.OWNRKY AND SM.SKUKEY = SI.SKUKEY
+		  WHERE SH.SHPOKY = #{SHPOKY}
+		    AND SI.SHPOIT = #{SHPOIT}
+	</select>
+	
+	
+	<delete id="DL042POPREMOVE_DELETE" parameterType="Map">
+		DELETE FROM TASDI 
+		WHERE STATIT = 'NEW'
+		  AND TASKKY = #{TASKKY}
+		  AND TASKIT = #{TASKIT}
+	</delete>
+	
+	<select id="DL042_STOCK_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT * 
+		FROM (
+		    SELECT CASE WHEN NOT EXISTS ( SELECT  	NVL(SUM(QTSIWH),0)
+	                                      FROM    	STKKY
+	                                      WHERE   	WAREKY = STD.WAREKY
+	                                      AND     	LOTNUM = STD.LOTNUM
+	                                      AND     	LOCAKY = STD.LOCAKY
+	                                      AND     	TRNUID = STD.TRNUID
+	                                      AND     	PACKID = STD.PACKID
+	                                      AND     	((QTSIWH&gt;0 AND QTSPMO=0) or (QTSIWH&gt;0 AND TASKKY =STD.TASKKY AND TASKIT=STD.TASKIT))   
+	                                      HAVING NVL(SUM(QTSIWH),0) &gt;= STD.QTTAOR
+	                                     )
+		                THEN 'IN_M0138†' || STD.LOTNUM || '/' || STD.LOCAKY|| '/' || STD.TRNUID || '/' || TO_CHAR(STD.QTTAOR) || '/'
+		                				 || ( SELECT  	TO_CHAR(NVL(SUM(QTSIWH),0))
+		                                      FROM    	STKKY
+		                                      WHERE   	WAREKY = STD.WAREKY
+		                                      AND     	LOTNUM = STD.LOTNUM
+		                                      AND     	LOCAKY = STD.LOCAKY
+		                                      AND     	TRNUID = STD.TRNUID
+		                                      AND     	PACKID = STD.PACKID
+		                                      AND     	((QTSIWH&gt;0 AND QTSPMO=0) or (QTSIWH&gt;0 AND TASKKY =STD.TASKKY AND TASKIT=STD.TASKIT)) ) 
+		                ELSE 'OK'
+				        END AS RESULTMSG                                      
+		    FROM (  ${APPEND_QUERY}   ) STD
+		)
+		WHERE	RESULTMSG != 'OK'
+		AND		ROWNUM = 1
+	</select>
+
+	<select id="DL042_MANUALALLOCATE_AVAILABLE_STOCK_LIST" parameterType="Map" resultType="DataMap">
+		SELECT S.STOKKY  AS "STOKKY",
+		       S.WAREKY  AS "WAREKY",
+		       S.LOTNUM  AS "LOTNUM",
+		       S.LOCAKY  AS "LOCAKY",
+		       S.TRNUID  AS "TRNUID",
+		       S.SECTID  AS "SECTID",
+		       S.PACKID  AS "PACKID",
+		       S.QTSIWH  AS "QTSIWH",
+		       S.QTSALO  AS "QTSALO",
+		       S.QTSPMO  AS "QTSPMO",
+		       S.QTSPMI  AS "QTSPMI",
+		       S.QTSBLK  AS "QTSBLK",
+		       S.QTYUOM  AS "QTYUOM",
+		       S.TRUNTY  AS "TRUNTY",
+		       S.MEASKY  AS "MEASKY",
+		       S.UOMKEY  AS "UOMKEY",
+		       S.QTPUOM  AS "QTPUOM",
+		       S.DUOMKY  AS "DUOMKY",
+		       S.QTDUOM  AS "QTDUOM",
+		       S.TKFLKY  AS "TKFLKY",
+		       S.STEPNO  AS "STEPNO",
+		       S.LSTTFL  AS "LSTTFL",
+		       S.SRCSKY  AS "SRCSKY",
+		       S.UOMDOC  AS "UOMDOC",
+		       S.CNTBSK  AS "CNTBSK",
+		       S.NUPDPS  AS "NUPDPS",
+		       S.REFDKY  AS "REFDKY",
+		       S.REFDIT  AS "REFDIT",
+		       S.REFCAT  AS "REFCAT",
+		       S.REFDAT  AS "REFDAT",
+		       S.PURCKY  AS "PURCKY",
+		       S.PURCIT  AS "PURCIT",
+		       S.ASNDKY  AS "ASNDKY",
+		       S.ASNDIT  AS "ASNDIT",
+		       S.RECVKY  AS "RECVKY",
+		       S.RECVIT  AS "RECVIT",
+		       S.SHPOKY  AS "SHPOKY",
+		       S.SHPOIT  AS "SHPOIT",
+		       S.GRPOKY  AS "GRPOKY",
+		       S.GRPOIT  AS "GRPOIT",
+		       S.TASKKY  AS "TASKKY",
+		       S.TASKIT  AS "TASKIT",
+		       S.SADJKY  AS "SADJKY",
+		       S.SADJIT  AS "SADJIT",
+		       S.SDIFKY  AS "SDIFKY",
+		       S.SDIFIT  AS "SDIFIT",
+		       S.PHYIKY  AS "PHYIKY",
+		       S.PHYIIT  AS "PHYIIT",
+		       S.OWNRKY  AS "OWNRKY",
+		       S.SKUKEY  AS "SKUKEY",
+		       S.LOTA01  AS "LOTA01",
+		       S.LOTA02  AS "LOTA02",
+		       S.LOTA03  AS "LOTA03",
+		       S.LOTA04  AS "LOTA04",
+		       S.LOTA05  AS "LOTA05",
+		       S.LOTA06  AS "LOTA06",
+		       S.LOTA07  AS "LOTA07",
+		       S.LOTA08  AS "LOTA08",
+		       S.LOTA09  AS "LOTA09",
+		       S.LOTA10  AS "LOTA10",
+		       S.LOTA11  AS "LOTA11",
+		       S.LOTA12  AS "LOTA12",
+		       S.LOTA13  AS "LOTA13",
+		       S.LOTA14  AS "LOTA14",
+		       S.LOTA15  AS "LOTA15",
+		       S.LOTA16  AS "LOTA16",
+		       S.LOTA17  AS "LOTA17",
+		       S.LOTA18  AS "LOTA18",
+		       S.LOTA19  AS "LOTA19",
+		       S.LOTA20  AS "LOTA20",
+		       S.AWMSNO  AS "AWMSNO",
+		       S.DESC01  AS "DESC01",
+		       S.DESC02  AS "DESC02",
+		       S.ASKU01  AS "ASKU01",
+		       S.ASKU02  AS "ASKU02",
+		       S.ASKU03  AS "ASKU03",
+		       S.ASKU04  AS "ASKU04",
+		       S.ASKU05  AS "ASKU05",
+		       S.EANCOD  AS "EANCOD",
+		       S.GTINCD  AS "GTINCD",
+		       S.SKUG01  AS "SKUG01",
+		       S.SKUG02  AS "SKUG02",
+		       S.SKUG03  AS "SKUG03",
+		       S.SKUG04  AS "SKUG04",
+		       S.SKUG05  AS "SKUG05",
+		       S.GRSWGT  AS "GRSWGT",
+		       S.NETWGT  AS "NETWGT",
+		       S.WGTUNT  AS "WGTUNT",
+		       S.LENGTH  AS "LENGTH",
+		       S.WIDTHW  AS "WIDTHW",
+		       S.HEIGHT  AS "HEIGHT",
+		       S.CUBICM  AS "CUBICM",
+		       S.CAPACT  AS "CAPACT",
+		       S.ZONEKY  AS "ZONEKY",
+		       S.TKZONE  AS "TKZONE",
+		       S.AREAKY  AS "AREAKY",
+		       S.SMANDT  AS "SMANDT",
+		       S.SEBELN  AS "SEBELN",
+		       S.SEBELP  AS "SEBELP",
+		       S.SZMBLNO AS "SZMBLNO",
+		       S.SZMIPNO AS "SZMIPNO",
+		       S.STRAID  AS "STRAID",
+		       S.SVBELN  AS "SVBELN",
+		       S.SPOSNR  AS "SPOSNR",
+		       S.STKNUM  AS "STKNUM",
+		       S.STPNUM  AS "STPNUM",
+		       S.SWERKS  AS "SWERKS",
+		       S.SLGORT  AS "SLGORT",
+		       S.SDATBG  AS "SDATBG",
+		       S.STDLNR  AS "STDLNR",
+		       S.SSORNU  AS "SSORNU",
+		       S.SSORIT  AS "SSORIT",
+		       S.SMBLNR  AS "SMBLNR",
+		       S.SZEILE  AS "SZEILE",
+		       S.SMJAHR  AS "SMJAHR",
+		       S.SXBLNR  AS "SXBLNR",
+		       S.SAPSTS  AS "SAPSTS",
+		       S.SBKTXT  AS "SBKTXT",
+		       S.CREDAT  AS "CREDAT",
+		       S.CRETIM  AS "CRETIM",
+		       S.CREUSR  AS "CREUSR",
+		       S.LMODAT  AS "LMODAT",
+		       S.LMOTIM  AS "LMOTIM",
+		       S.LMOUSR  AS "LMOUSR",
+		       NVL((SELECT SYSLOC FROM DOCTM WHERE DOCUTY = #{SHPMTY}), ' ') AS "LOCATG"
+		  FROM STKKY S
+		       INNER JOIN LOCMA L
+		               ON L.WAREKY = S.WAREKY
+		              AND L.LOCAKY = S.LOCAKY
+		 WHERE S.OWNRKY = #{OWNRKY}
+		   AND S.WAREKY = #{WAREKY}
+		   AND S.LOCAKY = NVL(TRIM(#{LOCAKY}), ' ')
+		   AND S.SKUKEY = NVL(TRIM(#{SKUKEY}), ' ')
+		   AND S.TRNUID = NVL(TRIM(#{TRNUID}), ' ') 		   		  
+		   AND S.PACKID = NVL(TRIM(#{PACKID}), ' ')
+		   AND S.QTSIWH &gt; 0
+		   AND S.QTSALO = 0
+		   AND S.QTSPMO = 0
+		   AND S.QTSPMI = 0
+		   AND S.QTSBLK = 0
+		   AND S.LOTA06 = '00'
+		   AND L.INDUPK = 'V'
+		   AND L.STATUS = '00'
+		   
+		   <if test="LOTNUM != null and LOTNUM != ''">		   
+			AND S.LOTNUM = NVL(TRIM(#{LOTNUM}), ' ')
+		   </if>
+		   
+		   <if test="STOKKY != null and STOKKY != ''">		   
+			AND S.STOKKY = #{STOKKY}
+		   </if>
+		   <if test="BARCOD != null and BARCOD != ''">		   
+			AND S.LOTA14 = #{BARCOD}
+		   </if>
+		   
+		   AND ROWNUM =1
+		 ORDER BY S.STOKKY
+	</select>
+	
+	<select id="TASK_AVAILABLE_STOCK_LIST" parameterType="Map" resultType="DataMap">
+	SELECT   
+		       TB.WAREKY  AS "WAREKY",
+		       TB.LOTNUM  AS "LOTNUM",
+		       TB.LOCAKY  AS "LOCAKY",
+		       TB.TRNUID  AS "TRNUID",
+		       TB.SECTID  AS "SECTID",
+		       TB.PACKID  AS "PACKID",
+		       SUM(TB.QTSIWH)  AS "QTSIWH",
+		       SUM(TB.QTSALO)  AS "QTSALO",
+		       SUM(TB.QTSPMO)  AS "QTSPMO",
+		       SUM(TB.QTSPMI)  AS "QTSPMI",
+		       SUM(TB.QTSBLK)  AS "QTSBLK",
+		       SUM(TB.QTYUOM)  AS "QTYUOM",
+		       TB.TRUNTY  AS "TRUNTY",
+		       TB.MEASKY  AS "MEASKY",
+		       TB.UOMKEY  AS "UOMKEY",
+		       TB.QTPUOM  AS "QTPUOM",
+		       TB.DUOMKY  AS "DUOMKY",
+		       TB.QTDUOM  AS "QTDUOM",
+		       TB.TKFLKY  AS "TKFLKY",
+		       TB.STEPNO  AS "STEPNO",
+		       TB.LSTTFL  AS "LSTTFL",
+		       TB.UOMDOC  AS "UOMDOC",
+		       TB.CNTBSK  AS "CNTBSK",
+		       TB.NUPDPS  AS "NUPDPS",
+		       TB.REFDKY  AS "REFDKY",
+		       TB.REFDIT  AS "REFDIT",
+		       TB.REFCAT  AS "REFCAT",
+		       TB.REFDAT  AS "REFDAT",
+		       TB.PURCKY  AS "PURCKY",
+		       TB.PURCIT  AS "PURCIT",
+		       TB.ASNDKY  AS "ASNDKY",
+		       TB.ASNDIT  AS "ASNDIT",
+		       TB.RECVKY  AS "RECVKY",
+		       TB.RECVIT  AS "RECVIT",
+		       TB.SHPOKY  AS "SHPOKY",
+		       TB.SHPOIT  AS "SHPOIT",
+		       TB.GRPOKY  AS "GRPOKY",
+		       TB.GRPOIT  AS "GRPOIT",
+		       TB.TASKKY  AS "TASKKY",
+		       TB.TASKIT  AS "TASKIT",
+		       TB.SADJKY  AS "SADJKY",
+		       TB.SADJIT  AS "SADJIT",
+		       TB.SDIFKY  AS "SDIFKY",
+		       TB.SDIFIT  AS "SDIFIT",
+		       TB.PHYIKY  AS "PHYIKY",
+		       TB.PHYIIT  AS "PHYIIT",
+		       TB.OWNRKY  AS "OWNRKY",
+		       TB.SKUKEY  AS "SKUKEY",
+		       TB.LOTA01  AS "LOTA01",
+		       TB.LOTA02  AS "LOTA02",
+		       TB.LOTA03  AS "LOTA03",
+		       TB.LOTA04  AS "LOTA04",
+		       TB.LOTA05  AS "LOTA05",
+		       TB.LOTA06  AS "LOTA06",
+		       TB.LOTA07  AS "LOTA07",
+		       TB.LOTA08  AS "LOTA08",
+		       TB.LOTA09  AS "LOTA09",
+		       TB.LOTA10  AS "LOTA10",
+		       TB.LOTA11  AS "LOTA11",
+		       TB.LOTA12  AS "LOTA12",
+		       TB.LOTA13  AS "LOTA13",
+		       TB.LOTA14  AS "LOTA14",
+		       TB.LOTA15  AS "LOTA15",
+		       TB.LOTA16  AS "LOTA16",
+		       TB.LOTA17  AS "LOTA17",
+		       TB.LOTA18  AS "LOTA18",
+		       TB.LOTA19  AS "LOTA19",
+		       TB.LOTA20  AS "LOTA20",
+		       TB.AWMSNO  AS "AWMSNO",
+		       TB.DESC01  AS "DESC01",
+		       TB.DESC02  AS "DESC02",
+		       TB.ASKU01  AS "ASKU01",
+		       TB.ASKU02  AS "ASKU02",
+		       TB.ASKU03  AS "ASKU03",
+		       TB.ASKU04  AS "ASKU04",
+		       TB.ASKU05  AS "ASKU05",
+		       TB.EANCOD  AS "EANCOD",
+		       TB.GTINCD  AS "GTINCD",
+		       TB.SKUG01  AS "SKUG01",
+		       TB.SKUG02  AS "SKUG02",
+		       TB.SKUG03  AS "SKUG03",
+		       TB.SKUG04  AS "SKUG04",
+		       TB.SKUG05  AS "SKUG05",
+		       TB.GRSWGT  AS "GRSWGT",
+		       TB.NETWGT  AS "NETWGT",
+		       TB.WGTUNT  AS "WGTUNT",
+		       TB.LENGTH  AS "LENGTH",
+		       TB.WIDTHW  AS "WIDTHW",
+		       TB.HEIGHT  AS "HEIGHT",
+		       TB.CUBICM  AS "CUBICM",
+		       TB.CAPACT  AS "CAPACT",
+		       TB.ZONEKY  AS "ZONEKY",
+		       TB.TKZONE  AS "TKZONE",
+		       TB.AREAKY  AS "AREAKY",
+		       TB.SMANDT  AS "SMANDT",
+		       TB.SEBELN  AS "SEBELN",
+		       TB.SEBELP  AS "SEBELP",
+		       TB.SZMBLNO AS "SZMBLNO",
+		       TB.SZMIPNO AS "SZMIPNO",
+		       TB.STRAID  AS "STRAID",
+		       TB.SVBELN  AS "SVBELN",
+		       TB.SPOSNR  AS "SPOSNR",
+		       TB.STKNUM  AS "STKNUM",
+		       TB.STPNUM  AS "STPNUM",
+		       TB.SWERKS  AS "SWERKS",
+		       TB.SLGORT  AS "SLGORT",
+		       TB.SDATBG  AS "SDATBG",
+		       TB.STDLNR  AS "STDLNR",
+		       TB.SSORNU  AS "SSORNU",
+		       TB.SSORIT  AS "SSORIT",
+		       TB.SMBLNR  AS "SMBLNR",
+		       TB.SZEILE  AS "SZEILE",
+		       TB.SMJAHR  AS "SMJAHR",
+		       TB.SXBLNR  AS "SXBLNR",
+		       TB.SAPSTS  AS "SAPSTS",
+		       TB.SBKTXT  AS "SBKTXT"
+
+FROM(
+		SELECT S.STOKKY  AS "STOKKY",
+		       S.WAREKY  AS "WAREKY",
+		       S.LOTNUM  AS "LOTNUM",
+		       S.LOCAKY  AS "LOCAKY",
+		       S.TRNUID  AS "TRNUID",
+		       S.SECTID  AS "SECTID",
+		       S.PACKID  AS "PACKID",
+		       S.QTSIWH  AS "QTSIWH",
+		       S.QTSALO  AS "QTSALO",
+		       S.QTSPMO  AS "QTSPMO",
+		       S.QTSPMI  AS "QTSPMI",
+		       S.QTSBLK  AS "QTSBLK",
+		       S.QTYUOM  AS "QTYUOM",
+		       S.TRUNTY  AS "TRUNTY",
+		       S.MEASKY  AS "MEASKY",
+		       S.UOMKEY  AS "UOMKEY",
+		       S.QTPUOM  AS "QTPUOM",
+		       S.DUOMKY  AS "DUOMKY",
+		       S.QTDUOM  AS "QTDUOM",
+		       S.TKFLKY  AS "TKFLKY",
+		       S.STEPNO  AS "STEPNO",
+		       S.LSTTFL  AS "LSTTFL",
+		       S.SRCSKY  AS "SRCSKY",
+		       S.UOMDOC  AS "UOMDOC",
+		       S.CNTBSK  AS "CNTBSK",
+		       S.NUPDPS  AS "NUPDPS",
+		       S.REFDKY  AS "REFDKY",
+		       S.REFDIT  AS "REFDIT",
+		       S.REFCAT  AS "REFCAT",
+		       S.REFDAT  AS "REFDAT",
+		       S.PURCKY  AS "PURCKY",
+		       S.PURCIT  AS "PURCIT",
+		       S.ASNDKY  AS "ASNDKY",
+		       S.ASNDIT  AS "ASNDIT",
+		       S.RECVKY  AS "RECVKY",
+		       S.RECVIT  AS "RECVIT",
+		       S.SHPOKY  AS "SHPOKY",
+		       S.SHPOIT  AS "SHPOIT",
+		       S.GRPOKY  AS "GRPOKY",
+		       S.GRPOIT  AS "GRPOIT",
+		       S.TASKKY  AS "TASKKY",
+		       S.TASKIT  AS "TASKIT",
+		       S.SADJKY  AS "SADJKY",
+		       S.SADJIT  AS "SADJIT",
+		       S.SDIFKY  AS "SDIFKY",
+		       S.SDIFIT  AS "SDIFIT",
+		       S.PHYIKY  AS "PHYIKY",
+		       S.PHYIIT  AS "PHYIIT",
+		       S.OWNRKY  AS "OWNRKY",
+		       S.SKUKEY  AS "SKUKEY",
+		       S.LOTA01  AS "LOTA01",
+		       S.LOTA02  AS "LOTA02",
+		       S.LOTA03  AS "LOTA03",
+		       S.LOTA04  AS "LOTA04",
+		       S.LOTA05  AS "LOTA05",
+		       S.LOTA06  AS "LOTA06",
+		       S.LOTA07  AS "LOTA07",
+		       S.LOTA08  AS "LOTA08",
+		       S.LOTA09  AS "LOTA09",
+		       S.LOTA10  AS "LOTA10",
+		       S.LOTA11  AS "LOTA11",
+		       S.LOTA12  AS "LOTA12",
+		       S.LOTA13  AS "LOTA13",
+		       S.LOTA14  AS "LOTA14",
+		       S.LOTA15  AS "LOTA15",
+		       S.LOTA16  AS "LOTA16",
+		       S.LOTA17  AS "LOTA17",
+		       S.LOTA18  AS "LOTA18",
+		       S.LOTA19  AS "LOTA19",
+		       S.LOTA20  AS "LOTA20",
+		       S.AWMSNO  AS "AWMSNO",
+		       S.DESC01  AS "DESC01",
+		       S.DESC02  AS "DESC02",
+		       S.ASKU01  AS "ASKU01",
+		       S.ASKU02  AS "ASKU02",
+		       S.ASKU03  AS "ASKU03",
+		       S.ASKU04  AS "ASKU04",
+		       S.ASKU05  AS "ASKU05",
+		       S.EANCOD  AS "EANCOD",
+		       S.GTINCD  AS "GTINCD",
+		       S.SKUG01  AS "SKUG01",
+		       S.SKUG02  AS "SKUG02",
+		       S.SKUG03  AS "SKUG03",
+		       S.SKUG04  AS "SKUG04",
+		       S.SKUG05  AS "SKUG05",
+		       S.GRSWGT  AS "GRSWGT",
+		       S.NETWGT  AS "NETWGT",
+		       S.WGTUNT  AS "WGTUNT",
+		       S.LENGTH  AS "LENGTH",
+		       S.WIDTHW  AS "WIDTHW",
+		       S.HEIGHT  AS "HEIGHT",
+		       S.CUBICM  AS "CUBICM",
+		       S.CAPACT  AS "CAPACT",
+		       S.ZONEKY  AS "ZONEKY",
+		       S.TKZONE  AS "TKZONE",
+		       S.AREAKY  AS "AREAKY",
+		       S.SMANDT  AS "SMANDT",
+		       S.SEBELN  AS "SEBELN",
+		       S.SEBELP  AS "SEBELP",
+		       S.SZMBLNO AS "SZMBLNO",
+		       S.SZMIPNO AS "SZMIPNO",
+		       S.STRAID  AS "STRAID",
+		       S.SVBELN  AS "SVBELN",
+		       S.SPOSNR  AS "SPOSNR",
+		       S.STKNUM  AS "STKNUM",
+		       S.STPNUM  AS "STPNUM",
+		       S.SWERKS  AS "SWERKS",
+		       S.SLGORT  AS "SLGORT",
+		       S.SDATBG  AS "SDATBG",
+		       S.STDLNR  AS "STDLNR",
+		       S.SSORNU  AS "SSORNU",
+		       S.SSORIT  AS "SSORIT",
+		       S.SMBLNR  AS "SMBLNR",
+		       S.SZEILE  AS "SZEILE",
+		       S.SMJAHR  AS "SMJAHR",
+		       S.SXBLNR  AS "SXBLNR",
+		       S.SAPSTS  AS "SAPSTS",
+		       S.SBKTXT  AS "SBKTXT",
+		       S.CREDAT  AS "CREDAT",
+		       S.CRETIM  AS "CRETIM",
+		       S.CREUSR  AS "CREUSR",
+		       S.LMODAT  AS "LMODAT",
+		       S.LMOTIM  AS "LMOTIM",
+		       S.LMOUSR  AS "LMOUSR",
+		       NVL((SELECT SYSLOC FROM DOCTM WHERE DOCUTY = #{SHPMTY}), ' ') AS "LOCATG"
+		  FROM STKKY S
+		       INNER JOIN LOCMA L
+		               ON L.WAREKY = S.WAREKY
+		              AND L.LOCAKY = S.LOCAKY
+		       INNER JOIN TASDR TR 
+                       ON TR.STOKKY = S.STOKKY        
+		 WHERE S.OWNRKY = #{OWNRKY}
+		   AND S.WAREKY = #{WAREKY}
+		   AND S.LOCAKY = NVL(TRIM(#{LOCAKY}), ' ')
+		   AND S.SKUKEY = NVL(TRIM(#{SKUKEY}), ' ')
+		   AND S.TRNUID = NVL(TRIM(#{TRNUID}), ' ') 		   		  
+		   AND S.PACKID = NVL(TRIM(#{PACKID}), ' ')
+		   AND S.QTSIWH &gt; 0
+		   AND S.QTSALO > 0
+
+		   <if test="LOTNUM != null and LOTNUM != ''">		   
+			AND S.LOTNUM = NVL(TRIM(#{LOTNUM}), ' ')
+		   </if>
+		   
+		   <if test="STOKKY != null and STOKKY != ''">		   
+			AND S.STOKKY = #{STOKKY}
+		   </if>
+		   <if test="TASKKY != null and TASKKY != ''">		   
+			AND S.TASKKY = #{TASKKY}
+		   </if>
+		   <if test="TASKIT != null and TASKIT != ''">		   
+			AND S.TASKIT = #{TASKIT}
+		   </if>
+		   <if test="BARCOD != null and BARCOD != ''">		   
+			AND S.LOTA14 = #{BARCOD}
+		   </if>
+		
+		 ORDER BY S.STOKKY
+		 ) TB
+         
+         GROUP BY TB.WAREKY 
+					,TB.LOTNUM 
+					,TB.LOCAKY 
+					,TB.TRNUID 
+					,TB.SECTID 
+					,TB.PACKID 
+					,TB.TRUNTY 
+					,TB.MEASKY 
+					,TB.UOMKEY 
+					,TB.QTPUOM 
+					,TB.DUOMKY 
+					,TB.QTDUOM 
+					,TB.TKFLKY 
+					,TB.STEPNO 
+					,TB.LSTTFL 
+					,TB.UOMDOC 
+					,TB.CNTBSK 
+					,TB.NUPDPS 
+					,TB.REFDKY 
+					,TB.REFDIT 
+					,TB.REFCAT 
+					,TB.REFDAT 
+					,TB.PURCKY 
+					,TB.PURCIT 
+					,TB.ASNDKY 
+					,TB.ASNDIT 
+					,TB.RECVKY 
+					,TB.RECVIT 
+					,TB.SHPOKY 
+					,TB.SHPOIT 
+					,TB.GRPOKY 
+					,TB.GRPOIT 
+					,TB.TASKKY 
+					,TB.TASKIT 
+					,TB.SADJKY 
+					,TB.SADJIT 
+					,TB.SDIFKY 
+					,TB.SDIFIT 
+					,TB.PHYIKY 
+					,TB.PHYIIT 
+					,TB.OWNRKY 
+					,TB.SKUKEY 
+					,TB.LOTA01 
+					,TB.LOTA02 
+					,TB.LOTA03 
+					,TB.LOTA04 
+					,TB.LOTA05 
+					,TB.LOTA06 
+					,TB.LOTA07 
+					,TB.LOTA08 
+					,TB.LOTA09 
+					,TB.LOTA10 
+					,TB.LOTA11 
+					,TB.LOTA12 
+					,TB.LOTA13 
+					,TB.LOTA14 
+					,TB.LOTA15 
+					,TB.LOTA16 
+					,TB.LOTA17 
+					,TB.LOTA18 
+					,TB.LOTA19 
+					,TB.LOTA20 
+					,TB.AWMSNO 
+					,TB.DESC01 
+					,TB.DESC02 
+					,TB.ASKU01 
+					,TB.ASKU02 
+					,TB.ASKU03 
+					,TB.ASKU04 
+					,TB.ASKU05 
+					,TB.EANCOD 
+					,TB.GTINCD 
+					,TB.SKUG01 
+					,TB.SKUG02 
+					,TB.SKUG03 
+					,TB.SKUG04 
+					,TB.SKUG05 
+					,TB.GRSWGT 
+					,TB.NETWGT 
+					,TB.WGTUNT 
+					,TB.LENGTH 
+					,TB.WIDTHW 
+					,TB.HEIGHT 
+					,TB.CUBICM 
+					,TB.CAPACT 
+					,TB.ZONEKY 
+					,TB.TKZONE 
+					,TB.AREAKY 
+					,TB.SMANDT 
+					,TB.SEBELN 
+					,TB.SEBELP 
+					,TB.SZMBLNO
+					,TB.SZMIPNO
+					,TB.STRAID 
+					,TB.SVBELN 
+					,TB.SPOSNR 
+					,TB.STKNUM 
+					,TB.STPNUM 
+					,TB.SWERKS 
+					,TB.SLGORT 
+					,TB.SDATBG 
+					,TB.STDLNR 
+					,TB.SSORNU 
+					,TB.SSORIT 
+					,TB.SMBLNR 
+					,TB.SZEILE 
+					,TB.SMJAHR 
+					,TB.SXBLNR 
+					,TB.SAPSTS 
+					,TB.SBKTXT 
+	</select>
+
+	<select id="DL042_SEARCHTASDIALL_LIST" parameterType="Map" resultType="DataMap">
+		SELECT 
+			T.TASKKY,
+			T.TASKIT,
+			T.TASKTY,
+			T.RSNCOD,
+			T.STATIT,
+			T.QTTAOR,
+			T.QTCOMP,
+			T.OWNRKY,
+			T.SKUKEY,
+			T.LOTNUM,
+			T.ACTCDT,
+			T.ACTCTI,
+			T.QTYUOM,
+			T.TKFLKY,
+			T.STEPNO,
+			T.LSTTFL,
+			T.LOCASR,
+			T.SECTSR,
+			T.PAIDSR,
+			T.TRNUSR,
+			T.STRUTY,
+			T.SMEAKY,
+			T.SUOMKY,
+			T.QTSPUM,
+			T.SDUOKY,
+			T.QTSDUM,
+			T.LOCATG,
+			T.SECTTG,
+			T.PAIDTG,
+			T.TRNUTG,
+			T.TTRUTY,
+			T.TMEAKY,
+			T.TUOMKY,
+			T.QTTPUM,
+			T.TDUOKY,
+			T.QTTDUM,
+			T.LOCAAC,
+			T.SECTAC,
+			T.PAIDAC,
+			T.TRNUAC,
+			T.ATRUTY,
+			T.AMEAKY,
+			T.AUOMKY,
+			T.QTAPUM,
+			T.ADUOKY,
+			T.QTADUM,
+			T.REFDKY,
+			T.REFDIT,
+			T.REFCAT,
+			T.REFDAT,
+			T.PURCKY,
+			T.PURCIT,
+			T.ASNDKY,
+			T.ASNDIT,
+			T.RECVKY,
+			T.RECVIT,
+			T.SHPOKY,
+			T.SHPOIT,
+			T.GRPOKY,
+			T.GRPOIT,
+			T.SADJKY,
+			T.SADJIT,
+			T.SDIFKY,
+			T.SDIFIT,
+			T.PHYIKY,
+			T.PHYIIT,
+			T.DROPID,
+			T.DESC01,
+			T.DESC02,
+			T.ASKU01,
+			T.ASKU02,
+			T.ASKU03,
+			T.ASKU04,
+			T.ASKU05,
+			T.EANCOD,
+			T.GTINCD,
+			T.SKUG01,
+			T.SKUG02,
+			T.SKUG03,
+			T.SKUG04,
+			T.SKUG05,
+			T.GRSWGT,
+			T.NETWGT,
+			T.WGTUNT,
+			T.LENGTH,
+			T.WIDTHW,
+			T.HEIGHT,
+			T.CUBICM,
+			T.CAPACT,
+			T.WORKID,
+			T.WORKNM,
+			T.HHTTID,
+			T.AREAKY,
+			T.LOTA01,
+			T.LOTA02,
+			T.LOTA03,
+			T.LOTA04,
+			T.LOTA05,
+			T.LOTA06,
+			T.LOTA07,
+			T.LOTA08,
+			T.LOTA09,
+			T.LOTA10,
+			T.LOTA11,
+			T.LOTA12,
+			T.LOTA13,
+			T.LOTA14,
+			T.LOTA15,
+			T.LOTA16,
+			T.LOTA17,
+			T.LOTA18,
+			T.LOTA19,
+			T.LOTA20,
+			T.AWMSNO,
+			T.AWMSTS,
+			T.SMANDT,
+			T.SEBELN,
+			T.SEBELP,
+			T.SZMBLNO,
+			T.SZMIPNO,
+			T.STRAID,
+			T.SVBELN,
+			T.SPOSNR,
+			T.STKNUM,
+			T.STPNUM,
+			T.SWERKS,
+			T.SLGORT,
+			T.SDATBG,
+			T.STDLNR,
+			T.SSORNU,
+			T.SSORIT,
+			T.SMBLNR,
+			T.SZEILE,
+			T.SMJAHR,
+			T.SXBLNR,
+			T.SAPSTS,
+			T.DOORKY,
+			T.PTLT01,
+			T.PTLT02,
+			T.PTLT03,
+			T.PTLT04,
+			T.PTLT05,
+			T.PTLT06,
+			T.PTLT07,
+			T.PTLT08,
+			T.PTLT09,
+			T.PTLT10,
+			T.PTLT11,
+			T.PTLT12,
+			T.PTLT13,
+			T.PTLT14,
+			T.PTLT15,
+			T.PTLT16,
+			T.PTLT17,
+			T.PTLT18,
+			T.PTLT19,
+			T.PTLT20,
+			T.PASTKY,
+			T.ALSTKY,
+			T.SBKTXT,
+			T.TASRSN,
+			T.CREDAT,
+			T.CRETIM,
+			T.CREUSR,
+			T.LMODAT,
+			T.LMOTIM,
+			T.LMOUSR,
+			T.INDBZL,
+			T.INDARC,
+			T.UPDCHK
+		FROM TASDI T
+		WHERE T.SHPOKY = #{SHPOKY}
+		AND	  T.SHPOIT = #{SHPOIT}
+		AND	  T.TASKKY = #{TASKKY}
+		<if test="TASKIT != null and TASKIT != ''">
+		AND	  T.TASKIT = #{TASKIT}
+		</if>
+		AND	  T.STATIT != 'FCN'		
+	</select>
+	
+	<select id="DL042_CLOSING_SHIPMENT_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT *
+		  FROM (
+		         SELECT CASE WHEN SH.STATDO IN ('PAL','FAL')
+		                          THEN 'OUT_M0155†' || STD.SHPOKY
+		                     WHEN SH.STATDO IN ('PPC','FPC')
+		                          THEN 'OUT_M0156†' || STD.SHPOKY
+		                     WHEN SH.STATDO IN ('PSH','FSH')
+		                          THEN 'OUT_M0157†' || STD.SHPOKY
+		                     WHEN SH.STATDO IN ('CLS')
+		                          THEN 'OUT_M0158†' || STD.SHPOKY
+		                     ELSE 'OK'
+		                  END AS RESULTMSG
+		           FROM (
+		                  ${APPEND_QUERY}
+		                ) STD
+		                INNER JOIN SHPDH SH ON SH.SHPOKY = STD.SHPOKY
+		       )
+		 WHERE RESULTMSG != 'OK'
+	</select>
+	
+	<update id="DL042_CLOSING_SHIPMENT_UPDATE" parameterType="Map">
+		UPDATE SHPDH
+		   SET STATDO = 'CLS'
+		     , LMODAT = TO_CHAR(SYSDATE,'YYYYMMDD')
+		     , LMOTIM = TO_CHAR(SYSDATE,'HH24MISS')
+		     , LMOUSR = #{SES_USER_ID} 
+		 WHERE SHPOKY = #{SHPOKY}
+		   AND STATDO = 'NEW'
+	</update>
+	
+	<select id="VEHINOVal_MAP" parameterType="Map" resultType="DataMap">
+		SELECT	
+			VEHITY
+		FROM	VEHMA
+		WHERE	1 = 1
+		AND		VEHINO = #{VEHINO}
+	</select>
+	
+	<select id="VEHINO_COMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT VEHIID AS VALUE_COL
+		    ,  VEHINO AS TEXT_COL
+		FROM VEHMA
+		ORDER BY VEHIID, VEHINO 
+	</select>
+
+	<!-- SVBELN체크 -->
+	<select id="IFWMS113CHK_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) CNT
+		  FROM SHPDI X
+		       INNER JOIN SHPDH Y ON Y.SHPOKY = X.SHPOKY
+		 WHERE X.SVBELN = #{SVBELN}
+		   AND X.STATIT != 'FCN'
+		   AND Y.STATDO != 'FCN'
+		   AND Y.DOCUTY = NVL(TRIM(#{DOCUTY}),Y.DOCUTY)
+	</select>  
+
+	<select id="DL042_ALLOC_ITEM_PROCALL_MAP" parameterType="Map" resultType="DataMap">
+		{ call SZP_BATCH_ALLOCATION_ITEM(#{SHPOKY}, #{SHPOIT}, #{SES_USER_ID}) }
+	</select>
+	
+	<!-- TOTAL_PICKING_DUPLICATE OBJECT-->	
+	<select id="TOTAL_PICKING_DUPLICATE_CHECK_OBJECT" parameterType="Map" resultType="java.lang.String">
+		 SELECT DISTINCT            
+             SHPOKY
+         FROM 
+	         TASTP
+	     WHERE 1=1	
+	     <if test="SHPOKY != null and SHPOKY != ''">
+	     AND SHPOKY = #{SHPOKY}
+		</if>
+	</select>
+	
+	<!-- TOTAL_PICKING_STKNUM OBJECT -->	
+	<select id="TOTAL_PICKING_STKNUM_OBJECT" resultType="Map">
+		SELECT NVL(MAX(STKNUM)+1,CONCAT( TO_CHAR(SYSDATE, 'YYYYMMDD'), CONCAT('0000', NVL(COUNT(*), 0)+1))) AS STKNUM
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS CREDAT
+			 , TO_CHAR(SYSDATE,'HH24MISS') AS CRETIM
+		FROM 
+			(
+			SELECT CREDAT
+				, STKNUM
+			FROM TASTP
+              WHERE CREDAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+              GROUP BY CREDAT, STKNUM
+	        )
+	</select>
+	
+	<!-- TOTAL_PICKING_CREATE INSERT -->
+	<insert id="TOTAL_PICKING_CREATE_INSERT" parameterType="Map">
+		INSERT INTO TASTP(
+				  STKNUM
+				, ORDDAT
+				, OWNRKY
+				, WAREKY
+				, SHPOKY
+				, CREDAT
+				, CRETIM
+				, CREUSR
+						)
+		SELECT    #{STKNUM}
+				, TO_CHAR(SYSDATE,'YYYYMMDD') AS ORDDAT
+				, SH.OWNRKY
+				, SH.WAREKY
+				, SH.SHPOKY
+				, #{CREDAT}
+		        , #{CRETIM}
+				, #{SES_USER_ID} AS CREUSR
+		FROM SHPDH SH
+		WHERE SH.SHPOKY = #{SHPOKY}		
+	</insert>	
+	
+	<!-- TOTAL_PICKING_DELETE DELETE-->
+	<delete id="TOTAL_PICKING_DELETE_DELETE" parameterType="Map">
+		DELETE TASTP  
+		WHERE STKNUM = #{STKNUM}		 	
+	</delete>	
+	
+	<select id="SEARCHMAXSHPOIT_LIST" parameterType="Map" resultType="DataMap">
+		  SELECT
+		   		 NVL(SUBSTR(MAX(NVL(SHPOIT,0)), 2,6),0) AS SHPOIT
+          FROM SHPDI 
+          WHERE	1 = 1
+				AND	SHPOKY = #{SHPOKY}
+				AND SUBSTR(SHPOIT,0,1) = 1
+	</select>			
+	
+	<!-- 할당 취소시 SHPDI update -->
+	<update id="DL042_SHPDI_UPDATE" parameterType="Map">
+		<selectKey resultType="string" keyProperty="WAREKY" order="BEFORE">
+			SELECT WAREKY FROM SHPDH WHERE SHPOKY = #{SHPOKY}
+		</selectKey>
+		UPDATE SHPDI
+		   SET LMODAT = TO_CHAR(SYSDATE,'YYYYMMDD')
+			 , LMOTIM = TO_CHAR(SYSDATE,'HH24MISS')
+			 , LMOUSR = #{SES_USER_ID}			
+			 , STATIT = CASE WHEN QTYORG = 0 THEN 'FCO'
+			 				 ELSE STATIT
+			 			END	
+			 , QTSHPO = SZF_GET_CONVERT_QTY(#{WAREKY}, SKUKEY, QTYORG, UOMKEY, DUOMKY)
+			 , QTYUOM = SZF_GET_CONVERT_QTY(#{WAREKY}, SKUKEY, QTYORG, UOMKEY, DUOMKY)
+			 , QTPUOM = SZF_GET_CONVERT_QTY(#{WAREKY}, SKUKEY, 1, UOMKEY, DUOMKY)
+			 , CHGFLG = CASE WHEN STATIT = 'FCO' THEN CHGFLG
+			 				 ELSE ' '
+			 			END	 	 		
+			 , KEEPIT = #{KEEPIT}  
+			 			 				   
+		 WHERE SHPOKY = #{SHPOKY}		
+		<if test="SHPOIT != '' and SHPOIT != null">  
+		   AND SHPOIT = #{SHPOIT}
+		</if>  		   	
+			  
+		AND SUBSTR(SHPOIT,0,1) != 1 
+	</update>
+	
+	<!-- 할당 취소시 SHPDH update -->
+	<update id="DL042_SHPDH_UPDATE" parameterType="Map">
+		UPDATE SHPDH
+		   SET LMODAT = TO_CHAR(SYSDATE,'YYYYMMDD')
+			 , LMOTIM = TO_CHAR(SYSDATE,'HH24MISS')
+			 , LMOUSR = #{SES_USER_ID}
+			 , KEEPTS = ' '
+			 			<!-- CASE WHEN (SELECT SUM(NVL(SI.QTYORG, 0)) FROM SHPDI SI WHERE SI.SHPOKY = #{SHPOKY} AND SUBSTR(SI.SHPOIT,0,1) != 1)  = 0  
+			 					   AND KEEPTS != ' 'THEN ' '
+			 				 ELSE KEEPTS
+			 			END -->	 
+ 			, STATDO = CASE WHEN (SELECT SUM(SI.QTYORG) FROM SHPDI SI WHERE SI.SHPOKY = #{SHPOKY} AND SUBSTR(SI.SHPOIT,0,1) != 1 )  = 0  
+			 					AND KEEPTS != ' ' THEN 'OCN'
+			 				ELSE STATDO
+			 			END	
+		 WHERE SHPOKY = #{SHPOKY}
+	</update>
+
+	<select id="DL042_DEALKY_OBJECT" resultType="int">
+		SELECT NVL(MAX(DEALKY), 0) + 1 FROM DEALH
+	</select>
+	
+	<insert id="DL042_DEALH_MULTI_INSERT" parameterType="Map">
+		INSERT INTO DEALH (
+			  DEALKY
+			, TKNUM
+			, KUNNR
+			, KUNAG
+			, STCD2_A, TELF2_A, NAME1_A, J1KFREPRE_A, ADDR_A, J_1KFTIND_A, J_1KFTBUS_A
+			, STCD2_B, TELF2_B, NAME1_B, J1KFREPRE_B, ADDR_B, J_1KFTIND_B, J_1KFTBUS_B
+			, KUNWE_T, KUNWE_TEL, KUNWE_ADDR
+			, KVGR1
+			, DRIVE_INFO
+			, DRIVERCEL
+			, MEMO1
+			, MEMO2
+			, PERNE_INFO
+			, CBM
+			, FSC
+			, CONFIRM
+			, LOGSEQNO
+			, CREDAT, CRETIM, CREUSR
+			, LMODAT, LMOTIM, LMOUSR
+		)
+		<foreach collection="list" item="i" separator=" UNION ALL " open="" close="">
+			SELECT #{i.DEALKY}
+				 , NVL(#{i.TKNUM}, ' ')
+				 , NVL(SUBSTR(LPAD(TRIM(#{i.KUNNR}), 10, '0'), 5, 6), ' ')
+				 , NVL(SUBSTR(LPAD(TRIM(#{i.KUNAG}), 10, '0'), 5, 6), ' ')
+				 , NVL(#{i.STCD2_A}, ' '), NVL(#{i.TELF2_A}, ' '), NVL(#{i.NAME1_A}, ' '), NVL(#{i.J1KFREPRE_A}, ' '), NVL(#{i.ADDR_A}, ' '), NVL(#{i.J_1KFTIND_A}, ' '), NVL(#{i.J_1KFTBUS_A}, ' ')
+				 , NVL(#{i.STCD2_B}, ' '), NVL(#{i.TELF2_B}, ' '), NVL(#{i.NAME1_B}, ' '), NVL(#{i.J1KFREPRE_B}, ' '), NVL(#{i.ADDR_B}, ' '), NVL(#{i.J_1KFTIND_B}, ' '), NVL(#{i.J_1KFTBUS_B}, ' ')
+				 , NVL(#{i.KUNWE_T}, ' '), NVL(#{i.KUNWE_TEL}, ' '), NVL(#{i.KUNWE_ADDR}, ' ')
+				 , NVL(#{i.KVGR1}, ' ')
+				 , NVL(#{i.DRIVE_INFO}, ' ')
+				 , NVL(#{i.DRIVERCEL}, ' ')
+				 , NVL(#{i.MEMO1}, ' ')
+				 , NVL(#{i.MEMO2}, ' ')
+				 , NVL(#{i.PERNE_INFO}, ' ')
+				 , NVL(#{i.CBM}, ' ')
+				 , NVL(#{i.FSC}, ' ')
+				 , NVL(#{i.CONFIRM}, ' ')
+				 , NVL(#{i.LOGSEQNO}, ' ')
+				 , TO_CHAR(SYSDATE, 'YYYYMMDD'), TO_CHAR(SYSDATE, 'HH24MISS'), #{i.SES_USER_ID}
+				 , TO_CHAR(SYSDATE, 'YYYYMMDD'), TO_CHAR(SYSDATE, 'HH24MISS'), #{i.SES_USER_ID}
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<insert id="DL042_DEALI_MULTI" parameterType="Map">
+		INSERT INTO DEALI (
+			  DEALKY
+			, TKNUM
+			, KUNNR
+			, KUNAG
+			, STCD2_B
+			, MAKTX
+			, MAKTX2
+			, BARCODE
+			, KONDM
+			, ZSPEC
+			, LFIMG1
+			, LFIMG2
+			, NETPR
+			, NETWR
+			, BIGO
+			, BIGO2
+			, TOT_FLAG
+			, LFIMG1_TOT
+			, LFIMG2_TOT
+			, NETWR_TOT
+			, VAT_TOT
+			, NETWR_VAT
+			, FSC
+			, MATNR
+		)
+		<foreach collection="list" item="i" separator=" UNION ALL " open="" close="">
+			SELECT #{i.DEALKY}
+				 , NVL(#{i.TKNUM}, ' ')
+				 , NVL(SUBSTR(LPAD(TRIM(#{i.KUNNR}), 10, '0'), 5, 6), ' ')
+				 , NVL(SUBSTR(LPAD(TRIM(#{i.KUNAG}), 10, '0'), 5, 6), ' ')
+				 , NVL(#{i.STCD2_B}, ' ')
+				 , NVL(#{i.MAKTX}, ' ')
+				 , NVL(#{i.MAKTX2}, ' ')
+				 , NVL(#{i.BARCODE}, ' ')
+				 , NVL(#{i.KONDM}, ' ')
+				 , NVL(#{i.ZSPEC}, ' ')
+				 , NVL(TO_NUMBER(TRIM(REPLACE(#{i.LFIMG1}, ',', ''))), 0)
+				 , NVL(TO_NUMBER(TRIM(REPLACE(#{i.LFIMG2}, ',', ''))), 0)
+				 , NVL(TO_NUMBER(TRIM(REPLACE(#{i.NETPR }, ',', ''))), 0)
+				 , NVL(TO_NUMBER(TRIM(REPLACE(#{i.NETWR }, ',', ''))), 0)
+				 , NVL(#{i.BIGO}, ' ')
+				 , NVL(#{i.BIGO2}, ' ')
+				 , NVL(#{i.TOT_FLAG}, ' ')
+				 , NVL(#{i.LFIMG1_TOT}, ' ')
+				 , NVL(#{i.LFIMG2_TOT}, ' ')
+				 , NVL(#{i.NETWR_TOT}, ' ')
+				 , NVL(#{i.VAT_TOT}, ' ')
+				 , NVL(#{i.NETWR_VAT}, ' ')
+				 , NVL(#{i.FSC}, ' ')
+				 , NVL(#{i.MATNR}, ' ')
+			  FROM DUAL
+		</foreach>
+	</insert>
+	
+	<select id="DL042_SHPDI_STKNUM_INFO_LIST" parameterType="Map" resultType="DataMap">
+				SELECT 
+					( CASE 
+						WHEN COUNT(DISTINCT(IF333.TKNUM)) = 1 THEN MAX(IF333.TKNUM)
+						ELSE DECODE(SI.STKNUM, ' ', SUBSTR(LISTAGG(IF333.TKNUM, ',') WITHIN GROUP (ORDER BY IF333.SEQNO DESC), 0, INSTR(LISTAGG(IF333.TKNUM, ',') WITHIN GROUP (ORDER BY IF333.SEQNO), ',') - 1), SI.STKNUM)
+					END
+					) TKNUM
+					 , SI.SVBELN AS VBELN
+					 , SH.WAREKY AS WAREKY
+					 , #{STATUS} AS STATUS
+				 FROM SHPDH SH
+				INNER JOIN SHPDI SI ON SH.SHPOKY = SI.SHPOKY
+				LEFT JOIN IFWMS333 IF333 ON (SI.SVBELN = IF333.VBELN AND IF333.STATUS = 'C')
+							       
+				 WHERE 1 = 1
+				   AND SH.WAREKY = #{WAREKY}
+		           AND SI.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{SES_MTYPE})
+				   AND SUBSTR(SI.SHPOIT, 0, 1) != 1 
+				   AND NVL(TRIM(SI.SAPSTS), NULL) IS NOT NULL
+	    	   	<choose>
+					<when test="STATUS == &quot;C&quot;">
+				   AND SI.STATIT IN('PAL', 'FAL', 'PPC', 'FPC')                   
+					</when>
+					<otherwise>
+				   AND SI.STATIT IN('NEW', 'FAL')
+					</otherwise> 	
+			   	</choose>
+
+			   <if test="SHPOKY != null and SHPOKY != ''">
+				   AND SH.SHPOKY IN ${SHPOKY}
+			   </if>			   
+       			 GROUP BY SI.STKNUM, SI.SVBELN, SH.WAREKY
+	</select>
+	
+	<select id="DL042_ALLCATIONVAL_MAP" parameterType="Map" resultType="DataMap">
+		SELECT STATDO FROM SHPDH
+		 WHERE SHPOKY = #{SHPOKY}	   				
+	</select>
+	
+	<update id="DL042_PRTCHK_SHPDH_UPDATE" parameterType="Map">
+		UPDATE SHPDH
+		   SET PRTCHK = 'V'
+		 WHERE SHPOKY IN (SELECT DISTINCT(SHPOKY) FROM SHPDI WHERE STKNUM = #{STKNUM})
+          <if test="statdoList != null and statdoList != ''">
+          AND STATDO IN (${statdoList})
+          </if>
+	</update>
+
+	<select id="DL042_STKNUM_INFO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT 
+			( CASE 
+				WHEN COUNT(DISTINCT(IF333.TKNUM)) = 1 THEN MAX(IF333.TKNUM)
+				ELSE DECODE(SI.STKNUM, ' ', SUBSTR(LISTAGG(IF333.TKNUM, ',') WITHIN GROUP (ORDER BY IF333.SEQNO DESC), 0, INSTR(LISTAGG(IF333.TKNUM, ',') WITHIN GROUP (ORDER BY IF333.SEQNO), ',') - 1), SI.STKNUM)
+			END
+			) TKNUM 
+			 , SI.SVBELN AS VBELN
+			 , SH.WAREKY AS WAREKY
+			 , #{STATUS} AS STATUS
+		 FROM SHPDH SH
+		INNER JOIN SHPDI SI ON SH.SHPOKY = SI.SHPOKY 
+		LEFT JOIN IFWMS333 IF333 ON (SI.SVBELN = IF333.VBELN AND IF333.STATUS = 'C')
+		WHERE 1 = 1
+		  AND SH.WAREKY = #{WAREKY}
+		  AND SH.SHPOKY = #{SHPOKY}
+		  AND SH.DPTNKY = #{DPTNKY}
+		  -- AND SH.STATDO IN('NEW')
+		  AND NVL(TRIM(SI.SAPSTS), NULL) IS NOT NULL
+		GROUP BY SI.STKNUM, SI.SVBELN, SH.WAREKY
+	</select>
+	
+	<select id="DL042_WMS_IFS301_STATDO_LIST" parameterType="Map" resultType="DataMap">
+        SELECT    SI.STKNUM                                                  AS STKNUM           --선적번호
+                , SI.SVBELN                                                  AS SVBELN           --출고오더번호/납품문서번호
+                , SI.SHPOKY                                                  AS SHPOKY           --출고문서번호
+                , SH.RQSHPD                                                  AS RQSHPD           --출하요청일자
+                , SH.STATDO                                                  AS STATDO           --문서상태      /*Detail*/
+                , ST.CDESC1                                                  AS STATDONM         --문서상태명    /*Detail*/
+                , SH.DOCUTY                                                                      --문서유형      /*Detail*/
+                , (SELECT SHORTX FROM DOCTM WHERE DOCUTY = SH.DOCUTY)        AS DOCUTYNM         --문서유형명    /*Detail*/
+        FROM SHPDI SI
+            INNER JOIN SHPDH SH ON SH.SHPOKY = SI.SHPOKY
+            LEFT OUTER JOIN CMCDV ST ON ST.CMCDKY = 'STATDO'
+                                    AND ST.CMCDVL = SH.STATDO
+        WHERE 1=1
+        AND SI.STATIT NOT IN('FCO')  --주문취소 제외
+        AND SUBSTR(SI.SHPOIT, 0, 1) != 1
+        AND SH.WAREKY = #{WAREKY}
+            AND NVL(DECODE(SI.STKNUM, ' ', NULL, SI.STKNUM), '*'||SI.SHPOKY) = #{STKNUM}
+            
+            AND ( SH.RQSHPD BETWEEN #{RQSHPD_FR} AND #{RQSHPD_TO} )
+        GROUP BY  SI.STKNUM
+                , SI.SVBELN
+                , SI.SHPOKY
+                , SH.RQSHPD
+                , SH.STATDO
+                , ST.CDESC1
+                , SH.DOCUTY
+	</select>
+</mapper>

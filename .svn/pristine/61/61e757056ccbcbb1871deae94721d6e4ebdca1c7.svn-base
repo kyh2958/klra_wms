@@ -1,0 +1,79 @@
+package project.common.task;
+
+import java.io.PrintWriter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import project.common.bean.DataMap;
+
+public class SseEventManager {
+
+    private static final Map<String, Set<PrintWriter>> clients =
+            new ConcurrentHashMap<>();
+
+    // ObjectMapper는 thread-safe (설정 변경 안 하면)
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    public static void addClient(String topic, PrintWriter writer) {
+        clients
+            .computeIfAbsent(topic, k -> new CopyOnWriteArraySet<>())
+            .add(writer);
+    }
+
+    public static void removeClient(String topic, PrintWriter writer) {
+        Set<PrintWriter> set = clients.get(topic);
+        if (set != null) {
+            set.remove(writer);
+        }
+    }
+
+    /**
+     * 🔑 List<DataMap>을 받아서
+     *    반드시 JSON 문자열로 직렬화 후 SSE 전송
+     */
+    public static void sendEvent(String topic, String event, List<DataMap> data) {
+
+        Set<PrintWriter> set = clients.get(topic);
+        if (set == null || set.isEmpty()) {
+            return;
+        }
+
+        try {
+            // time 생성 (서버 기준)
+            String time = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss"));
+
+            // payload 구성 (JSON 구조)
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("time", time);     // 메타 정보
+            //payload.put("event", event);   // 이벤트명 (선택)
+            payload.put("data", data);     // 실제 List<DataMap>
+
+            // JSON 문자열 직렬화 (한 줄)
+            String jsonData = objectMapper.writeValueAsString(payload);
+
+            // SSE 전송
+            for (PrintWriter w : set) {
+                try {
+                    w.write("event: " + event + "\n");
+                    w.write("data: " + jsonData + "\n\n");
+                    w.flush();
+                } catch (Exception e) {
+                    set.remove(w); // 끊긴 연결 정리
+                }
+            }
+
+        } catch (Exception e) {
+            // 직렬화 실패 시 로그
+            e.printStackTrace();
+        }
+    }
+
+}
+

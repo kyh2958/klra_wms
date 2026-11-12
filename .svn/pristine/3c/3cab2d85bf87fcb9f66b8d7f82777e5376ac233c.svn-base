@@ -1,0 +1,1129 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	
+	String skukey = request.getParameter("SKUKEY");
+	String lota01 = request.getParameter("LOTA01");
+	String lota02 = request.getParameter("LOTA02");
+	String lota06 = request.getParameter("LOTA06");
+	String ebeln = request.getParameter("EBELN");
+	String docdat = request.getParameter("DOCDAT");
+	String parMenuId = request.getParameter("PAR_MENUID");
+	String qtyrcv1 = request.getParameter("QTYRCV1");
+	String barcod = request.getParameter("BARCOD");
+	String bwart = request.getParameter("BWART");
+	String signi = request.getParameter("SIGNI");
+	
+%>
+<!doctype html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>WMS</title>
+
+<style type="text/css">
+.tem5_content .tableWrap_search select	{width:172px;  height:25px; }
+.tem5_content .tableWrap_search .text_2{width:90%; margin-right:3px;height:22px;border:#b8b8b8;}
+
+.select-editable { position:relative; background-color:white; border:solid 1px #b8b8b8; width:172px; height:25px; }
+.select-editable select { top:0px; left:0px; width:172px; height:25px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:23px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+
+.select-editable { position:relative; background-color:white; border:solid 1px #d5d5d5; width:100%; height:35px; }
+.select-editable select { position:absolute; top:0px; left:0px; width:100%; height:35px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:33px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+
+</style>
+
+<%@ include file="/mobile/include/head.jsp" %>
+<script type="text/javascript" src="/common/js/page.js"></script>
+<script>
+	var SKUG01 = "";
+	var popRowNum = "-1";
+	
+	$(document).ready(function(){
+		
+		gridList.setGrid({
+	    	id : "gridList",
+			editable : true,
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR05_POP",
+			gridMobileType : true,
+			emptyMsgType : false
+	    });
+		
+		setDetail();
+		searchList();
+		
+		$("#BARCOD").focus();
+	});
+	
+	function setDetail(){
+		
+		var param = new DataMap();
+		param.put("WAREKY", "<%= wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");
+		param.put("PROGID", "<%=parMenuId%>");
+		param.put("SKUKEY", "<%=skukey%>");
+		param.put("LOTA01", "<%=lota01%>");
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("LOTA06", "<%=lota06%>");
+		param.put("SEBELN", "<%=ebeln%>");
+		param.put("BWART", "<%=bwart%>");
+		
+		var json = netUtil.sendData({
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR05_POP",
+			sendType : "map",
+			param : param
+		});
+		
+		if(json.data){
+			var SKUKEY = json.data["SKUKEY"]; 
+			var SKUKEYNM = json.data["DESC01"];
+			var MEINS = json.data["MEINS"];
+			var QTYRCV1 = json.data["QTYRCV1"];
+			var MENGE = json.data["MENGE"];
+			SKUG01 = json.data["SKUG01"];
+			
+			// 20220715 "10"으로 하드코딩 요청으로 하드코딩함.
+			SKUG01 = "10";
+			
+			$("#SKUKEY").val(SKUKEY);
+			$("#DESC01").val(SKUKEYNM);
+			$("#UOMKEY").val(MEINS);
+			$("#QTYRCV1").val(MENGE);
+			$("#QTYRCV1").trigger( "blur" );
+		}else{
+			closePop();
+		}
+		
+	}
+	
+	function searchList(){
+		
+		var param = new DataMap();
+		param.put("WAREKY", "<%= wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");
+		param.put("PROGID", "<%=parMenuId%>");
+		param.put("SKUKEY", "<%=skukey%>");
+		param.put("LOTA01", "<%=lota01%>");
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("LOTA06", "<%=lota06%>");
+		param.put("SEBELN", "<%=ebeln%>");
+		param.put("DOCDAT", "<%=docdat%>");
+		param.put("BWART", "<%=bwart%>");
+		
+		var json = netUtil.sendData({
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR05_POP",
+			param : param
+		});
+		
+		//console.log(JSON.stringify(json));
+		gridList.resetGrid("gridList");
+		gridList.appendJson('gridList', json);
+		
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength, excelLoadType){
+	 	if(gridId == "gridList" && dataLength > 0){
+	 		
+			var list = gridList.getGridData(gridId);
+			for(var i=0; i < list.length; i++) {
+				gridList.setRowReadOnly(gridId, i, true, ['LOTA14','LOTA41']);
+				var recvky = list[i].get("RECVKY");
+				if($.trim(recvky)!=""){
+					gridList.setRowCheck(gridId, i, true);
+				}				
+			}
+			
+			PlaySound('s');
+	 	}else{
+	 		
+	 		//PlaySound('e');
+	 		//closePop();
+	 	}
+	}
+	
+	function searchEndEventFunction(){
+		$("#BARCOD").focus();	
+	}
+	
+ 	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+ 		
+ 		if(gridId == "gridList" ){
+ 			
+	 		var today = new Date();
+			var year = today.getFullYear();
+		    var month = today.getMonth()+1;
+		    var date = today.getDate();
+		    if(month < 10){
+		    	month = "0" + month;
+		    }
+		    if(date < 10){
+		    	date = "0" + date;
+		    }
+			var sysdate = year+month+date;
+			
+	 		if(colName == "LOTA11"&& colValue.trim() != ""){
+	 			var lota11 = gridList.getColData(gridId, rowNum, "LOTA11");
+	 			
+		 	 	if(lota11 != ""){
+					//제조일자 validation
+					if(lota11 > sysdate){
+						gridList.setColValue("gridList", rowNum, "LOTA11", " ");
+						commonUtil.msgBox("VALID_M1607",null,null,function(){ gridList.setColFocus("gridList", rowNum, "LOTA11"); });	//제조일자는 오늘/과거일자만 입력 가능합니다.
+						return;
+					}
+	 			}
+			}else if(colName == "LOTA13"&& colValue.trim() != ""){
+				var lota13 = gridList.getColData(gridId, rowNum, "LOTA13");
+		 	 	
+		 	 	if(lota13 != ""){	
+					//유통기한 validation
+					if(lota13 <= sysdate){
+						gridList.setColValue("gridList", rowNum, "LOTA13", " ");
+						commonUtil.msgBox("VALID_M1606",null,null,function(){ gridList.setColFocus("gridList", rowNum, "LOTA13"); });	//유통기한은 미래일자만 입력 가능합니다.
+						return;
+					}
+				}
+		 	 
+			}else if (colName == "LOTA14") {
+				//gridList.setColValue(gridId, rowNum, "LOTA15", colValue);				
+				gridList.setColValue(gridId, rowNum, "BARCNO", colValue);
+			}else if (colName == "QTYRCV") {
+				
+				var param = new DataMap();
+				
+				var SKUKEY = gridList.getColData("gridList", rowNum, "SKUKEY");
+				var UOMKEY = gridList.getColData("gridList", rowNum, "UOMKEY");
+				
+				var UOMQTY = getQtyuom(SKUKEY, UOMKEY, colValue);
+				
+				gridList.setColValue(gridId, rowNum, "UOMQTY", UOMQTY);
+				//gridList.setColValue(gridId, rowNum, "QTYRCV1", UOMQTY);
+				
+			}else if(colName == "LOTA49") {
+				
+				if(colValue.length > 0 && colValue != " ") {
+					var param = new DataMap();
+					param.put("OWNRKY", "<%=ownrky%>");
+					param.put("DPTNKY", colValue);
+					param.put("PTNRTY", "VD");
+					
+					var json = netUtil.sendData({
+						module: "WmsInbound",
+						command: "GR99_DPTNKYNM",
+						sendType: "map",
+						param: param
+					});
+					if(json && json.data) {
+						gridList.setColValue(gridId, rowNum, "LOTA49NM", json.data["DPTNKYNM"]);
+					} else {
+						//alert(colValue + " : 공급사가 존재하지 않습니다.");
+						gridList.setColValue(gridId, rowNum, "LOTA49", " ");
+						gridList.setColValue(gridId, rowNum, "LOTA49NM", "");
+						commonUtil.msgBox("VALID_M2080", [colValue],null,null,function(){ gridList.setColFocus(gridId, rowNum, "LOTA49"); }); // 공급사[{0}]가 존재하지 않습니다.
+					}
+				} else {
+					gridList.setColValue(gridId, rowNum, "LOTA49", " ");
+					gridList.setColValue(gridId, rowNum, "LOTA49NM", "");
+				}
+			}else if(colName == "NETWT" || colName == "WGTMUL") {
+				getCalcQTYRCV1(gridId, rowNum);
+			}
+ 		
+ 		}
+ 		
+	}
+ 	
+ 	function getCalcQTYRCV1(gridId, rowNum){
+		// 입고가능수량 재계산
+		var NETWT = gridList.getColData(gridId, rowNum, "NETWT");     // Net Weight_중량
+		var WGTMUL = gridList.getColData(gridId, rowNum, "WGTMUL");   // 중량배수
+		var QTYRCV1 = 0;
+		QTYRCV1 = Number(NETWT) * Number(WGTMUL);
+		gridList.setColValue(gridId, rowNum, "QTYRCV1", QTYRCV1);
+	}
+ 	
+ 	function getQtyuom(SKUKEY, UOMKEY, QTY){
+ 		
+ 		var param = new DataMap();
+		
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("SKUKEY", SKUKEY);
+		param.put("UOMKEY", UOMKEY);
+		param.put("QTY", QTY);
+		
+		var json = netUtil.sendData({
+			module : "WmsInbound",
+			command : "UOMQTYval",
+			sendType : "map",
+			param : param
+		});
+		
+		var UOMQTY = json.data["UOMQTY"];
+		
+		return UOMQTY; 
+ 	}
+ 	
+	function saveData(){
+		
+		var param = new DataMap();
+		
+		var chkItemIdx = gridList.getSelectRowNumList("gridList");
+		var chkItemLen = chkItemIdx.length;	
+		
+		var sumQty = 0;
+		var qtyasn = $("#QTYRCV1").val();
+		
+		var gridId = "gridList";
+		
+		var delListYn = false; // 체크박스 언체크되고, 입고키가있는 경우 데이터 삭제 목록 존재
+		var list = gridList.getGridData(gridId);
+		for(var i=0; i < list.length; i++) {
+			var rowData = list[i];
+			var rowNum = rowData.get("GRowNum");
+			var rowState = gridList.getRowState(gridId, rowNum);
+			var rowCheck = gridList.getSelectType(gridId, rowNum);
+			var recvky = rowData.get("RECVKY");
+			
+			if(!rowCheck && $.trim(recvky)!=""){
+				delListYn=true;
+			}
+		}
+		
+		if( chkItemLen == 0 && delListYn==false){
+			PlaySound('e');
+			commonUtil.msgBox("VALID_M0006");// 선택된 아이템이 없습니다.
+			return;
+		}
+		
+		if (chkItemLen > 0 && chkItemLen != list.length) {
+			PlaySound('e');
+			commonUtil.msgBox("MOBILE_M0061");// 부분입고는 지원되지 않습니다.
+			return;
+		}
+		
+		
+		if(chkItemLen > 0 && chkItemLen == list.length){
+		
+			var chkItemList = gridList.getSelectData(gridId);
+			var headList = getHeadList(chkItemList);
+			
+			for(var i=0; i < chkItemList.length; i++) {
+				
+				var rowNum = chkItemList[i].get("GRowNum");
+				var rowData = chkItemList[i];
+				
+				
+				var QTYRCV = chkItemList[i].get("QTYRCV");
+				sumQty = Number(sumQty) + Number(QTYRCV);
+				if(QTYRCV==0){
+					PlaySound('e');
+					var STD_QTYRCV = commonLabel.getLabel("STD_QTYRCV", 1);
+					commonUtil.msgBox("VALID_required",[STD_QTYRCV],null,function(){ gridList.setColFocus(gridId, rowNum, "QTYRCV"); }); // {0} 은(는) 필수 입력항목입니다.
+					return;
+				}
+				/*
+				var LOTA11 = chkItemList[i].get("LOTA11");
+				if($.trim(LOTA11)==""){
+					gridList.setColFocus("gridList", rowNum, "LOTA11");
+					var STD_LOTA11 = commonLabel.getLabel("STD_LOTA11", 1);
+					commonUtil.msgBox("VALID_required",[STD_LOTA11]); // {0} 은(는) 필수 입력항목입니다.
+					return;
+				}
+				
+				var LOTA14 = chkItemList[i].get("LOTA14");
+				if($.trim(LOTA14)==""){
+	            	gridList.setColFocus("gridList", rowNum, "LOTA14");
+	            	commonUtil.msgBox("VALID_M2063");// 개별바코드가 없는 문서가 존재하여 입고를 할 수 없습니다.
+	                return;
+	            }
+				*/
+				
+				var NETWT = new Number(rowData.get("NETWT")); // Net Weight_중량
+				if(NETWT <= 0){
+					PlaySound('e');
+					var STD_NETWT = commonLabel.getLabel("NETWT", 1);
+					commonUtil.msgBox("VALID_M0956", [STD_NETWT],null,function(){ gridList.setColFocus(gridId, rowNum, "NETWT"); }); // [{0}] 수량을 입력하여 주세요
+					return;
+				}
+				
+				var WGTMUL = new Number(rowData.get("WGTMUL")); // 중량배수
+				if(WGTMUL <= 0){
+					PlaySound('e');
+					var STD_WGTMUL = commonLabel.getLabel("WGTMUL", 1);
+					commonUtil.msgBox("VALID_M0956", [STD_WGTMUL],null,function(){ gridList.setColFocus(gridId, rowNum, "WGTMUL"); }); // [{0}] 수량을 입력하여 주세요
+					return;
+				}
+				
+				var QTYRCV1 = new Number(rowData.get("QTYRCV1")); //입고가능수량
+				if(QTYRCV1 <= 0){
+					PlaySound('e');
+					var STD_QTYRCV1 = commonLabel.getLabel("QTYRCV1", 1);
+					commonUtil.msgBox("VALID_M0956", [STD_QTYRCV1],null,function(){ gridList.setColFocus(gridId, rowNum, "QTYRCV1"); }); // [{0}] 수량을 입력하여 주세요
+					return;
+				}
+				
+				if(QTYRCV>QTYRCV1){
+					PlaySound('e');
+					commonUtil.msgBox("IN_M0078",null,null,function(){ gridList.setColFocus(gridId, rowNum, "QTYRCV"); }); //입고수량은 입고가능수량보다 클 수 없습니다.
+					return;
+				}
+				
+				// 필수값 체크
+				var reqFieldArr = mkRollListReqFieldArr();
+				
+				if (1) {
+					for(var j=0;j<reqFieldArr.length;j++){
+						var chkMap = reqFieldArr[j];
+						var chkId = chkMap.get("id");
+						var chkLabel = chkMap.get("label");
+						var chkVal = rowData.get(chkId);
+						
+				        if($.trim(chkVal)==""){
+					        PlaySound('e');
+							var STD_LABEL = commonLabel.getLabel(chkLabel, 1);
+							commonUtil.msgBox("VALID_required",[STD_LABEL],null,function(){ gridList.setColFocus("gridList", rowNum, chkId); }); // {0} 은(는) 필수 입력항목입니다.
+							return false;
+				        }
+				        
+					}
+				}
+			}
+			/*
+			if(sumQty > qtyasn){
+				commonUtil.msgBox("VALID_M1722");	//"PDA로 초과입고 할 수 없습니다.
+				return;
+			}
+			*/
+			
+			if(!confirm('입고처리 하겠습니까?')){
+				return;
+			}
+			
+			fnInboundDel(gridId);
+			
+			//var chkItemList = gridList.getGridData(gridId);
+			param.put("WAREKY", "<%=wareky%>");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("headSebeln", "<%=ebeln%>");
+			param.put("head", headList);		// 헤더처리
+			param.put("list", chkItemList);
+			param.put("PROGID", configData.MENU_ID);
+			param.put("QTYCHKYN", "N");
+			param.put("ROLLYN", "Y");    // 수입미롤 여부
+			
+			netUtil.sendData({
+				//url : "/mobile/mobileInboundGoodsReceipt/json/SavePDGR05_POP.data",
+				url : "/wms/inbound/json/SaveGR02New.data",
+				param : param,
+				async : true,
+				//loading : true,
+                callBackFunction : function(json){
+                	if(json.data && json.data.RESULTMSG ){
+        				PlaySound('e');
+        				var msgList = json.data.RESULTMSG.split("†");
+        				var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+        				commonUtil.msg(msgTxt);
+        				return;
+        			}
+        			
+        			
+        			console.dir(json)
+        			if(json && json.data){
+        				PlaySound('s');
+        				
+        				commonUtil.msgBox("MASTER_M0564", null, null, function(){
+        					parentMove();
+        				}); //저장완료				
+        			}else{
+        				PlaySound('e');
+        			}
+                }
+			});
+		
+		}else if(delListYn && chkItemLen==0){
+		
+			/*
+			if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+				return;
+			}
+			*/
+			
+			// 저장하시겠습니까?
+			commonUtil.msgConfirm(confirmMsg, null
+					            , function(){
+										
+										if(fnInboundDel(gridId)){
+											PlaySound('s');
+											commonUtil.msgBox("MASTER_M0564"); //저장완료
+											parentMove();
+										}else{
+											PlaySound('e');
+										}
+										
+								}
+			);
+			
+			
+		}
+			
+	}
+	
+	
+	function mkRollListReqFieldArr(){
+		
+		var reqFieldArr = new Array();
+		var reqFieldMap = new DataMap();
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","QTYRCV");
+		reqFieldMap.put("label","STD_QTYRCV");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","LOTA11");
+		reqFieldMap.put("label","STD_LOTA11");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","LOTA14");
+		reqFieldMap.put("label","STD_LOTA14");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","BARCNO");
+		reqFieldMap.put("label","STD_BARCNO");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","CONTNO");
+		reqFieldMap.put("label","STD_CONTNO");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","ROLLID");
+		reqFieldMap.put("label","STD_ROLLID");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","DESCRI");
+		reqFieldMap.put("label","STD_DESCRI");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","MRGSM");
+		reqFieldMap.put("label","STD_MRGSM");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","LENGTH");
+		reqFieldMap.put("label","STD_ROLL_LENGTH");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","NETWT");
+		reqFieldMap.put("label","STD_NETWT");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","WGTMUL");
+		reqFieldMap.put("label","STD_WGTMUL");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","COREDI");
+		reqFieldMap.put("label","STD_COREDI");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","MATNR");
+		reqFieldMap.put("label","STD_MATNR");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","KUNIT");
+		reqFieldMap.put("label","STD_KUNIT");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","CPCOD");
+		reqFieldMap.put("label","STD_CPCOD");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","WEIGHT");
+		reqFieldMap.put("label","STD_ROLL_WEIGHT");
+		reqFieldArr.push(reqFieldMap);
+		
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","RBRGEW");
+		reqFieldMap.put("label","STD_RBRGEW");
+		reqFieldArr.push(reqFieldMap);
+		
+		/*
+		reqFieldMap = new DataMap();
+		reqFieldMap.put("id","LUNIT");
+		reqFieldMap.put("label","STD_LUNIT");
+		reqFieldArr.push(reqFieldMap);
+		*/
+		return reqFieldArr;
+	}
+	
+ 	function closePop(){
+ 		
+ 		var modifyCnt = gridList.getModifyRowCount("gridList"); 		
+ 		var checkCnt = gridList.getSelectData("gridList").length;
+ 		
+ 		if(modifyCnt!=0 || checkCnt!=0){
+ 			/*
+ 			if(!commonUtil.msgConfirm("VALID_M2094")){ 
+				return;
+			}
+ 			*/
+ 			// 작업중인 내역이 존재합니다. 이전으로 돌아가시겠습니까?
+ 			commonUtil.msgConfirm("VALID_M2094", null
+ 					            , function(){
+ 										parentMove();
+ 								  }
+ 			);
+ 			
+ 		}
+ 		parentMove();
+ 	}
+ 	
+	function parentMove(){
+ 		var paramStr = "FLAG=N&EBELN=<%=ebeln%>&DOCDAT=<%=docdat%>&SIGNI=<%=signi%>";
+		location.href="/mobile/PDGR05.page?"+paramStr;
+ 	}
+ 	
+ 	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+ 	
+ 	function showMain() {
+		$("#detailInfo").hide();
+		$("#main").show();
+	}
+	
+ 	function clearText(data){
+		if(data!=null||data!=""){
+	    	data.value="";
+	    }
+	}
+ 	
+ 	function setBarcod(){
+ 		
+ 		var BARCOD = $.trim($("#BARCOD").val());
+ 		
+ 		if(BARCOD==""){
+ 			$("#BARCOD").val("");
+ 			PlaySound('e');
+ 			commonUtil.msgBox("VALID_M2050",null,null,function(){ $("#BARCOD").focus(); }); // 바코드를 입력하여주세요.
+ 			return;
+ 		}
+ 		
+ 		var gridId = "gridList";
+ 		
+ 		// 입고수량 체크
+		var sumQty = 0;
+		var chkItemList = gridList.getSelectData(gridId);
+		for(var i=0; i < chkItemList.length; i++) {
+			var QTYRCV = chkItemList[i].get("QTYRCV");
+			sumQty = Number(sumQty) + Number(QTYRCV);
+		}
+ 		
+		// 동일 바코드 확인
+ 		var list = gridList.getGridData(gridId);
+ 		var existsYN = false;
+		for(var i=0; i < list.length; i++) {
+			
+			var rowData = list[i];
+        	var GRowNum = rowData.get("GRowNum");
+			
+			var LOTA14 = rowData.get("LOTA14");
+			var LOTA02 = rowData.get("LOTA02");
+			var LOTA11 = rowData.get("LOTA11");
+			
+			if(BARCOD==LOTA14){
+				
+				var QTYRCV = rowData.get("QTYRCV");
+				var QTYRCV1 = rowData.get("QTYRCV1");
+				var rowCheck = gridList.getSelectType(gridId, GRowNum);
+				if(rowCheck){
+					PlaySound('e');
+					commonUtil.msgBox("MOBILE_M0030",null,null,function(){ gridList.setColFocus(gridId, GRowNum, "QTYRCV"); }); // 이미 스캔한 바코드입니다.
+					$("#BARCOD").select();
+					return;
+				}else{
+					gridList.setColFocus(gridId, GRowNum, "QTYRCV");
+					PlaySound('s');
+					//gridList.setColValue(gridId, GRowNum, "QTYRCV", QTYRCV1);
+					gridList.setRowCheck(gridId, GRowNum, true);
+					existsYN=true;
+					$("#BARCOD").focus();
+					
+					var retLotaMap = getLotaInfo(SKUG01, LOTA11, BARCOD);
+					var retLOTA11 = retLotaMap.get("LOTA11");
+					gridList.setColValue(gridId, GRowNum, "LOTA11", retLOTA11);
+					
+					return;
+				}
+				
+			}
+			
+		}
+		
+		if(!existsYN){
+			PlaySound('e');
+			commonUtil.msgBox("HHTPROC_M0007",null,null,function(){ $("#BARCOD").focus(); }); // 존재하지 않는 바코드입니다.
+			return;
+		}
+		
+		$("#BARCOD").select();
+		PlaySound('s');
+		
+ 	}
+ 	
+	function getLotaInfo(I_SKUG01, I_LOTA11, I_BARCOD){
+		
+		var rsMap = new DataMap();
+		
+		var param = new DataMap();
+		param.put("SKUG01", I_SKUG01);
+		param.put("LOTA11", I_LOTA11);
+		param.put("BARCOD", I_BARCOD);
+		param.put("WAREKY", "<%= wareky%>");
+		param.put("SKUKEY", "<%=skukey%>");
+		
+		param.put("WAREKY", "<%= wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");
+		param.put("PROGID", "<%=parMenuId%>");
+		param.put("SEBELN", "<%=ebeln%>");
+		param.put("LOTA01", "<%=lota01%>");
+		param.put("LOTA06", "<%=lota06%>");
+		param.put("BWART", "<%=bwart%>");
+		param.put("MTYPE", "<%=mtype%>");
+		
+		// 제조일자
+		var json = netUtil.sendData({
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR05_LOTA_INFO",
+			sendType : "list",
+			param : param
+		});
+		//console.log("getLotaInfo : " + JSON.stringify(json));
+		if (json.data){
+			
+			var palqty = json.data[0]["PALQTY"];
+			var lota11 = json.data[0]["LOTA11"];
+			var muomkey = json.data[0]["MUOMKEY"];
+			
+			rsMap.put("LOTA11", LOTA11);
+			rsMap.put("PALQTY", palqty);
+			rsMap.put("MUOMKEY", muomkey);
+			rsMap.put("data", json.data[0]);
+			
+		}
+		
+		return rsMap;
+		
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType){
+		var param = new DataMap();
+		if(searchCode == "SHBZPTN"){
+			
+			var gridId = "gridList";
+			popRowNum = gridList.getFocusRowNum(gridId);
+			
+			searchPtnrkyList();
+			return false;
+			
+			return param;
+		}
+	}
+	
+	function searchPtnrkyList(){
+		
+		var param = new DataMap();
+		
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put('WAREKY', '<%=wareky%>');
+		param.put('PTNRTY', 'VD');
+		
+		mobile.linkPopOpen('/mobile/PDGR05_PTNRKY_POP.page', param);
+		
+	}
+	
+	function ptnrkyPopCallback(data) {
+		
+		var PTNRKY = data.get('PTNRKY');
+		var NAME01 = data.get('NAME01');
+		
+		var gridId = "gridList";
+		gridList.setColValue(gridId, popRowNum, "LOTA49", PTNRKY);
+		gridList.setColValue(gridId, popRowNum, "LOTA49NM", NAME01);
+		
+	}
+	
+	function setStlkyInfo(){
+		
+		var param = new DataMap();
+		
+		var LOTA01 = $('#STLKY').val();
+		
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("LOTA01", LOTA01);
+		
+		if(LOTA01==""){
+			$('#STLKY').val("");
+			$('#WMSMAK').val("");
+		}else{
+			var json = netUtil.sendData({
+				module : "WmsInbound",
+				command : "GR99_STLKYINFO",
+				sendType : "map",
+				param : param
+			});
+			
+			if(json && json.data){
+				$('#WMSMAK').val(json.data["WMSMAK"]);
+				PlaySound('s');
+			} else {
+				PlaySound('e');
+				commonUtil.msgBox("VALID_M2084",null,null,function(){ $("#STLKY").focus(); }); // 존재하지 않는 저장소입니다.
+				$('#STLKY').val("");
+				$('#WMSMAK').val("");
+			}
+		}
+	}
+	
+	
+	function fnInboundDel(gridId){
+		
+		var list = new Array();
+		
+		var itemList = gridList.getGridData(gridId);
+		
+		for(var i=0; i < itemList.length; i++) {
+			
+			var rowData = itemList[i];
+			var rowNum = rowData.get("GRowNum");
+			var recvky = rowData.get("RECVKY");
+			var rowCheck = gridList.getSelectType(gridId, rowNum);
+			//console.log(i + " - rowData : " + rowData);
+			
+			if(!rowCheck && recvky!=undefined && $.trim(recvky)!="" ){
+				list.push(rowData);
+			}
+			
+		}
+		
+		if(list.length > 0){
+		
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("list", list);
+			
+			var json = netUtil.sendData({
+				url : "/wms/inbound/json/deleteTmpGR40.data",
+				param : param
+			});
+			
+			if(json.data && json.data.RESULTMSG ){
+				PlaySound('e');
+				var msgList = json.data.RESULTMSG.split("†");
+				var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+				commonUtil.msg(msgTxt);
+				return false;
+			}else{
+				return true;
+			}
+		
+		}else{
+			return false;
+		}
+		
+	}
+	
+	function getHeadList(chkItemList){
+		
+		var headList = new Array();
+		
+		for(var i=0; i < chkItemList.length; i++) {
+			var rowData = chkItemList[i];
+			
+			var sebeln = rowData.get("SEBELN");
+			var newYN = true;
+			
+			for(var j=0; j < headList.length; j++) {
+				var headData = headList[j];
+				var hSebeln = headData.get("SEBELN");
+				if(sebeln==hSebeln){
+					newYN = false;
+					break;
+				}
+			}
+			
+			if(newYN){
+				headList.push(rowData);
+			}
+		}
+		return headList;
+	}
+ 	
+	
+</script>
+</head>
+<body>
+	<div id="menu-container">
+		<div class="menu-item"></div><!-- 입고확정 팔레트 분할 -->
+	</div>
+	<div class="main_wrap" id="main">
+	<div id="main_container">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="80px" />
+						<col />
+						<col width="70px" />
+						<col width="70px" />
+					</colgroup>
+					<tr>
+						<th CL='STD_SKUKEY'>품번</th> 
+						<td >
+							<input type="text" class="text" id="SKUKEY" style="text-align:center;" readonly="readonly"/>
+						</td>
+						<td>
+							<input type="text" class="text" id="QTYRCV1" UIFormat="N 20,3" style="text-align:right;" readonly="readonly" />
+						</td>
+						<td >
+							<input type="text" class="text" id="UOMKEY" style="text-align:center;" readonly="readonly"/>
+						</td>
+					</tr>
+					<tr>
+						<th CL='STD_DESC01'>품명</th> 
+						<td colspan="3">
+							<input type="text" class="text" name="DESC01" id="DESC01" readonly="readonly"/>
+						</td>
+					</tr>
+					<tr>
+						<th  CL='STD_BARCOD'>바코드</th>
+						<td colspan="3">
+						    
+						    <input type="text" class="text" name="BARCOD" id="BARCOD" value="<%=barcod %>" style="text-align: center;" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'setBarcod()')" />
+							 
+						</td>
+					</tr>
+					
+<!-- 					<tr> -->
+<!-- 						<th CL='STD_LOTA01'>저장위치</th> -->
+<!-- 						<td colspan="2"> -->
+<!-- 							<input type="text" class="text" name="STLKY" id="STLKY" style="text-align: center;" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'setStlkyInfo()')" onChange="setStlkyInfo(this)" /> -->
+<!-- 							<input type="hidden" name="WMSMAK" id="WMSMAK" /> -->
+<!-- 						</td> -->
+<!-- 						<td onclick ="searchStlkyList()"> -->
+<!-- 							<button class="bt" style="height: 36px;"> -->
+<!-- 								<p CL='BTN_FINDDATA'></p> -->
+<!-- 							</button> -->
+<!-- 						</td> -->
+<!-- 					</tr> -->
+					
+				</table>
+			</div>
+			<div class="tableWrap_search section">
+				<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="40px">
+							<col width="40px">
+							<col width="140px">
+							<col width="100px">
+							<col width="80px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="80px">
+							<col width="80px">
+							<col width="100px">
+							<col width="110px">
+							<col width="300px">
+							<col width="110px">
+							<col width="110px">
+							<col width="110px">
+							<col width="50px">
+							<col width="80px">
+							<col width="80px">
+							<col width="100px">
+							<col width="50px">
+							<col width="100px">
+							<col width="70px">
+							<col width="120px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+						</colgroup>
+						<thead>
+							<tr>
+								<th CL='STD_NO'>No.</th>
+								<th GBtnCheck="true"></th>
+								<th CL='STD_SKUKEY'>품목코드</th>
+								<th CL='STD_PRODLOT'>제조LOT</th>
+								<th CL='STD_LOTA11'>제조일자</th>
+								<th CL='STD_QTSTOK1'>입고가능수량</th>
+								<th CL='STD_QTYRCV'>입고수량</th>
+								
+<!-- 								<th CL='STD_SUOMQTY'>기본단위수량</th> -->
+								<th CL='STD_MEINS'>기본단위</th>
+								
+								<th CL='STD_BOXQT'>BAG/BOX</th>
+								
+								<th CL='STD_LOTA12'>입고일자</th>
+								<th CL='STD_LOTA13'>유통기한</th>
+								<th CL='STD_LOTA15'>유통기한</th>
+								
+								<th CL="STD_PTNRKY2">공급업체 코드</td>
+								<th CL="STD_PTNRKY2_DSC">공급업체 명</td>
+								<th CL="STD_CONTNO">컨테이너No</td>
+								<th CL="STD_BARCNO">바코드No</td>
+								
+								<th CL="STD_ROLLID">ROLL ID</td>
+								<th CL="STD_DESCRI">업체지종(SAP 지종)</td>
+								<th CL="STD_MRGSM">GSM - MR지폭</td>
+								<th CL="STD_ROLL_LENGTH">길이 - MR권치수</td>
+								<th CL="STD_NETWT">Net Weight_중량</td>
+								<th CL="STD_WGTMUL">중량배수</td>
+								<th CL="STD_COREDI">코어(Inch) - 지관인치</td>
+								<th CL="STD_KUNIT">롤당 중량단위</td>
+								<th CL="STD_CPCOD">고객지종</td>
+								<th CL="STD_ROLL_WEIGHT">평량</td>
+								<th CL="STD_RBRGEW">M/ROLL 중량</td>
+								<th CL="STD_LUNIT">Length 단위</td>
+								
+								<th CL="STD_RMK1">Remark1</td>
+								<th CL="STD_RMK2">Remark2</td>
+								<th CL="STD_RMK3">Remark3</td>
+								<th CL="STD_RMK4">Remark4</td>
+								<th CL="STD_RMK5">Remark5</td>
+							</tr>
+						</thead>
+					</table>				
+				</div>					
+				<div class="tableBody">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="40px">
+							<col width="40px">
+							<col width="140px">
+							<col width="100px">
+							<col width="80px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="80px">
+							<col width="80px">
+							<col width="100px">
+							<col width="110px">
+							<col width="300px">
+							<col width="110px">
+							<col width="110px">
+							<col width="110px">
+							<col width="50px">
+							<col width="80px">
+							<col width="80px">
+							<col width="100px">
+							<col width="50px">
+							<col width="100px">
+							<col width="70px">
+							<col width="120px">
+							<col width="60px">
+							<col width="60px">
+							<col width="60px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+							<col width="80px">
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								
+								<td GCol="rowCheck"></td>
+								<td GCol="input,SKUKEY">품목코드</td>
+								<td GCol="input,LOTA14">제조LOT</td>
+								<td GCol="input,LOTA11" GF="C" validate="required">제조일자</td>
+								<td GCol="text,QTYRCV1" GF="N 20,3">입고가능수량</td>
+								<td GCol="text,QTYRCV" GF="N 20,3">입고수량</td>
+								
+<!-- 								<td GCol="text,UOMQTY" GF="N 20,3">기본단위수량</td> -->
+								<td GCol="text,MUOMKEY">기본단위</td>
+								
+								<td GCol="text,BOX" GF="N 20,3">BAG/BOX</td>
+								
+								<td GCol="text,LOTA12" GF="D 8">입고일자</td>
+								<td GCol="text,LOTA13" GF="D 8">유통기한</td>
+								<td GCol="text,LOTA15" >LOT번호</td>
+								
+								<td GCol="text,PTNRKY">공급업체 코드</td>
+								<td GCol="text,PTNRKYNM">공급업체 명</td>
+								<td GCol="text,CONTNO">컨테이너No</td>
+								<td GCol="text,BARCNO">바코드No</td>
+								
+								<td GCol="input,ROLLID" validate="required">ROLL ID</td>
+								<td GCol="input,DESCRI" validate="required">업체지종(SAP 지종)</td>
+								<td GCol="input,MRGSM" GF="N 20,3" validate="required">GSM - MR지폭</td>
+								<td GCol="input,LENGTH" GF="N 20,3" validate="required">길이 - MR권치수</td>
+								<td GCol="text,NETWT" GF="N 20,3">Net Weight_중량</td>
+								<td GCol="text,WGTMUL" GF="N 20,3">중량배수</td>
+								<td GCol="input,COREDI" GF="N 20,3" validate="required">코어(Inch) - 지관인치</td>
+								<td GCol="input,KUNIT" GF="S 3" validate="required">롤당 중량단위</td>
+								<td GCol="input,CPCOD" validate="required">고객지종</td>
+								<td GCol="input,WEIGHT" GF="N 3,0" validate="required">평량</td>
+								<td GCol="input,RBRGEW" GF="N 13,0" validate="required">M/ROLL 중량</td>
+								<td GCol="input,LUNIT" GF="S 3" validate="required">Length 단위</td>
+								
+								<td GCol="input,RMK1">Remark1</td>
+								<td GCol="input,RMK2">Remark2</td>
+								<td GCol="input,RMK3">Remark3</td>
+								<td GCol="input,RMK4">Remark4</td>
+								<td GCol="input,RMK5">Remark5</td>
+								
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 onclick="closePop()" style="width: 50%;"><label CL='BTN_PREVITEM'></label></td>
+						<td class=f_1 onclick="saveData()" width="50%"><label CL='STD_INBOUND'></label></td>
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->	
+		</div>
+	</div>
+	</div>
+</body>

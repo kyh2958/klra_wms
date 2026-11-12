@@ -1,0 +1,292 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+<%
+    User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css">
+<style>
+    input[type="checkbox"]{height:unset;} 
+</style>
+<script type="text/javascript">
+	var dblIdx = 0;
+	var subIdx = 0;
+	var searchType = 0;
+	var paramH = new DataMap();
+	var menuky = configData.MENU_ID;
+	
+	$(document).ready(function(){
+	    //setTopSize(300);
+	    
+	    gridList.setGrid({
+	        id : "gridList",
+	        module : "WmsOutbound",
+	        editable : true,
+	        command : "DL04POP",
+	    });
+	    
+	    
+	});
+	
+	function searchList(){
+		var param = inputList.setRangeParam("searchArea");
+			param.put("WAREKY", "<%=wareky%>");
+
+		 gridList.resetGrid("gridList");
+			
+		 gridList.gridList({
+	            id : "gridList",
+	            url : "/wms/outbound/json/DL04POP.data",
+	            param : param 
+	     });
+		
+	}	
+	
+	//Total 피킹삭제 (미작업에 대해서)
+	function TotalPickingDelete(){
+	    var taskky;
+	    var shpoky;
+	    var head = gridList.getSelectData("gridList");
+	    
+	    var chkRowCnt = gridList.getSelectRowNumList("gridList").length;
+		if(chkRowCnt < 1) {
+			commonUtil.msgBox("VALID_M0006"); // 선택된 데이터가 없습니다.
+			return;
+		}			
+		
+		var list = gridList.getSelectData("gridList");
+		var param = new DataMap();
+		param.put("list", list);
+		
+		for(var i=0; i< list.length; i++){
+			if(list[i].get("STATDO") != "NEW" && list[i].get("STATDO") != "FAL" && list[i].get("STATDO") != "PAL" ){			
+			
+				commonUtil.msgBox("OUT_M0232"); //상태값이 부분할당 또는 할당완료인 값만 삭제 가능합니다.
+				gridList.setColFocus("gridList", i, "STATDO");
+			 return;
+			}
+		}
+		
+		if(!commonUtil.msgConfirm("OUT_M0188")){ //피킹삭제 하시겠습니까?
+			return;
+		} 
+		
+		var json = netUtil.sendData({
+			url: "/wms/outbound/json/totalPickingDelete.data",
+			param: param
+		});
+		
+		if(json && json.data) {
+			
+			if(json.data == "OK" || json.data > 0 || !json.data.RESULT_VALUE) {								
+				commonUtil.msg(commonUtil.getMsg(configData.MSG_SYSTEM_SAVEOK));
+				searchList();
+			} else {				
+				commonUtil.msgBox("OUT_M0216", json.data.RESULT_VALUE);//문서번호 [{0}]는 이미 피킹삭제된 문서입니다.				
+			}
+		}
+	}
+	
+	function fn_closing(){
+		this.close();
+	}
+	
+	//출고지시서 출력
+	function printShpping(){
+		var list = gridList.getSelectData("gridList");
+		
+		if (list.length == 0){
+			commonUtil.msgBox("VALID_M0006");
+			return;
+		}
+		
+		if(!commonUtil.msgConfirm("SYSTEM_PRINTYN")){
+			return;
+		} 
+		
+		var param = new DataMap();
+		param.put("list",list);
+		param.put("columnList", "WAREKY,STKNUM");
+		param.put("PRTTYP","PK_LIST");
+		param.put("OWNRKY", "<%=ownrky%>");
+	
+		var json = netUtil.sendData({
+			url : "/wms/admin/json/commonPrint.data",
+			param : param
+		});
+		
+		var prtseq = null;
+		if(json && json.data){
+			prtseq = json.data;
+		}else{
+			alert("출력불가");
+			return;
+		}
+		
+		var url = "KN_shipment_list.ezg?ver=0.15";
+		var wareky  = "<%=wareky%>";
+		var ownrky  = "<%=ownrky%>";		
+		var where = "AND SH.WAREKY='"+wareky+"' AND SH.OWNRKY='"+ownrky+"' AND SH.SHPOKY IN (SELECT SHPOKY FROM TASTP WHERE STKNUM IN (";
+		for(var i=0; i<list.length; i++){
+			var row = list[i];
+			var key = row.get("STKNUM");
+			
+			where += "'"+key+"'";
+			if(i==list.length-1) break;
+			where += " ,";	
+		}
+		where += ") )"; 
+		
+		var map = new DataMap();
+		map.put("WAREKY", "<%=wareky%>");
+		WriteEZgenElement(url, where, "", '<%=langky%>', map, 1300, 950);
+	}
+	
+	//total피킹지시서 출력
+	function TotalPickingPrint(){
+		var list = gridList.getSelectData("gridList");
+		
+		if (list.length == 0){
+			commonUtil.msgBox("VALID_M0006");
+			return;
+		}
+		
+		if(!commonUtil.msgConfirm("SYSTEM_PRINTYN")){
+			return;
+		} 
+		
+		var param = new DataMap();
+		param.put("list",list);
+		param.put("columnList", "WAREKY,STKNUM");
+		param.put("PRTTYP","PKTT_LIST");
+		param.put("OWNRKY", "<%=ownrky%>");
+	
+		var json = netUtil.sendData({
+			url : "/wms/admin/json/commonPrint.data",
+			param : param
+		});
+		
+		var prtseq = null;
+		if(json && json.data){
+			prtseq = json.data;
+		}else{
+			alert("출력불가");
+			return;
+		}
+		
+		var url = "Total피킹 지시서.ezg?ver=0.08";
+		var wareky  = "<%=wareky%>";
+		var ownrky  = "<%=ownrky%>";		
+		var where = "AND SH.WAREKY='"+wareky+"' AND SH.OWNRKY='"+ownrky+"' AND (";
+		for(var i=0; i<list.length; i++){
+			var row = list[i];
+			var key = row.get("STKNUM");
+			
+			where += "TP.STKNUM='"+key+"'";
+			if(i==list.length-1) break;
+			where += " OR ";	
+		}
+		where += ")"; 
+		
+		var map = new DataMap();
+		map.put("WAREKY", wareky)
+		WriteEZgenElement(url, where, "", '<%=langky%>', map, 1300, 900);
+	}
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Delete"){
+			TotalPickingDelete();
+		} else if(btnName == "printShpping"){
+			printShpping();
+		} else if(btnName == "printPicking"){
+			TotalPickingPrint();
+		} else if(btnName == "Search"){
+			searchList()
+		}
+		
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>	
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">								
+				</div>				
+				<div class="fl_r">					
+					<input type="button" CB="Delete DELETE BTN_DELETE" />
+					<input type="button" CB="printShpping PRINT BTN_PRINT24" />
+					<input type="button" CB="printPicking PRINT BTN_TOTPICKPRT" />
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />				
+				</div>			        
+			</div>		
+		<div class="search_inner">
+				<div class="search_wrap ">						
+					<dl>
+                        <dt CL="STD_CREDAT">생성일자</dt>
+                        <dd>
+                            <input type="text" class="input" name="TP.CREDAT" UIFormat="C 0" UIInput="R"/> 
+                        </dd>
+                    </dl>                    
+				</div>	
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>			
+			</div>
+		</div>	
+		<div class="search_next_wrap" style="height: 95%">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_TOTPICKLIST">Total 피킹 리스트</span></a></li>
+				</ul>
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+					 	<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+										<tr CGRow="true">
+												<td GH="40" GCol="rownum">1</td>
+												<td GH="40" GCol="rowCheck"></td>
+												<td GH="100 STD_TOTPICKNUM" GCol="text,STKNUM"></td>												
+												<td GH="80 STD_QTYORDCNT" GCol="text,ORDCNT" GF="N 20,3"></td>
+												<td GH="80 STD_SKUCNT2" GCol="text,SKUCNT" GF="N 20,3"></td>
+												<td GH="80 STD_PICKSTATDO" GCol="text,STATNM"></td>
+												<td GH="100 STD_CREDAT" GCol="text,CREDAT"></td>
+												<td GH="100 STD_CRETIM" GCol="text,CRETIM"></td>
+												<td GH="80 STD_CREUSR" GCol="text,CREUSR"></td>
+												<td GH="80 STD_CUSRNM" GCol="text,CUSRNM"></td>
+											</tr>
+										</tbody>
+									</table>
+									</div>
+							</div>
+							<div class="btn_lit tableUtil">
+									<button type="button" GBtn="find"></button>
+									<button type="button" GBtn="sortReset"></button>
+									<button type="button" GBtn="layout"></button>
+									<button type="button" GBtn="total"></button>
+									<button type="button" GBtn="excel"></button>
+									<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+							</div>
+						</div>
+					  </div>	
+					</div>
+					
+				<!-- //contentContainer -->
+	</div>		
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

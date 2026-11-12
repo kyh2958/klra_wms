@@ -1,0 +1,220 @@
+<%@page import="java.time.LocalDateTime"%>
+<%@page import="java.time.format.DateTimeFormatter"%>
+<%@ page import="project.common.bean.DataMap,project.common.bean.CommonConfig,java.util.*"%>
+<%
+	DataMap paramDataMap = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+
+	if(paramDataMap == null){
+		paramDataMap = new DataMap(request);
+	}
+	
+	String langky = (String)request.getSession().getAttribute(CommonConfig.SES_USER_LANGUAGE_KEY);
+	String wareky = (String)request.getSession().getAttribute(CommonConfig.SES_USER_WHAREHOUSE_KEY);
+	String ownrky = (String)request.getSession().getAttribute(CommonConfig.SES_USER_OWNER_KEY);
+	//String plntky = (String)request.getSession().getAttribute(CommonConfig.SES_USER_PLANT_KEY);
+	String menuky = (String)request.getSession().getAttribute("MENUKY");
+	String menuId = paramDataMap.getString(CommonConfig.MENU_ID_KEY);
+	String mtype = (String)request.getSession().getAttribute(CommonConfig.SES_MTYPE);
+	String deviceType = (String)request.getSession().getAttribute(CommonConfig.SES_DEVICE_TYPE);
+	String dateTime = DateTimeFormatter.ofPattern("yyyyMMddhhmm").format(LocalDateTime.now());
+	String userId = (String)request.getSession().getAttribute(CommonConfig.SES_USER_ID_KEY);
+	String regn01 = (String)request.getSession().getAttribute(CommonConfig.SES_USER_REGN01_KEY);
+	
+	if (regn01 != null) {
+	    regn01 = regn01.trim();
+	}
+%>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<link rel="stylesheet" type="text/css" href="/mobile/css/mobile.css" />
+<link rel="stylesheet" type="text/css" href="/common/css/jquery/jquery-ui.css" />
+<script type="text/javascript" src="/common/js/jquery.js"></script>
+<script type="text/javascript" src="/common/js/jquery-ui.js"></script>
+<%
+	if(langky != null && (langky.equals("CN") || langky.equals("ZH"))){
+%>
+<script type="text/javascript" src="/common/js/datepicker/jquery.ui.datepicker-zh-CN.js"></script>
+<%
+	}else if(langky != null && langky.equals("EN")){
+%>
+<script type="text/javascript" src="/common/js/datepicker/jquery.ui.datepicker-en-GB.js"></script>
+<%
+	}else{
+%>
+<script type="text/javascript" src="/common/js/datepicker/jquery.ui.datepicker-ko.js"></script>
+<%
+	}
+%>
+<script type="text/javascript" src="/common/js/jquery.plugin.js"></script>
+<script type="text/javascript" src="/common/js/jquery.form.js"></script>
+<script type="text/javascript" src="/common/js/json2.js"></script>
+<script type="text/javascript" src="/common/js/dataMap.js"></script>
+<script type="text/javascript" src="/common/js/configData.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/label.js"></script>
+<script type="text/javascript" src="/common/lang/label-<%=langky%>.js"></script>
+<script type="text/javascript" src="/common/lang/message-<%=langky%>.js"></script>
+<script type="text/javascript" src="/common/js/site.js"></script>
+<script type="text/javascript" src="/common/js/big.js"></script>
+<script type="text/javascript" src="/common/js/commonUtil.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/theme.js"></script>
+<script type="text/javascript" src="/common/theme/webdek/js/theme.js"></script>
+<script type="text/javascript" src="/common/js/dataBind.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/input.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/netUtil.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/ui.js"></script>
+<script type="text/javascript" src="/common/js/validateUtil.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/bigdata.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/grid.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/common/js/jquery.cookie.js"></script>
+<script type="text/javascript" src="/mobile/js/mobile.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/mobile/js/mobileHead.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/wms/js/wms.js?ver=<%=dateTime%>"></script>
+<script type="text/javascript" src="/wms/js/sweetalert.js"></script>
+<script>
+
+configData.isMobile = true;
+
+$('document').ready(function () {
+	tableResize();
+	
+	if(!configData.MENU_ID){
+		configData.MENU_ID = '<%=menuId%>';
+	}
+});
+
+// resize event
+var delay = 300;
+var timer = null;
+$(window).on('resize', function() {
+	clearTimeout(timer);
+	timer = setTimeout(function(){
+		tableResize();
+	}, delay);
+});
+
+function isMobile(){
+	return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+	
+function tableResize() {
+	if($('.tableBody').length < 1) {
+		return;
+	};
+	
+	var height = window.innerHeight;
+	$('#searchArea' ).each(function (i, item) {               height -= $(item).height(); });
+	$('.tableHeader').each(function (i, item) {               height -= $(item).height(); });
+	$('.footer_5')   .each(function (i, item) {               height -= $(item).height(); });
+	$('.select_box') .each(function (i, item) { if (i != 0) { height -= $(item).height(); }
+		height -= Number($(item).css('margin-top').replaceAll('px', ''));
+	});
+	/* 가로스크롤 존재 시 가로스크롤 높이만큼 계산 */
+	$('.tableBody').each(function(i, item) {
+		
+		//if(item.scrollWidth > $(item).innerWidth()) {
+			
+			var scrollbarYn = hasHorizontalScrollBar($(".tableWrap_search"));
+			var scrollHeight = getScrollbarWidth();
+			//console.log("scrollbarYn : " + scrollbarYn + " - scrollHeight : " + scrollHeight + " - height : " + height);
+			
+			//height -= isMobile() ? 2 : 20;
+			if(scrollbarYn==true && (scrollHeight!=undefined && Number(height)>Number(scrollHeight))){
+				height -= scrollHeight;
+			}
+		//}
+	});
+	//console.log("height :" + height);
+	$('.tableBody').css('min-height', 0);
+	$('.tableBody').css('height', height);
+
+// 	var height = 0;
+// 	$('.tableHeader').each(function (i, item) {               height -= item.getBoundingClientRect().bottom; }); // from
+// 	$('.footer_5'   ).each(function (i, item) {               height += item.getBoundingClientRect().top   ; }); // to
+// 	$('.select_box') .each(function (i, item) { if (i != 0) { height -= $(item).height();                    }   // additional
+// 		height -= Number($(item).css('margin-top').replaceAll('px', ''));
+
+// 	});
+// 	height -= isMobile() ? 0 : 20;
+// 	$('.tableBody').css('height', height);
+}
+
+function getIntervalDate(date, interval){
+	if(date.length > 8){
+		while(1){
+			if(date.indexOf("-") != -1){
+				date = date.replace("-","");
+			}else if(date.indexOf(".") != -1){
+				date = date.replace(".","");
+			}else if(date.indexOf("/") != -1){
+				date = date.replace("/","");
+			}else{
+				break;
+			}
+		}
+	}
+	
+	var y = date.substring(0,4);
+	var m = date.substring(4,6);
+	var d = date.substring(6,8);
+	
+	var today = new Date(y + "/" + m + "/" + d + " 00:00:00");
+	today.setDate(today.getDate() + (Number)(interval));
+	
+	var year = today.getFullYear();
+    var month = today.getMonth()+1;
+    var date = today.getDate();
+    
+    if (month < 10) month = "0" + month;
+    if (date < 10) date = "0" + date;
+    year = year + "";
+    month = month + "";
+    date = date + "";
+    
+	var resultDate = year+month+date;
+    return resultDate;
+}
+
+var sSound = new Audio("/beepsound/beep_success.mp3");
+var eSound = new Audio("/beepsound/beep_error.mp3"  );
+var vSound = new Audio("/beepsound/beep_vas.mp3"    );
+
+function PlaySound(soundObjectId) {
+	if (soundObjectId == "s" && sSound) { sSound.play() }
+	if (soundObjectId == "e" && eSound) { eSound.play() }
+	if (soundObjectId == "v" && vSound) { vSound.play() }
+}
+
+function hasHorizontalScrollBar(obj) {
+    return obj.get(0) ? obj.get(0).scrollWidth > obj.innerWidth() : false;
+}
+
+function hasVerticalScrollBar(obj) {
+	return obj.get(0) ? obj.get(0).scrollHeight > obj.innerHeight() : false;
+}
+
+function getScrollbarWidth() {
+  var inner = document.createElement('p');
+  inner.style.width = "100%";
+  inner.style.height = "200px";
+
+  var outer = document.createElement('div');
+  outer.style.position = "absolute";
+  outer.style.top = "0px";
+  outer.style.left = "0px";
+  outer.style.visibility = "hidden";
+  outer.style.width = "200px";
+  outer.style.height = "150px";
+  outer.style.overflow = "hidden";
+  outer.appendChild (inner);
+
+  document.body.appendChild (outer);
+  var w1 = inner.offsetWidth;
+  outer.style.overflow = 'scroll';
+  var w2 = inner.offsetWidth;
+  if (w1 == w2) w2 = outer.clientWidth;
+
+  document.body.removeChild (outer);
+
+  return (w1 - w2);
+};
+
+</script>

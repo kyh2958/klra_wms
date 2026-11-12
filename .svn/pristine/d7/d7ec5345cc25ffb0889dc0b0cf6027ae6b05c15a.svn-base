@@ -1,0 +1,333 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	String DEPTID4 = request.getParameter("DEPTID4"); // 블라인드
+	String LOCAKY  = request.getParameter("LOCAKY"); // 로케이션
+	//String BARCOD  = request.getParameter("BARCOD"); // 바코드
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {float: right; }
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:DISABLED {
+	background-color: #e2e2e2;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	$(document).ready(function(){
+		var data = mobile.getLinkPopData();
+
+		var param = new DataMap();
+		param.put('searchType', data.get('searchType'));
+		param.put('PHYIKY', data.get('PHYIKY'));
+		param.put('LOTA14', data.get('BARCOD'));
+		
+		var json = netUtil.sendData({
+			id : "gridList",
+			module : "WmsInventory",
+			command : "PDPC02_DTL",
+			param : param
+		});
+
+		if (json.data.length == 1){
+			//data.put('SKUKEY', json.data[0]['SKUKEY']);
+			data = new DataMap();
+			data.putObject(json.data[0]);
+			data.put('param', param);
+			
+			$('#BARCOD').val(json.data[0]['LOTA14'])
+		}
+
+		dataBind.dataNameBind(data, "bindArea");
+		$('#QTYPDA').val(setDecimalValue(0, 0)); // QTYPDA init
+		
+		gridList.setGrid({
+			id : "gridList",
+			module : "WmsInventory",
+			command : "PDPC02_DTL",
+			gridMobileType : true
+		});
+		
+		var param = new DataMap();
+
+		param.put('searchType', data.get('searchType'));
+		param.put('PHYIKY', data.get('PHYIKY'));
+		param.put('SKUKEY', data.get('SKUKEY'));
+		param.put('LOCAKY', data.get('LOCAKY'));
+		param.put('LOTA14', data.get('LOTA14'));
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	});
+
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if (dataLength > 0) {
+			onReadBarcode();
+			
+			PlaySound('s');
+		} else {
+			PlaySound('e');
+		}
+	}
+	
+	function onReadBarcode() {
+		var BARCOD = $('#BARCOD').val();
+		if (!BARCOD) {
+			return;
+		}
+		
+		var list = gridList.getGridData('gridList', true);
+		var finded = list.find(data => data.get("LOTA14") == BARCOD && !Number(data.get('QTYPDA'))); // 바코드가 동일하면서 PDA실사수량이 0인 데이터 find
+		if (finded) {
+			var QTSIWH = finded.get('DEPTID4').trim() ? 0 : Number(finded.get("QTSIWH"));
+			$('#QTYPDA').val(setDecimalValue(QTSIWH, 0));
+			
+			var rowNum = finded.get("GRowNum");
+			var QTYPDA = gridList.getColData("gridList", rowNum, "QTYPDA");
+			
+			gridList.setColValue("gridList", rowNum, "QTYPDA", QTSIWH);
+			gridList.setColFocus("gridList", rowNum, 'LOTA14');
+			$('#BARCOD').focus();
+		} else {
+			commonUtil.msgBox("INV_M0081", null, null, function () {
+				$('#BARCOD').focus();
+				closePop();
+			}); // 지시된 품목이 존재하지 않거나 이미 실사가 완료된 재고입니다.
+		}
+	}
+	
+	function onChangeQtyPda (id) {
+		$tag = $('#' + id);
+		$tag.val(setDecimalValue($tag.val(), 0));
+		
+		var rowNum = gridList.getFocusRowNum('gridList');
+		gridList.setColValue("gridList", rowNum, "QTYPDA", $('#QTYPDA').val());
+		gridList.setColFocus("gridList", rowNum, 'LOTA14');
+		$('#BARCOD').focus();
+	}
+	
+	function saveData() {
+		if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+			return;
+		}
+		// 수정된 데이터 가져오기
+		var modifyList = gridList.getModifyList("gridList", "A");
+		if (modifyList.length > 0) {
+			var param = new DataMap();
+			param.put("list", modifyList);
+			param.put("PROGID", "<%=menuId%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			var json = netUtil.sendData({
+				url : "/wms/inventory/json/savePDPC01.data",
+				param : param
+			});
+			
+			if(json && json.data){
+				commonUtil.msgBox("MASTER_M0564", null, null, function () {
+					// 팝업 닫고 재조회
+					window.opener.searchList();
+					closePop();
+				}); //저장이 완료되었습니다.
+				
+			}
+		} else {
+			commonUtil.msgBox("TASK_M0003"); // 레코드가 선택되지 않았습니다.
+			return false;
+		}
+	}
+	
+	function closePop () {
+		mobile.linkPopClose();
+	}
+	
+	function setDecimalValue(str, decimal) {
+		str = new String(str);
+		var regex = /[^0-9.]/g;
+		var number = Number(str.replace(regex, ""));
+		number = number ? number : 0;
+		return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap" id="bindArea">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+					</colgroup>
+					<tbody>
+						<tr>
+							<th CL="STD_LOCAKY">지번</th>
+							<td colspan="3"><input type="text" class="text" name="LOCAKY" id="LOCAKY" readonly/></td>
+						</tr>
+						<tr>
+							<th CL="STD_SKUKEY">품목코드</th>
+							<td colspan="3"><input type="text" class="text" name="SKUKEY" id="SKUKEY" readonly/></td>
+						</tr>
+						<tr>
+							<th CL="STD_DESC01">품목명</th>
+							<td colspan="3"><input type="text" class="text" name="DESC01" id="DESC01" readonly/></td>
+						</tr>
+						<tr>
+							<th CL="STD_BARCOD">바코드</th>
+							<td colspan="3"><input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')"/></td>
+						</tr>
+						<tr>
+							<th CL="STD_QTYPDA">PDA실사수량</th>
+							<td colspan="2"><input type="text" class="text" name="QTYPDA" id="QTYPDA" inputmode="none" onfocus="fn_onfocus(this.id)" onchange="onChangeQtyPda(this.id)" style="text-align: right"/></td>
+							<td colspan="1"><input type="text" class="text" name="UOMKEY" id="UOMKEY" readonly/></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section">
+				<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="50px"  />
+							<col width="120px" />
+							<col width="50px" />
+						<% if (DEPTID4 != null && !"V".equals(DEPTID4)){ %>
+							<col width="120px" />
+						<% } %>
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="150px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="100px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th CL="STD_NUMBER">1</th>
+								<th CL="STD_LOTA14">개별바코드		</th>
+								<th CL="STD_LOTA06">재고상태		</th>
+							<% if (DEPTID4 != null && !"V".equals(DEPTID4)){ %>
+								<th CL="STD_ORDQTY">지시수량		</th>
+							<% } %>
+								<th CL="STD_QTYPDA">PDA실사수량	</th>
+								<th CL="STD_UOMKEY">단위			</th>
+								<th CL="STD_BOXQT">BOX			</th>
+								<th CL="STD_LOTA02">플랜트		</th>
+								<th CL="STD_LOTA01">저장위치		</th>
+								<th CL="STD_LOTA04">호기			</th>
+								<th CL="STD_LOTA08">국가코드		</th>
+								<th CL="STD_LOTA07">주문번호		</th>
+								<th CL="STD_LOTA09">거래처코드MTO	</th>
+								<th CL="STD_LOTA11">제조일자		</th>
+								<th CL="STD_LOTA12">입고일자		</th>
+								<th CL="STD_LOTA13">유통기한		</th>
+								<th CL="STD_LOTA15">LOT번호		</th>
+								<th CL="STD_LOTA03">포장타입		</th>
+								<th CL="STD_LOTA16">평량			</th>
+								<th CL="STD_LOTA17">컨테이너유형	</th>
+								<th CL="STD_WAREKY">거점			</th>
+								<th CL="STD_WARENM">거점명		</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="50px"  />
+							<col width="120px" />
+							<col width="50px" />
+						<% if (DEPTID4 != null && !"V".equals(DEPTID4)){ %>
+							<col width="120px" />
+						<% } %>
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="150px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="100px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								<td GCol="text,LOTA14"				>개별바코드	</td>
+								<td GCol="text,LOTA06NM"			>재고상태		</td>
+							<% if (DEPTID4 != null && !"V".equals(DEPTID4)){ %>
+								<td GCol="text,QTSIWH"	GF="N 20"	>지시수량		</td>
+							<% } %>
+								<td GCol="text,QTYPDA"	GF="N 20"	>PDA실사수량	</td>
+								<td GCol="text,UOMKEY"				>단위			</td>
+								<td GCol="text,BOXQT"				>BAG/BOX	</td>
+								<td Gcol="text,LOTA02"				>플랜트		</td>
+								<td Gcol="text,LOTA01"				>저장위치		</td>
+								<td Gcol="text,LOTA04"				>호기			</td>
+								<td Gcol="text,LOTA08"				>국가코드		</td>
+								<td Gcol="text,LOTA07"				>주문번호		</td>
+								<td Gcol="text,LOTA09"				>거래처코드MTO	</td>
+								<td Gcol="text,LOTA11"	GF="C"		>제조일자		</td>
+								<td Gcol="text,LOTA12"	GF="C"		>입고일자		</td>
+								<td Gcol="text,LOTA13"	GF="C"		>유통기한		</td>
+								<td Gcol="text,LOTA15"				>LOT번호		</td>
+								<td Gcol="text,LOTA03"				>포장타입		</td>
+								<td Gcol="text,LOTA16"	GF="N 20,3"	>평량			</td>
+								<td Gcol="text,LOTA17"				>컨테이너유형	</td>
+								<td Gcol="text,WAREKY"				>거점			</td>
+								<td Gcol="text,WARENM"				>거점명		</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 onclick ="closePop()" width="50%"><label CL='BTN_PREVITEM'></label></td>
+						<td class=f_1 onclick ="saveData()" width="50%"><label CL='BTN_SAVE'></label></td>
+					</tr>
+				</table>
+			</div>
+			<!-- end footer_5 -->	
+		</div>
+	</div>
+</body>

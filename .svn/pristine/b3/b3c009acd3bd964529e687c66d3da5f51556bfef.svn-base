@@ -1,0 +1,696 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {float: right; }
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:DISABLED {
+	background-color: #e2e2e2;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+
+<script type="text/javascript" src="/wms/js/wms.js"></script>
+<script>
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			module         : "WmsMobileInboundGoodsReceipt",
+			command        : "PDGR122",	// 임가공입고 리스트 정보 조회 생성 ()
+			gridMobileType : true,
+			editable       : false
+		});
+		
+		gridList.setGrid({
+			id : "gridList2",
+			module         : "WmsMobileInboundGoodsReceipt",
+			command        : "PDGR122",	// 임가공입고 리스트 정보 조회 생성 ()
+			gridMobileType : true,
+			editable       : false
+		});
+		
+		//searchDocList();
+		$('#EBELN').val('');
+		$('#EBELN').focus();
+		searchList();
+	});
+
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+
+	function initGrid() {
+		gridList.resetGrid('gridList');
+	}
+	
+	function searchDocList() {
+		mobile.linkPopOpen('/mobile/PDGR122_DOC_POP.page');
+	}
+	
+	function DocPopCallback (data) {
+		$('#EBELN').val(data.get('EBELN'));
+		searchList();
+	}
+	
+	function searchList() {
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", '<%= wareky %>');
+		//param.put('LOTA02', 'P400');
+
+		if (!param.containsKey('EBELN') || !param.get("EBELN").trim()) {
+			return;
+		}
+		
+		gridList.resetGrid('gridList');
+		gridList.resetGrid('gridList2');
+		
+		listChange('ORDER_DIV')
+
+		$("#N00102_IN").val("");
+		$("#BARCOD").val("");
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	}
+	
+	/* 바코드 스캔 이벤트 */
+	function onReadBarcode() {
+
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		
+		var list = gridList.getGridData("gridList2");
+
+		for (var i = 0; i < list.length; i++) {
+			var lota14 = list[i].map.LOTA14;
+			
+			if ($("#BARCOD").val() == lota14) {
+				alert('이미 스캔된 바코드 입니다.');
+				return;
+			}        
+		}
+
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command : "VALIDATE_BARCOD_PDMV01",
+			param : param
+		});
+
+		var checkMsg = "";
+
+		if (json && json.data && json.data.length > 0) {
+
+			listChange('BARCOD_DIV')
+			
+			
+			var data = json.data.filter(x => x.QTSIWH > 0);
+			var msg = "";
+			if (data.length > 0) {
+				if (data.filter(x => {return x.LOCAKY != 'SYSLOC'}).length == 0) { // 수량이 존재하는 재고가 SYSLOC만 존재하는 경우
+					msg = '사용 불가능한 재고입니다.';
+				} else if (data.filter(x => x.QTSPMO == 0).length == 0) {
+					msg = '이미 할당이 완료된 바코드입니다.';
+				} else if (data.filter(x => x.LOCAKY != 'SHPLOC').length == 0) { // 수량이 존재하는 재고가 SHPLOC만 존재하는 경우
+					msg = '출고중인 재고입니다.';
+				}
+			} else {
+				if (json.data.filter(x => x.LOCAKY != 'SHPLOC').length == 0) {  // 수량이 존재하지 않는 재고가 SHPLOC만 존재하는 경우
+					msg = '출고 완료된 재고입니다.';
+				}
+			}
+			
+			if (msg) {
+				commonUtil.msgBox(msg, null, null, function() {
+					$('#BARCOD').focus();
+				});
+				return false;
+			}
+			
+			// 1. 그리드 헤더 데이터 (SKU 기준 집계)
+			var head = gridList.getGridData("gridList");
+			var mergeHead = mergeByC00102(head);
+
+			// 2. 스캔 데이터 (LOTA14 + SKUKEY 기준 집계)
+			var mergedJson = mergeByLota14Sku(json);
+
+			// 3. 합계 및 그리드 반영
+			var n00102Sum = Number($("#N00102_IN").val());
+	
+
+			for (var i = 0; i < mergedJson.length; i++) {
+			    var data = mergedJson[i];
+
+			    for (var j = 0; j < mergeHead.length; j++) {
+			        var c00102 = mergeHead[j].map.C00102;
+
+			        n00102Sum += Number(data.QTSIWH); // ✔ 여기서만 누적
+		            gridList.appendJson('gridList2', {data:[data]}); // append grid
+		            
+			        if (c00102 == data.SKUKEY) {
+			            //break; // 같은 SKU 중복 방지
+			            // 그리드 추가하기
+			            //n00102Sum += Number(data.QTSIWH); // ✔ 여기서만 누적
+			            //gridList.appendJson('gridList2', {data:[data]}); // append grid
+			        }
+			    }
+			}
+
+			$("#N00102_IN").val(n00102Sum);
+		}else {
+			alert('스캔된 개별바코드 정보가 없습니다')
+		}
+		
+		$('#BARCOD').focus();
+	}
+	
+	/* 더블클릭 이벤트 */ 
+	function gridListEventRowDblclick(gridId, rowNum, colName, colValue) {
+		//openDetailPop(rowNum);
+	}
+	
+	function openRegistPop() {
+		
+	}
+	
+	function openDetailPop(rowNum) {
+		
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			param.put("WAREKY", '<%=wareky%>');
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			return param;
+		}
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList"){
+			
+			var n00102Sum = 0;
+			var ebelp = "";
+			var vbelv = "";
+			var posnv = "";
+			
+			for(var i=0; i < dataLength; i++){
+				
+				n00102Sum += gridList.getColData(gridId, i, "N00102")*1;
+
+				if (i == 0 || ebelp != gridList.getColData(gridId, i, "EBELP")) {
+				} else {
+				}
+				
+				ebelp = gridList.getColData(gridId, i, "EBELP");
+				vbelv = gridList.getColData(gridId, i, "VBELV");
+				posnv = gridList.getColData(gridId, i, "POSNV");
+	 		}
+			
+			$("#N00102_SUM").val(n00102Sum);
+			$("#VBELV").val(vbelv);	// SAP 판매출고 RFC호출을 위한 파라메터
+			$("#POSNV").val(posnv); // SAP 판매출고 RFC호출을 위한 파라메터
+		}
+	}
+	
+	function ebelnPopCallback(data) {
+		
+		//$('#PHYIKY').val(data.get('PHYIKY'));
+		//searchList();
+		
+		
+		var EBELN = data.get("EBELN");
+		$("#EBELN").val(EBELN);
+		
+		searchList();
+		
+		
+	}
+	
+	function listChange(id){
+		
+		const radio = document.querySelector("input[name='searchType'][value='" + id + "']");
+		
+		if (radio) {
+	        radio.checked = true;
+		}
+		
+		if (id == "ORDER_DIV") {
+			$("#ORDER_DIV").show();
+			$("#BARCOD_DIV").hide();
+		} else {
+			
+			if (gridList.getGridData("gridList").length < 1) {
+				//조회 후 바코드 스캔 해주세요.
+				alert('조회 후 바코드 스캔 해주세요.');
+				location.reload();
+			}
+			
+			$("#BARCOD_DIV").show();
+			$("#ORDER_DIV").hide();
+		}
+	}
+	
+	function mergeByC00102(list) {
+
+	    const map = new Map();
+
+	    list.forEach(item => {
+	        const key = item.SKUKEY;   // = C00102
+	        
+	        if (map.has(key)) {
+	        } else {
+	            // 최초 → 객체 복사 + 숫자화
+	            map.set(key, {
+	                ...item
+	            });
+	        }
+	    });
+
+	    return Array.from(map.values());
+	}
+	
+	function mergeByLota14Sku(json) {
+
+	    const resultMap = new Map();
+
+	    json.data.forEach(item => {
+	        const key = item.LOTA14 + "|" + item.SKUKEY;
+	        const qty = Number(item.QTSIWH || 0);
+
+	        if (resultMap.has(key)) {
+	            // 이미 존재 → 수량 합산
+	            resultMap.get(key).QTSIWH += qty;
+	        } else {
+	            // 최초 → 객체 복사 + QTSIWH 숫자화
+	            resultMap.set(key, {
+	                ...item,
+	                QTSIWH: qty
+	            });
+	        }
+	    });
+
+	    return Array.from(resultMap.values());
+	}
+	
+	function saveData1() {
+		
+		var param = new DataMap();
+		param.put("WAREKY", '<%=wareky%>');
+		param.put("EBELN", $("#EBELN").val());
+
+		// 스캔된 바코드 목록 
+		var lota14List = "";
+		var skukeyList = gridList.getGridData("gridList");
+		var barcodList = gridList.getGridData("gridList2");
+		
+		if ($("#N00102_SUM").val() > $("#N00102_IN").val()) {
+			alert("스캔된 바코드의 수량이 부족합니다");
+			return;
+		}
+		
+		if (barcodList.length < 1) {
+			alert("구성품 바코드를 스캔해주세요");
+			return;
+		}
+		
+		for (var i in skukeyList) {
+			var rowData = skukeyList[i];
+			
+			var ebelp = rowData.get('EBELP');
+			var palqty = rowData.get("PALQTY");
+			
+			if (palqty == "0.0") {
+				alert("기본단위 PLT 입력 필요");
+				return
+			}
+
+			
+			console.dir("PALQTY_"+ebelp + " > " + palqty)
+			
+			param.put("PALQTY_"+ebelp, palqty);
+		}
+		
+		var lota14_list = "";
+		for (var i in barcodList) {
+			var rowData = barcodList[i];
+			
+			var lota14 = rowData.get('LOTA14');
+			
+			if (i>0){
+				lota14_list +=",";
+			}
+			
+			lota14_list += lota14;
+		}
+		
+		param.put("LOTA14_LIST", lota14_list);
+		
+		console.log($("#N00102_SUM").val() + " / " + $("#N00102_IN").val()+ " / " + barcodList.length )
+		console.dir(param)
+		
+		
+		//상차완료 하시겠습니까?
+		// 입고처리 하겠습니까?
+		///common/omsApi/json/OMS_IF_2041/C.*
+		//PDA 입고를 위한 컨트롤러 신규생성 할지, AJAX 요청으로 처리할지 고민
+		commonUtil.msgConfirm("MOBILE_M0062",null, function () {			
+			
+			var json = netUtil.sendData({
+				url: "/common/omsApi/json/OMS_IF_2041/C.data",
+				param: param
+			});
+			
+			console.dir(json);
+			
+		});
+		
+		
+	}
+	
+	
+	function saveData() {
+
+	    // 1. 수량 검증
+	    var orderQty = Number($("#N00102_SUM").val() || 0);
+	    var scanQty  = Number($("#N00102_IN").val() || 0);
+
+	    if (scanQty < orderQty) {
+	        //alert("스캔된 바코드의 수량이 부족합니다");
+	        //return;
+	    }
+
+	    // 2. 그리드 데이터
+	    var skuList     = gridList.getGridData("gridList");
+	    var barcodeList = gridList.getGridData("gridList2");
+
+	    if (!barcodeList || barcodeList.length < 1) {
+	        alert("구성품 바코드를 스캔해주세요");
+	        return;
+	    }
+
+	    // 3. 전송 파라미터 (Plain Object)
+	    var param = {};
+	    param.WAREKY = '<%=wareky%>';
+	    param.EBELN  = $("#EBELN").val();
+
+	    // 4. PALQTY 동적 key
+	    for (var i = 0; i < skuList.length; i++) {
+	        var rowData = skuList[i];
+
+	        var ebelp  = rowData.get("EBELP");
+	        var palqty = rowData.get("PALQTY");
+
+	        if (!palqty || palqty === "0.0") {
+	            alert("기본단위 PLT 입력 필요");
+	            listChange('ORDER_DIV')
+	            return;
+	        }
+
+	        param["PALQTY_" + ebelp] = palqty;
+	    }
+
+	    // 5. LOTA14 목록
+	    var lota14List = [];
+	    for (var i = 0; i < barcodeList.length; i++) {
+	        lota14List.push(barcodeList[i].get("LOTA14"));
+	    }
+	    param.LOTA14_LIST = lota14List.join(",");
+
+	    // 입고처리 하겠습니까?
+		commonUtil.msgConfirm("MOBILE_M0062",null, function () {			
+			// 6. AJAX 전송
+		    $.ajax({
+		        type        : "POST",
+		        url         : "/common/omsApi/json/OMS_IF_2041/C.data",
+		        contentType : "application/x-www-form-urlencoded",
+		        dataType    : "json",
+		        data        : param,
+		        success     : function (json) {
+		            console.dir(json);
+		            console.dir(json.result);
+		            if (json.result == "SUCCESS") {
+		            	callSapFunc();	
+		            	alert(json.MSG)
+
+		            	location.reload();
+		            }else {
+		            	if (json.MSG.length) {
+			            	alert(json.MSG)
+			            	location.reload();
+		            	}else {
+		            		alert(json)
+		            	}
+		            }
+		            // {"MSG":"입고처리 요청이 완료되었습니다.","result":"SUCCESS","IFID":""} 
+		        },
+		        error       : function (xhr, status, err) {
+		            console.error(err);
+		        }
+		    });
+		});
+	}
+
+	function callSapFunc() {
+
+		// 완제품 기준 MTO 가용성 점검 수행 (테스트 코드)
+		if (0) {
+			var param = new DataMap();
+			param.put("IFID", "WMS_IF_2162");	// 신규 생성
+			param.put("IFTBL", "IFWMS203");		// 신규 생성
+			param.put("BWART", "");
+	 		param.put("RFCFN", "Z_SD_WEB_ATP_CHECK");
+	 		param.put("RFCTBL", "T_INPUT");
+	 		param.put("RFCP1", "T_OUTPUT");
+	 		param.put("RFCP2", "");
+
+	 		param.put("VBELN", "0048287293");
+	 		param.put("POSNR", "000020");
+
+	 		
+			var json = netUtil.sendData({
+				url : "/rfc/json/rfcCall.data",
+				param : param,
+			});	
+	 		
+			console.dir(json)
+		}
+		
+		var list = gridList.getGridData("gridList");
+		var ebelp = "";
+
+		// 완제품 기준 MTO 가용성 점검 수행
+		for (var i = 0; i < list.length; i++) {
+			
+			var data = list[i].map;
+			
+			if (i == 0) {
+				ebelp = data.EBELP;
+			}
+			
+			if (i == 0 || ebelp != data.EBELP) {
+				ebelp = data.EBELP;
+				
+				console.log(data.EBELP + " / " + data.VBELV + " / " + data.POSNV)
+				
+				if (data.VBELV != "" && data.POSNV != "") {
+    		
+		    		var param = new DataMap();
+					param.put("IFID", "WMS_IF_2162");	// 신규 생성
+					param.put("IFTBL", "IFWMS203");		// 신규 생성
+					param.put("BWART", "");
+			 		param.put("RFCFN", "Z_SD_WEB_ATP_CHECK");
+			 		param.put("RFCTBL", "T_INPUT");
+			 		param.put("RFCP1", "T_OUTPUT");
+			 		param.put("RFCP2", "");
+		
+			 		param.put("VBELN", data.VBELV);
+			 		param.put("POSNR", data.POSNV);
+		
+			 		
+					var json = netUtil.sendData({
+						url : "/rfc/json/rfcCall.data",
+						param : param,
+					});	
+			 		
+					console.dir(json)
+		    	}
+			}
+		}
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="20%" />
+						<col width="10%" />
+						<col width="10%" />
+						<col width="15%" />
+						<col width="10%" />
+						<col width="10%" />
+						<col width="*" />
+					</colgroup>
+					<tbody id="searchArea">
+						<tr>
+							<th CL='STD_EBELN'>오더번호</th>
+							<td colspan="5">
+								<input type="text" class="text" name="EBELN" id="EBELN" inputmode="text" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'searchList()')" style="text-align:center; float:left;"/>
+								<input type='hidden' name='VBELV' id='VBELV' />
+								<input type='hidden' name='POSNV' id='POSNV' />
+							</td>
+							<td colspan="1" onclick ="searchDocList()">
+								<button class="bt" style="height: 32px; min-width: 70px;"><p CL='BTN_FINDDATA'></p></button>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_QTYORG'>오더수량</th>
+							<td CL='STD_QTYRCV1' colspan="2">완제품</td>
+							<td colspan="1">
+								<input type="text" class="text" name="N00102_SUM" id="N00102_SUM" inputmode="none" value='0' readonly style="text-align:center; float:left;"/>
+							</td>
+							<td CL='STD_QTYSCAN' colspan="2">구성품</td>
+							<td colspan="">
+								<input type="text" class="text" name="N00102_IN" id="N00102_IN" inputmode="none" value='0' readonly style="text-align:center; float:left;"/>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_BARCOD' colspan="1">바코드</th>
+							<td colspan="8">
+								<input type="text" class="text" name="BARCOD" id="BARCOD" inputmode="none" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')" style="text-align:center; float:left;"/>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_LIST'>리스트</th>
+							<td CL='STD_140' colspan="2">완제품/구성품</td>
+							<td><input type="radio" class="text" name="searchType" value='ORDER_DIV' checked onchange="listChange('ORDER_DIV')"/></td>
+							<td CL='STD_SHPBCD' colspan="2">바코드목록</td>
+							<td><input type="radio" class="text" name="searchType" value='BARCOD_DIV' onchange="listChange('BARCOD_DIV')"/></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div id='ORDER_DIV' class="tableWrap_search section" style="margin-bottom: 0px;">
+				<div class="tableHeader">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="60px"/>
+							<col width="40px"/>
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="40px"/>
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO"		>No.</th>
+								<th CL="STD_SKUKEY"	>완제품</th>
+								<th CL="STD_MENGE"	>수량</th>
+								<th CL="STD_PALQTY"	>수량</th>
+								<th CL="STD_UOMKEY"	>단위</th>
+								<th CL="STD_C00102"	>구성품</th>
+								<th CL="STD_MENGE"	>수량</th>
+								<th CL="STD_UOMKEY"	>단위</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="60px"/>
+							<col width="40px"/>
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="40px"/>
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum"					>No.</td>
+								<td GCol="text,SKUKEY"				>완제품</td>
+								<td GCol="text,MENGE"				>수량</td>
+								<td GCol="input,PALQTY"				>기본단위/PLT</td>
+								<td GCol="text,MEINS"				>단위</td>
+								<td GCol="text,C00102"				>구성품</td>
+								<td GCol="text,N00102"				>수량</td>
+								<td GCol="text,C00104"				>단위</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div id='BARCOD_DIV' class="tableWrap_search section" style="margin-bottom: 0px; display: none;">
+				<div class="tableHeader">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="120px"/>
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="40px"/>
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO"		>No.</th>
+								<th CL="STD_SKUKEY"	>품목코드</th>
+								<th CL="STD_LOTA14"	>개별바코드</th>
+								<th CL="STD_MENGE"	>수량</th>
+								<th CL="STD_UOMKEY"	>단위</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="120px"/>
+							<col width="140px"/>
+							<col width="50px"/>
+							<col width="40px"/>
+						</colgroup>
+						<tbody id="gridList2">
+							<tr CGRow="true">
+								<td GCol="rownum"					>No.</td>
+								<td GCol="text,SKUKEY"				>품목코드</td>
+								<td GCol="text,LOTA14"				>개별바코드</td>
+								<td GCol="text,QTSIWH"				>수량</td>
+								<td GCol="text,DUOMKY"				>단위</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="50%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'>닫기</label>
+						</td>
+						<td class=f_1 width="50%" onclick ="saveData()" >
+							<label CL='STD_INBOUND'>입고</label>
+						</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+</body>

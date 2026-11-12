@@ -1,0 +1,81 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript">
+	//     $(document).ready(function(){
+	//     	webix.ui({
+	//             view: "chart",
+	//             type:"donut",
+	//             container:"chartDiv",
+	//             value:"#sales#",
+	//             color:"#color#",
+	//             legend:{
+	//                 width: 75,
+	//                 align:"right",
+	//                 valign:"middle",
+	//                 template:"#month#"
+	//             },
+	//             pieInnerText:"#sales#",
+	//             shadow:0,
+	//             gradient:false,
+	//             data:month_dataset
+	//         });
+	//     });
+    
+    function test(){
+        var loop = 3;
+        var param = dataBind.paramData("searchArea");
+        param.put("async", true);
+        param.put("messageOption", {
+            total_count : loop,
+            current_count : 1,
+            message   : "출고완료 진행중입니다."    
+        })
+        sendTest(param);
+    }
+    
+    function sendTest(param, recall){
+        if(param.map.messageOption){
+        	netUtil.processMessage(param);
+	    }
+        
+        setTimeout(function(){
+        	var json = netUtil.sendData({
+                url : "/wms/outbound/json/test.data",
+                param : param,
+                async : true,       // 응답없는 메시지 제거를위해 비동기 처리
+                loading : true,     // 전체완료될때까지 로딩 유지
+                recall : recall,    // 로딩이미지 적용을위해 재귀호출시 필요
+                callBackFunction : function(returnData){
+                    if(param.map.messageOption.total_count >= param.map.messageOption.current_count){
+                        sendTest(param, true);
+                    }else{
+                        netUtil.processMessageOff();
+                    }
+                }
+            });
+        }, 100);
+    }
+    
+    
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+    <div class="content_inner">
+        <%@ include file="/common/include/webdek/title.jsp" %>
+        <div id="chartDiv" style="width:400px;height:250px;margin:20px"></div>
+        <button value="TEST" onclick="javascript:test();">Test Click</button>
+    </div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

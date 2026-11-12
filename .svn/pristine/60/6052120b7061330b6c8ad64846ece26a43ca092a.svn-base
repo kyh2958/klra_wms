@@ -1,0 +1,53 @@
+package project.common.controller;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import project.common.task.SseEventManager;
+
+@WebServlet("/api/sse/subscribe")
+public class SseServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        String topic = req.getParameter("topic");
+        if (topic == null) topic = "default";
+
+        resp.setContentType("text/event-stream");
+        resp.setCharacterEncoding("UTF-8");
+        resp.setHeader("Cache-Control", "no-cache");
+        resp.setHeader("Connection", "keep-alive");
+
+        PrintWriter writer = resp.getWriter();
+
+        // 클라이언트 등록
+        SseEventManager.addClient(topic, writer);
+
+        // 최초 연결 이벤트
+        writer.write("event: connected\n");
+        writer.write("data: SSE Connected (" + topic + ")\n\n");
+        writer.flush();
+
+        try {
+            while (!writer.checkError()) {
+                try {
+                    Thread.sleep(30000); // keep-alive
+                } catch (InterruptedException ie) {
+                    // 인터럽트 복구 + 루프 종료
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        } finally {
+            // 반드시 정리
+            SseEventManager.removeClient(topic, writer);
+        }
+    }
+}

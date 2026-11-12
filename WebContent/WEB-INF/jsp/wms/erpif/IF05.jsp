@@ -1,0 +1,233 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript">
+// 	var refresh;
+	
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList1",
+			editable : true,
+			module : "Erpif",
+			command : "IF_CHK",
+			colHoldType: true,
+			colHold: "IFTBL,IFID,IFNM",
+			colorType : true
+		});
+		
+// 		refresh = setInterval(function() {
+// 			searchList();
+// 		}, 3000);
+
+// 		clearInterval(refresh);
+	});
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			// 조회
+			searchList();
+		}
+	}
+		
+	function searchList(){
+		if(validate.check("searchArea")){
+			var param = inputList.setRangeDataParam("searchArea");
+
+			gridList.gridList({
+				id : "gridList1",
+				param : param
+			});
+		}
+		
+		$("#tab1").trigger('click'); 
+	}
+	
+// 	function gridListColColorChange(gridId, rowNum, colName, colValue){
+// 		if(gridId == "gridList1"){
+// 			if(colName == "IFID"){
+// // 				if(colValue == "BTN"){
+// 					return configData.GRID_COLOR_TEXT_RED_CLASS;
+// // 				}
+// 			}
+// 		}
+// 	}
+	
+	function gridListRowColorChange(gridId, rowNum, rowData){
+		if(gridId == "gridList1"){
+			if(rowData.get("PRCFLG") == "E"){
+				return configData.GRID_COLOR_BG_RED_CLASS;
+			}
+			if(rowData.get("PRCFLG") == "I" || rowData.get("IFTBL") == "ROLLBACK"){
+				return configData.GRID_COLOR_BG_YELLOW_CLASS;
+			}
+		}
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap">
+					<dl>
+						<dt CL="현시점 이전일수" style="width:100px;">현시점 이전일수</dt>
+						<dd style="width:50px;">
+							<input type="text" name="STDAY" class="input" value="1" style="width:50px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_MATNR" style="width:60px;">품목코드</dt>
+						<dd style="width:120px;">
+							<input type="text" name="MATNR" class="input" style="width:120px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_EBELN" style="width:60px;">오더번호</dt>
+						<dd style="width:80px;">
+							<input type="text" name="ORDNUM" class="input" style="width:80px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_ZDOC_NO" style="width:85px;">WMS문서번호</dt>
+						<dd style="width:140px;">
+							<input type="text" name="ZDOC_NO" class="input" style="width:140px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_STKNUM" style="width:60px;">선적번호</dt>
+						<dd style="width:100px;">
+							<input type="text" name="STKNUM" class="input" style="width:100px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_LOTA14" style="width:70px;">개별바코드</dt>
+						<dd style="width:110px;">
+							<input type="text" name="LOTA14" class="input" style="width:110px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_LOTA15" style="width:60px;">SAP배치번호</dt>
+						<dd style="width:100px;">
+							<input type="text" name="LOTA15" class="input" style="width:100px;"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="ROLLBACK" style="width:53px;">롤백</dt>
+						<dd style="width:60px;">
+							<input type="checkbox" name="ROLLBACK" class="input" value="V" style="width:50px;" checked="checked"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="선적통제문서 포함" style="width:110px;">선적통제문서 포함</dt>
+						<dd>
+							<input type="checkbox" name="TKNUMAT" class="input" value="V" style="width:50px;"/>
+						</dd>
+					</dl>
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+		<div class="search_next_wrap">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tabs1-1" CL='STD_LIST'><span>리스트</span></a></li>
+				</ul>
+				<div class="table_box section" id="tabs1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList1">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum"></td>
+										<td GH="100 IFTBL" GCol="text,IFTBL">IFTBL</td>
+										<td GH="100 SEQNO" GCol="text,SEQNO">SEQNO</td>
+										<td GH="100 IFID" GCol="text,IFID">IFID</td>
+										<td GH="250 IFNM" GCol="text,IFNM">IFNM</td>
+										<td GH="250 LOGSEQNO" GCol="text,LOGSEQNO">LOGSEQNO</td>
+										<td GH="150 MATNR" GCol="text,MATNR">MATNR</td>
+										<td GH="60 QTY" GCol="text,CNT">QTY</td>
+										<td GH="60 MEINS" GCol="text,MEINS">MEINS</td>
+										<td GH="60 STATUS" GCol="text,STATUS">STATUS</td>
+										<td GH="150 ZDOC_NO" GCol="text,ZDOC_NO">ZDOC_NO</td>
+										<td GH="100 ZDOC_ITEM" GCol="text,ZDOC_ITEM">ZDOC_ITEM</td>
+										<td GH="200 REMARK" GCol="text,REMARK">REMARK</td>
+										<td GH="170 ORDNUM" GCol="text,ORDNUM">ORDNUM</td>
+										<td GH="100 ITEMNO" GCol="text,ITEMNO">ITEMNO</td>
+										<td GH="100 SCHDAT" GCol="text,DAT">SCHDAT</td>
+										<td GH="100 STKNUM" GCol="text,STKNUM">STKNUM</td>
+										<td GH="100 BWARTSAP" GCol="text,BWARTSAP">BWARTSAP</td>
+										<td GH="100 LOTA01" GCol="text,LOTA01">LOTA01</td>
+										<td GH="100 LOTA02" GCol="text,LOTA02">LOTA02</td>
+										<td GH="100 LOTA03" GCol="text,LOTA03">LOTA03</td>
+										<td GH="100 LOTA04" GCol="text,LOTA04">LOTA04</td>
+										<td GH="100 LOTA06" GCol="text,LOTA06">LOTA06</td>
+										<td GH="100 LOTA07" GCol="text,LOTA07">LOTA07</td>
+										<td GH="100 LOTA09" GCol="text,LOTA09">LOTA09</td>
+										<td GH="100 LOTA14" GCol="text,LOTA14">LOTA14</td>
+										<td GH="100 LOTA15" GCol="text,LOTA15">LOTA15</td>
+										<td GH="100 LOTA17" GCol="text,LOTA17">LOTA17</td>
+										<td GH="100 TLOTA01" GCol="text,TLOTA01">TLOTA01</td>
+										<td GH="100 TLOTA02" GCol="text,TLOTA02">TLOTA02</td>
+										<td GH="100 TLOTA03" GCol="text,TLOTA03">TLOTA03</td>
+										<td GH="100 TLOTA04" GCol="text,TLOTA04">TLOTA04</td>
+										<td GH="100 TLOTA06" GCol="text,TLOTA06">TLOTA06</td>
+										<td GH="100 TLOTA07" GCol="text,TLOTA07">TLOTA07</td>
+										<td GH="100 TLOTA09" GCol="text,TLOTA09">TLOTA09</td>
+										<td GH="100 TLOTA14" GCol="text,TLOTA14">TLOTA14</td>
+										<td GH="100 TLOTA15" GCol="text,TLOTA15">TLOTA15</td>
+										<td GH="100 MBLNR" GCol="text,MBLNR">MBLNR</td>
+										<td GH="100 ITFFLG" GCol="text,ITFFLG">ITFFLG</td>
+										<td GH="100 PRCFLG" GCol="text,PRCFLG">PRCFLG</td>
+										<td GH="300 PRCETX" GCol="text,PRCETX">PRCETX</td>
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="C">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="C">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자명</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+<!-- 						<button type='button' GBtn="add"></button> -->
+<!-- 						<button type='button' GBtn="copy"></button> -->
+<!-- 						<button type='button' GBtn="delete"></button> -->
+<!-- 						<button type='button' GBtn="total"></button> -->
+<!-- 						<button type='button' GBtn="layout"></button> -->
+						<button type='button' GBtn="excel"></button>
+<!-- 						<button type='button' GBtn="excelUpload"></button> -->
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

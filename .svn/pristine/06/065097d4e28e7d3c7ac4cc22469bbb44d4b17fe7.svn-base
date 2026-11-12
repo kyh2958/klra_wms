@@ -1,0 +1,678 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css">
+<style>
+	.inner_search_wrap .searchInBox {border:1px solid #ddd; margin-top: 10px;}
+	.inner_search_wrap .searchInBox h2{padding:10px; font-weight:bold;}
+	.content_layout .hArea{padding-bottom: 10px;}
+	.content_layout .hArea dl{float:unset; width:30%; padding:0 10px;}
+	.content_layout .hArea dt{width: 120px;}
+	.content_layout .hArea dd{text-align:left;}
+	input[type="checkbox"]{width:18px;vertical-align:top;}
+</style>
+
+<script type="text/javascript">
+	var itemListMap = new DataMap();
+	var searchYN = "Y";
+	var nowHeadIndex = 0;
+	var itemList = [];
+	var rangelist = [ "LOTA01", "LOTA02", "LOTA06", "AREAKY", "ZONEKY", "LOCAKY", "TKZONE", "SKUL01" ];
+	var rngvoplist = ["BW", "NB", "EQ", "NE", "LT", "GT", "LE", "GE", "LS", "TS"];
+	var operlist = ["E", "N", "E", "N", "LT", "GT", "LE", "GE", "LS", "TS"];
+	var flag = false; //재고상태 값 체크 변수
+	
+	$(document).ready(function() {
+		//$('input[type="text"][name="LOTA11MONTH"]').prop('disabled', 'disabled');
+		$('input[type="checkbox"][id="LOTA11"]').click(function(){
+			if ($(this).prop('checked')) {
+				$('input[type="checkbox"][id="LOTA11"]').prop('checked', false);
+				if($(this).attr('name') == "LOTA11MNCK"){					
+					$('input[type="text"][name="LOTA11MONTH"]').prop('disabled', '');
+				} else {
+					$('input[type="text"][name="LOTA11MONTH"]').val('');
+					$('input[type="text"][name="LOTA11MONTH"]').prop('disabled', 'disabled');
+				}
+				$(this).prop('checked', true);
+				$(this).prop('disabled', '');
+			} else {
+				$('input[type="text"][name="LOTA11MONTH"]').val('');
+				$('input[type="text"][name="LOTA11MONTH"]').prop('disabled', 'disabled');
+			}
+		});
+		
+		gridList.setGrid({
+			id : "gridList",
+			editable : true,
+			pkcol : "WAREKY,LOTRKY",
+			module : "WmsAdmin",
+			command : "TF01",
+			emptyMsgType : false,
+			//bindArea : "tabs1-2"
+		});
+		
+		inputList.setInput();
+		
+		searchList();
+	});
+	
+	function commonBtnClick(btnName) {
+		if(btnName == "Search"){
+			searchList();
+		}else if(btnName == "Save"){
+			saveData();
+		}
+	}
+	
+	function searchList() {
+		itemListMap = new DataMap();
+		nowHeadIndex = 0;
+		searchYN = "Y";
+		clearData();
+		
+		gridList.resetGrid("gridList");
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY","<%=wareky%>");
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	}
+
+	function gridListEventRowAddBefore(gridId, rowNum) {
+		if (gridId == "gridList") {
+			var headCnt = gridList.getModifyRowCount("gridList");
+			//var listCnt = gridList.getModifyRowCount("gridListSub");
+			if (headCnt > 0) {
+				commonUtil.msgBox("MASTER_M0702");
+				return false;
+			} else {
+				var newData = new DataMap();
+				newData.put("WAREKY", "<%=wareky%>");
+				newData.put("STATUS", "C");
+
+				clearData();
+				return newData;
+			}
+		}
+	}
+	
+	function saveData() {
+		tempPutItemList();
+		
+		var list = gridList.getGridData("gridList");
+		if(list.length == 0){
+			alert(commonUtil.getMsg(configData.MSG_SYSTEM_SAVEEMPTY));
+			return;
+		}
+				
+		if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+			return;
+		}
+		
+		/* var focusNum = gridList.getFocusRowNum("gridList");
+		var wareky = gridList.getColData("gridList", focusNum, "WAREKY");
+		var lotrky = gridList.getColData("gridList", focusNum, "LOTRKY");
+		var key = wareky + "/" + lotrky;
+		
+		var tempMap = itemListMap.get(key);
+		flag = false;
+		var itamList = [];
+		for(var i = 0; i < tempMap.length; i++){
+			itamList.push(tempMap[i].map);
+		}
+		
+		$.each(itamList, function(i, obj) {
+			var name = obj.DBFILD.toUpperCase();
+			if (name == "LOTA06") {
+				flag = true;
+			}
+		});
+		
+		if(flag == false){
+			commonUtil.msgBox("VALID_M2078");
+			return false;
+		} */
+		
+		var param = new DataMap();
+		param.put("list", list);
+		param.put("itemlist", itemListMap);
+		
+		var json = netUtil.sendData({
+			url : "/wms/admin/json/TF01.data",
+			param : param
+		});
+		
+		if(json && json.data){
+			if(json.data == "OK") {
+				searchList();
+				alert(commonUtil.getMsg("SYSTEM_SAVEOK"));
+			} else {
+				alert(commonUtil.getMsg("SYSTEM_SAVEFAIL") + " [" + json.data + "]");
+			}
+		}
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength > 0){
+			itemListMap = new DataMap();
+			gridListEventRowDblclick(gridId, 0, "", "");
+		}
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum, colName, colValue){
+		if(gridId == "gridList"){
+			if(searchYN == "Y"){
+				searchYN = "N";
+			}else{
+				tempPutItemList();
+			}
+			nowHeadIndex = rowNum;
+			var wareky = gridList.getColData(gridId, rowNum, "WAREKY");
+			var lotrky = gridList.getColData(gridId, rowNum, "LOTRKY");
+			var key = wareky + "/" + lotrky;
+			
+			clearData();
+			
+			if(!itemListMap.containsKey(key)) {
+				var param = new DataMap();
+				param.put("WAREKY", wareky);
+				param.put("LOTRKY", lotrky);
+
+				if(lotrky == null || lotrky.trim() == ""){
+					return;
+				}
+				
+				// bind item data
+				var json = netUtil.sendData({
+					module : "WmsAdmin",
+					command : "TF01SUB",
+					bindId : "tabs1-2",
+					sendType : "list",
+					bindType : "field",
+					param : param
+				});
+				
+				itemList = json.data;
+			} else {
+				itemList = [];
+				var tempMap = itemListMap.get(key);
+				for(var i = 0; i < tempMap.length; i++){
+					itemList.push(tempMap[i].map);
+				}
+			} 
+			
+			$.each(itemList, function(i, obj) {
+				var name = obj.DBFILD.toUpperCase();
+				
+				//if (name == "LOTA11") {
+				if(obj.RNGVOP == "LS"){
+					$('input[type="checkbox"][name="LOTA11LSCK"]').prop('checked', true);
+					$('input[type="checkbox"][name="LOTA11TSCK"]').prop('checked', false);
+					$('input[type="checkbox"][name="LOTA11MNCK"]').prop('checked', false);
+				} else if(obj.RNGVOP == "TS"){
+					$('input[type="checkbox"][name="LOTA11LSCK"]').prop('checked', false);
+					$('input[type="checkbox"][name="LOTA11TSCK"]').prop('checked', true);
+					$('input[type="checkbox"][name="LOTA11MNCK"]').prop('checked', false);
+				} else if(obj.RNGVOP == "GT"){
+					$('input[type="checkbox"][name="LOTA11LSCK"]').prop('checked', false);
+					$('input[type="checkbox"][name="LOTA11TSCK"]').prop('checked', false);
+					$('input[type="checkbox"][name="LOTA11MNCK"]').prop('checked', true);
+					$("#LOTA11MONTH").prop("disabled", '');
+					$("#LOTA11MONTH").val(obj.RNGVMI);
+				//	}
+				} else if (name == "LOTA13") {
+					var rngvop = obj.RNGVOP;
+					if (rngvop == "LT") {
+						$("#LOTA13RD").val(obj.RNGVMI);
+					}
+				} else if (name == "TKZONE"){
+					$("[name=TKZONE]").val(obj.RNGVMI).prop("selected", true);
+				} else if( name == "STKQTY"){
+					$("[name=STKQTY]").val(obj.RNGVMI).prop("selected", true);
+				}
+			});
+			
+			$.each(rangelist, function(num, data) {
+				var rangeList = new Array();
+				var rngvop = "";
+				
+				$.each(itemList, function(i, obj) {
+					if (obj.DBFILD.toUpperCase() == data) {
+						var mangeMap = new DataMap();
+						rngvop = obj.RNGVOP;
+						for(var i = 0; i < rngvoplist.length; i++){
+							if(rngvop == rngvoplist[i]){
+								if(i < 2){
+									mangeMap.put("OPER", operlist[i]);
+									mangeMap.put("LOGICAL", obj.LGCOPT);
+									mangeMap.put("FROM", obj.RNGVMI);
+									mangeMap.put("TO", obj.RNGVMX);
+								} else {
+									mangeMap.put("OPER", operlist[i]);
+									mangeMap.put("LOGICAL", obj.LGCOPT);
+									mangeMap.put("DATA", obj.RNGVMI);
+								}
+								break;
+							}
+						}
+						rangeList.push(mangeMap);
+					}
+				});
+				
+				if (rngvop == "BW" ||  rngvop == "NB") {
+					inputList.setRangeData(data,
+							configData.INPUT_RANGE_TYPE_RANGE, rangeList);
+				} else {
+					inputList.setRangeData(data,
+							configData.INPUT_RANGE_TYPE_SINGLE, rangeList);
+				}
+			});
+			
+		}
+	}
+	
+	function tempPutItemList(){
+		var wareky = gridList.getColData("gridList", nowHeadIndex, "WAREKY");
+		var lotrky = gridList.getColData("gridList", nowHeadIndex, "LOTRKY");
+		var key = wareky + "/" + lotrky;
+		if(typeof wareky != "undefined" && typeof lotrky != "undefined" && typeof itemList != "undefined"){
+			var list = dataBind.paramData("tabs1-2");
+			
+			$.each(rangelist, function(i, obj) {
+				var singleListLot = inputList.getRangeData(obj,
+						configData.INPUT_RANGE_TYPE_SINGLE);
+				var rangeListLot = inputList.getRangeData(obj,
+						configData.INPUT_RANGE_TYPE_RANGE);
+				if (singleListLot.length > 0) {
+					list.put(obj, singleListLot);
+				} else {
+					list.put(obj, rangeListLot);
+				}
+			});
+			
+			var inputDataList = new Array();
+			var keyset = list.keys();
+			
+			for(var i = 0; i < keyset.length; i++){
+				if(keyset[i] == "LOTA11MONTH" || keyset[i] == "LOTA13RD") {
+					continue;
+				}
+				if(rangelist.includes(keyset[i])){
+					var curData = list.get(keyset[i]);
+					var arrlen = curData.length;
+					
+					for(var ii = 0; ii < arrlen; ii++){
+						var inputValue = new DataMap();
+						inputValue.put("WAREKY", wareky);
+						inputValue.put("LOTRKY", lotrky);
+						inputValue.put("DBFILD", keyset[i]);
+						var index = 0;
+						if(curData[ii].get("DATA")){
+							if(curData[ii].get("OPER") == "E"){
+								index = 2;
+							} else if(curData[ii].get("OPER") == "N"){
+								index = 3;
+							} else {
+								for(var fidx = 4; fidx < operlist.length; fidx++){
+									if(curData[ii].get("OPER") == operlist[fidx]){
+										index = fidx;
+										break;
+									}
+								}
+							}
+							inputValue.put("RNGVOP", rngvoplist[index]);
+							inputValue.put("RNGVMI", curData[ii].get("DATA"));
+							inputValue.put("RNGVMX", " ");
+							inputValue.put("LGCOPT", curData[ii].get("LOGICAL"));
+						} else {
+							if(curData[ii].get("OPER") == "E"){
+								index = 0;
+							} else if(curData[ii].get("OPER") == "N"){
+								index = 1;
+							}
+							inputValue.put("RNGVOP", rngvoplist[index]);
+							inputValue.put("RNGVMI", curData[ii].get("FROM"));
+							inputValue.put("RNGVMX", curData[ii].get("TO"));
+							inputValue.put("LGCOPT", curData[ii].get("LOGICAL"));
+						}
+						inputDataList.push(inputValue);
+					}
+				} else {
+					var inputValue = new DataMap();
+					inputValue.put("WAREKY", wareky);
+					inputValue.put("LOTRKY", lotrky);
+					inputValue.put("DBFILD", keyset[i]);
+					
+					if($('input[type="checkbox"][name="LOTA11LSCK"]').prop('checked')){
+						inputValue.put("DBFILD", "LOTA11");
+						inputValue.put("RNGVOP", "LS");
+						inputValue.put("RNGVMI", "0");
+					} else if($('input[type="checkbox"][name="LOTA11TSCK"]').prop('checked')){
+                        inputValue.put("DBFILD", "LOTA11");
+						inputValue.put("RNGVOP", "TS");
+						inputValue.put("RNGVMI", "1");
+					} else if($('input[type="checkbox"][name="LOTA11MNCK"]').prop('checked')){
+                        inputValue.put("DBFILD", "LOTA11");
+						inputValue.put("RNGVOP", "GT");
+						inputValue.put("RNGVMI", $("#LOTA11MONTH").val());
+					}
+					
+					if(keyset[i] == "TKZONE" || keyset[i] == "STKQTY"){
+						inputValue.put("RNGVOP", "EQ");
+						inputValue.put("RNGVMI", list.get(keyset[i]));
+					} else if(keyset[i] == "LOTA13"){
+						inputValue.put("RNGVOP", "LT");
+						inputValue.put("RNGVMI", $("#LOTA13RD").val());
+					}
+					
+					inputValue.put("RNGVMX", " ");
+					inputValue.put("LGCOPT", "OR");
+					inputDataList.push(inputValue);
+				}
+			}
+			itemList = inputDataList;
+			itemListMap.put(key, itemList);
+		}
+	}
+	
+	function clearData(){
+		/* 이전에 조회되었던 input 데이터값 삭제 */
+		$("[name=SHORTX]").val("");
+		$('input[type="checkbox"][name="LOTA11LSCK"]').prop('checked', false);
+		$('input[type="checkbox"][name="LOTA11TSCK"]').prop('checked', false);
+		$('input[type="checkbox"][name="LOTA11MNCK"]').prop('checked', false);
+		$('input[type="text"][name="LOTA11MONTH"]').val('');
+		$('input[type="text"][name="LOTA11MONTH"]').prop('disabled', 'disabled');
+		$("#LOTA11MONTH").val("");
+		$("#LOTA13RD").val("");
+		$("[name=STKQTY] option:eq(0)").prop("selected", "selected");
+		
+		inputList.resetRange();
+	}
+
+	function searchHelpEventOpenBefore(searchCode, gridType, object) {
+		var param = dataBind.paramData("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		
+		if(searchCode=="SHTKZONE"){
+			param.put("ZONETY", "TASK");
+		} else if(searchCode=="SHCMCDV"){
+			if(object.name == "SKUL01"){
+				param.put("CMCDKY", "SKUL01");	
+			}else if(object.name == "LOTA06"){
+				param.put("CMCDKY", "LOTA06");
+			}else if(object.name == "LOTA02"){
+				param.put("CMCDKY", "LOTA02");
+			}
+		} else if(searchCode=="SHSTLMA"){
+			param.put("OWNRKY", "<%=ownrky%>");
+		}
+		
+		return param;
+	}
+	
+	function gridListEventColBtnClick(gridId, rowNum, btnName){
+		if(gridId == "gridList"){
+			if(btnName == "Delete"){
+				if(!commonUtil.msgConfirm(configData.MSG_MASTER_DELETE_CONFIRM)){
+					return;
+				}
+				
+				var wareky = gridList.getColData(gridId, rowNum, "WAREKY");
+				var lotrky = gridList.getColData(gridId, rowNum, "LOTRKY");
+				
+				var param = new DataMap();
+				param.put("WAREKY", wareky);
+				param.put("LOTRKY", lotrky);
+				
+				var json = netUtil.sendData({
+					url : "/wms/admin/json/deleteTF01.data",
+					param : param
+				});
+				
+				if(json && json.data && json.data == "OK"){
+					searchList();
+				} else {
+					alert(json.data);
+				}
+			}
+		}
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+					<!-- <input type="button" CB="Create CREATE BTN_CREATE" /> -->
+					<input type="button" CB="Save SAVE STD_SAVE" />
+				</div>
+			</div>
+		</div>
+        <div class="search_next_wrap noSearch">
+			<div class="content_layout tabs top_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tabs1-1"><span>리스트</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				<div class="table_box section" id="tabs1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">1</td>
+										<td GH="80 STD_WAREKY"  GCol="text,WAREKY">센터</td>
+										<td GH="100 STD_LOTRKY" GCol="input,LOTRKY" validate="required">할당필터링키</td>
+										<td GH="100 STD_SHORTX" GCol="input,SHORTX" GF="S 180">설명</td>
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자ID</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자ID</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자명</td>									
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="add"></button>
+						<button type='button' GBtn="delete"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+			
+			<div class="content_layout tabs bottom_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tabs1-1"><span>조회</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<!-- <li><button class="btn btn_smaller"><span>축소</span></button></li> -->
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				<div class="table_box section" id="tabs1-2">
+					<div class="inner_search_wrap">
+						
+						<div id="tabs1-2">
+							<div class="section type1">
+								<div>
+									<div class="table type1">
+										<!-- 	Lot 속성 -->
+										<div class="searchInBox">
+											<h2>LOT속성</h2>
+											<div class="hArea">
+												<dl>
+													<dt CL="STD_LOTA02">플랜트</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA02" UIInput="R,SHCMCDV" UIFormat="S 20" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_LOTA01">저장위치</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA01" UIInput="R,SHSTLMA" UIFormat="S 20" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_LOTA06">재고상태</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA06" id="LOTA06" UIInput="R,SHCMCDV" UIFormat="S 20" validate="required" />
+													</dd>
+												</dl>
+
+												<!-- <dl>
+													<dt CL="STD_LOTA01">S/N번호</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA01" UIInput="R" UIFormat="S 20" />
+													</dd>
+													<dt CL="STD_LOTA02">재고유형</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA02" UIInput="R" UIFormat="S 20" />
+													</dd>
+													<dt CL="STD_LOTA03">벤더</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA03" UIInput="R" UIFormat="S 20" />
+													</dd>
+												</dl> -->
+											</div>
+										</div>
+										
+										<!-- 제조일자, 유통기한  -->
+										<div class="searchInBox">
+											<h2>제조일자</h2>
+											<div class="hArea">
+												<dl>
+													<dt CL="STD_LSYEAR">전년도</dt>
+													<dd>
+														<input type="checkbox" class="input" id="LOTA11" value="V" name="LOTA11LSCK" />
+													</dd>
+												</dl>
+												<dl>
+													<dt CL="STD_TSYEAR">당해년도</dt>
+													<dd>
+														<input type="checkbox" class="input" id="LOTA11" value="V" name="LOTA11TSCK" />
+													</dd>
+												</dl>
+												<dl>
+													<dt CL="STD_WHNDAY">일기한</dt>
+													<dd>
+														<input type="checkbox" class="input" id="LOTA11" value="V" name="LOTA11MNCK" />
+														<input type="text" class="input" name="LOTA11MONTH" UIFormat="N 10" id="LOTA11MONTH" style="width:127px;"/>&nbsp;<label CL="STD_PERMON"></label>
+													</dd>
+												</dl>
+											</div>
+											<h2>유통기한</h2>
+											<div class="hArea">
+												
+												<dl>
+													<!-- <dt CL="STD_LTDTMN">유통기한</dt> -->
+													<dt CL="STD_WSD_EXPRTN_DE_DAYCNT">유통기한잔여일수</dt>
+													<dd>
+														<input type="text" class="input" name="LOTA13" UIFormat="N 10" id="LOTA13RD" />&nbsp;<label CL="STD_DAY" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_SKUL01">품목구분</dt>
+													<dd>
+														<input type="text" class="input"  name="SKUL01" id="SKUL01" UIInput="R,SHCMCDV" UIFormat="S 10" />
+													</dd>
+												</dl>
+											</div>
+										</div>
+											
+										<!-- 위치정보 -->
+										<div class="searchInBox">
+											<h2>위치정보</h2>
+											<div class="hArea">
+												<dl>
+													<dt CL="STD_AREAKY">창고</dt>
+													<dd>
+														<input type="text" class="input"  name="AREAKY" id="AREAKY" UIInput="R,SHAREMA" UIFormat="S 10" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_ZONEKY">구역</dt>
+													<dd>
+														<input type="text" class="input" name="ZONEKY" UIInput="R,SHZONMA" UIFormat="S 10" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_LOCAKY">지번</dt>
+													<dd>
+														<input type="text" class="input" name="LOCAKY" UIInput="R,SHLOCMA" UIFormat="S 10" />
+													</dd>
+												</dl>
+												
+												<dl>
+													<dt CL="STD_TKZONE">작업구역</dt>
+													<dd>
+														<input type="text" class="input" name="TKZONE" id="TKZONE" UIInput="R,SHZONMA" UIFormat="S 10" />
+													</dd>
+												</dl>
+											</div>
+										</div>
+										
+										<!-- 수량정보 -->
+										<!-- <div class="searchInBox">
+											<h2>수량정보</h2>
+											<div class="hArea">
+												<dl>
+													<dt CL="STD_PICKWAY">피킹방식</dt>
+													<dd>
+													 	<select name="STKQTY" class="input" CommonCombo="STKQTY" ComboCodeView=false>
+															<option value=" ">선택</option>
+														</select>
+														&nbsp;&nbsp; 팔렛피킹 or 낱개피킹
+													</dd>
+												</dl>
+											</div>
+										</div> -->
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

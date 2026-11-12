@@ -1,0 +1,687 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%	
+	String STKNUM = request.getParameter("STKNUM");
+	String DPTNKY = request.getParameter("DPTNKY");
+	String BARCOD = request.getParameter("BARCOD");
+	String TASKKY = request.getParameter("TASKKY");
+	String LOTA07 = request.getParameter("LOTA07");
+	String SEARCHCOUNT = request.getParameter("SEARCHCOUNT");
+			
+	
+	if(STKNUM == null){
+		STKNUM = "";
+	}
+	
+	if(DPTNKY == null){
+		DPTNKY = "";
+	}
+	
+	if(BARCOD == null){
+		BARCOD = "";
+	}
+	
+	if(TASKKY == null){
+		TASKKY = "";
+	}
+	if(LOTA07 == null){
+		LOTA07 = "";
+	}
+	
+	if(SEARCHCOUNT == null){
+		SEARCHCOUNT = "";
+	}
+	
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:disabled {
+	background-color: #e2e2e2;
+}
+button {
+	vertical-align: bottom;
+    height: 37px;
+}
+.tem5_content .tableWrap_search {overflow: hidden;}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script type="text/javascript">
+ /* jQuery.event.special.dblclick = {
+
+	    setup: function(data, namespaces) {
+
+	        var elem = this,
+
+	            $elem = jQuery(elem);
+
+	        $elem.bind('touchend.dblclick', jQuery.event.special.dblclick.handler);
+
+	    },
+
+
+
+	    teardown: function(namespaces) {
+
+	        var elem = this,
+
+	            $elem = jQuery(elem);
+
+	        $elem.unbind('touchend.dblclick');
+
+	    },
+
+
+
+	    handler: function(event) {
+
+	        var elem = event.target,
+
+	            $elem = jQuery(elem),
+
+	            lastTouch = $elem.data('lastTouch') || 0,
+
+	            now = new Date().getTime();
+
+
+
+	        var delta = now - lastTouch;
+
+	        if(delta > 20 && delta<500){
+
+	            $elem.data('lastTouch', 0);
+
+	            $elem.trigger('dblclick');
+
+	        }else
+
+	            $elem.data('lastTouch', now);
+
+	    }
+
+	};  */
+</script>
+<script>
+	
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsMobileOutboundPicking_COPY",					  
+			command : "PDPK06HL_DETAIL",
+			gridMobileType : true,
+			emptyMsgType:false
+		});
+		
+		 gridList.setGrid({
+				id : "gridListHidden",
+				module : "WmsMobileOutboundPicking_COPY",					  
+				command : "PDPK05_DETAIL_SUB",
+				gridMobileType : true,
+				emptyMsgType : false
+			});  
+		 
+		if("<%=BARCOD%>" != "") {
+			$("#BARCOD").val("<%=BARCOD%>");
+
+			searchList();
+		}				
+				
+		searchList();
+		
+			var param = new DataMap();
+		
+				param.put("WAREKY", "<%=wareky%>");
+				param.put("DPTNKY", '<%=DPTNKY%>');
+				param.put("STKNUM", '<%=STKNUM%>');
+		
+			var vjson = netUtil.sendData({
+				url : "/mobile/Mobile/json/sendStknumInfo.data",			
+				param : param
+			});
+			
+			if(vjson && vjson.data){
+				
+				if(vjson.data["MSG"] && vjson.data["MSG"] != "SUCCESS"){
+					PlaySound('e');
+					commonUtil.msgBox(vjson.data["MSG"], null, null, function () { 
+						          			
+					}); 
+					
+				}
+			}
+			
+
+		
+	});
+	
+	// 작업지시번호로 문서정보검색
+	function searchList(){		
+				
+		
+		var BARCOD = $("#BARCOD").val();
+		
+		var param = new DataMap();
+		
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");
+<%-- 		param.put("PLNTKY", '<%=plntky%>'); --%>
+		
+		param.put("BARCOD", BARCOD);
+		param.put("DPTNKY", '<%=DPTNKY%>');
+		param.put("STKNUM", '<%=STKNUM%>');
+		param.put("TASKKY", '<%=TASKKY%>');
+		param.put("LOTA07", '<%=LOTA07%>');
+		
+		param.put("PROGID", "PK05_DETAIL");
+		
+		
+		gridList.resetGrid("gridList");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+		
+		
+		param.put("INOUTCHK", 'RESET');
+		
+// 		var json = netUtil.sendData({
+// 			url : "/mobile/Mobile_COPY/json/taskLockUpdate.data",			
+// 			param : param
+// 		});
+		
+// 		if(json && json.data){
+			
+			
+			var vjson = netUtil.sendData({
+				url : "/mobile/Mobile_COPY/json/sendStknumInfo.data",			
+				param : param
+			});
+			
+			if(vjson && vjson.data){
+				
+				if(vjson.data["MSG"] && vjson.data["MSG"] != "SUCCESS"){
+					PlaySound('e');
+					commonUtil.msgBox(vjson.data["MSG"], null, null, function () { 
+						$('#BARCOD').focus();            			
+					}); 
+					
+				}
+			}
+			
+			
+// 		}
+		
+		
+		//$('#BARCOD').focus();
+	}
+	
+	function gridListEventRowDblclick(gridBox, rowNum){
+				
+		var SKUKEY = gridList.getColData("gridList", rowNum, "SKUKEY");	
+		var DESC01 = gridList.getColData("gridList", rowNum, "DESC01");
+		var STKNUM = gridList.getColData("gridList", rowNum, "STKNUM");
+		var LOTA07 = gridList.getColData("gridList", rowNum, "LOTA07");
+		var LOTA01 = gridList.getColData("gridList", rowNum, "LOTA01");
+		var LOTA02 = gridList.getColData("gridList", rowNum, "LOTA02");
+		
+
+	    var rowData = gridList.getRowData("gridList", rowNum);
+		
+	    var param = new DataMap();
+    	param.put("data", rowData);
+		
+		
+		location.href="/mobile/PDPK06HL_DETAIL02_COPY.page?SKUKEY="+SKUKEY+"&DESC01="+DESC01+"&STKNUM="+STKNUM+"&LOTA01="+LOTA01+"&LOTA02="+LOTA02+'&DPTNKY='+'<%=DPTNKY%>'+'&LOTA07='+LOTA07;
+		
+		+'<%=SEARCHCOUNT%>'
+					  
+	}
+		
+
+
+
+		
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		
+		if(gridId == "gridList" && dataLength == 0){
+			PlaySound('e');
+			gridList.resetGrid("gridList");
+		
+		}else if(gridId == "gridList" && dataLength > 0){
+									
+			var param = new DataMap();
+			
+			param.put("WAREKY", '<%=wareky%>');						
+			param.put("DPTNKY", '<%=DPTNKY%>');
+			param.put("STKNUM", '<%=STKNUM%>');
+			param.put("TASKKY", '<%=TASKKY%>');
+<%-- 			param.put("PLNTKY", '<%=plntky%>'); --%>
+			
+			var json = netUtil.sendData({
+				url : "/mobile/Mobile_COPY/json/PDPK05DETAILCNT.data",			
+				param : param
+			});
+			
+			if(json && json.data["CNT"] > 0){
+				
+				var CNT = Number(json.data["CNT"]);
+				
+				$("#COMPCNT").val(CNT);        //전체 건수
+				$("#COMPCNT2").val(Number(json.data["COMPCNT2"]));   //현재까지 완료된 건수
+				/* 
+				$("#QTCOMP_L7141").val(Number(json.data["QTTAOR"]));   //전체 수량
+				$("#QTCOMP_L7141_2").val(Number(json.data["QTCOMP"]));   //현재까지 완료된 수량
+				$("#UOMKEY2").val(json.data["UOMKEY"]);        //단위
+				$("#UOMKEY3").val(json.data["UOMKEY"]);        //단위
+				 */				
+				
+				if(CNT == 0){
+					resetGrid();
+					PlaySound("e");					
+					commonUtil.msgBox("MOBILE_M0001", null, null, function () { //작업지시번호가 존재하지 않습니다.
+						$('#BARCOD').focus();            			
+					}); 
+					
+				}else{
+					PlaySound("s");
+					$('#BARCOD').focus();
+				}
+				
+				
+			}
+		
+		}else if(gridId == "gridListHidden" && dataLength > 0){
+			
+			var key = $.trim($("#BARCOD").val());
+			
+			for(var i=0; i < gridList.getGridData("gridListHidden").length; i++){
+				
+				var checkItem1 = gridList.getColData("gridListHidden", i, "SKUKEY");
+				var checkItem2 = gridList.getColData("gridListHidden", i, "EANCOD");
+				var checkItem3 = gridList.getColData("gridListHidden", i, "GTINCD");
+				var checkItem4 = gridList.getColData("gridListHidden", i, "LOTA14");
+				var checkItem5 = gridList.getColData("gridListHidden", i, "STATIT");
+				
+				if((key == checkItem1 || key ==checkItem2 || key == checkItem3 || key == checkItem4) && (checkItem5 == "NEW")){
+						
+					var BARCOD = key;	
+					var DPTNKY = '<%=DPTNKY%>';		
+					var LOCAKY = gridList.getColData("gridListHidden", i, "LOCAKY");	
+					var SKUKEY = gridList.getColData("gridListHidden", i, "SKUKEY");	
+					var DESC01 = gridList.getColData("gridListHidden", i, "DESC01");
+					var LOTA01 = gridList.getColData("gridListHidden", i, "LOTA01");
+					var LOTA02 = gridList.getColData("gridListHidden", i, "LOTA02");
+					var LOTA07 = gridList.getColData("gridListHidden", i, "LOTA07");
+					var LOTA14 = gridList.getColData("gridListHidden", i, "LOTA14");
+					var STKNUM = gridList.getColData("gridListHidden", i, "STKNUM");
+					var SHPOKY = gridList.getColData("gridListHidden", i, "SHPOKY");
+					
+					
+					var param = new DataMap();
+					
+					var rowData = gridList.getRowData("gridListHidden", i);
+					
+			    	param.put("data", rowData);
+			    	param.put("DPTNKY", '<%=DPTNKY%>');
+			    	
+// 					var json = netUtil.sendData({
+// 						url : "/mobile/Mobile_COPY/json/taskLockCheck.data",			
+// 						param : param
+// 					});
+					
+// 					if(json && json.data){
+						
+// 						if(json.data["PAIDSR"]){
+							
+// 							PlaySound("e");					
+// 							commonUtil.msgBox("OUT_M0241", json.data["PAIDSR"], null, function () { //해당 지시건은 현재 다른 사용자 [{0}]가 처리중입니다.
+// 								$('#BARCOD').focus();            			
+// 							}); 
+// 							return;
+// 						}
+						
+// 					}
+					
+					location.href="/mobile/PDPK05_DETAIL02_COPY.page?DPTNKY="+DPTNKY+"&LOCAKY="+LOCAKY+"&BARCOD="+BARCOD+
+								  "&SKUKEY="+SKUKEY+"&DESC01="+DESC01+"&STKNUM="+STKNUM+
+								  "&LOTA01="+LOTA01+"&LOTA02="+LOTA02+"&LOTA07="+LOTA07+'&SEARCHCOUNT='+'<%=SEARCHCOUNT%>'+
+								  "&SHPOKY="+SHPOKY;
+					
+					return;
+				}
+			}
+
+			
+		}else if(gridId == "gridListHidden" && dataLength == 0){
+							
+			PlaySound("e");					
+			commonUtil.msgBox("MOBILE_M0046", null, null, function () { //할당정보와 다른 바코드입니다.
+				$('#BARCOD').focus();            			
+			}); 
+			
+			
+		} 
+		
+		
+	}
+	
+	function showMain() {
+		window.top.closePage();
+	}
+	
+	function eventKeydown(event,objId){
+// 		if(event.keyCode == "13"){
+				
+// 				var key = $.trim($("#BARCOD").val());
+				
+// 				if(key == ""){					
+// 					PlaySound("e");					
+// 					commonUtil.msgBox("VALID_M0936", null, null, function () { //오더번호를 입력해주세요.
+// 						$('#BARCOD').focus();            			
+// 					}); 
+// 					return;	
+// 				}								
+				
+// 				gridList.resetGrid("gridListHidden");
+				
+// 				var param = new DataMap();				
+	
+<%-- 				param.put("WAREKY", "<%=wareky%>"); --%>
+<%-- 				param.put("STKNUM", '<%=STKNUM%>'); --%>
+<%-- 				param.put("DPTNKY", '<%=DPTNKY%>'); --%>
+<%-- 				param.put("PLNTKY", '<%=plntky%>'); --%>
+// 				param.put("DIFFRENT_STKKY", "N");
+				
+// 				param.put("OWNRKY", $("#OWNRKY").val());
+// 				param.put("BARCOD", key);
+				
+// 				var json = netUtil.sendData({
+// 					url : "/mobile/Mobile_COPY/json/barcodCheck.data",			
+// 					param : param
+// 				});
+				
+// 				if(json && json.data){
+					
+// 					 var sendMsg = json.data["MSG"];
+			            
+// 		            if(sendMsg && sendMsg != 'Y'){
+
+// 		            	PlaySound("e");					
+// 						commonUtil.msgBox(sendMsg, null, null, function () { //오더번호를 입력해주세요.
+// 							$('#BARCOD').focus();            			
+// 						}); 
+						
+// 		            	return;
+// 		            }
+		            
+// 				}
+				
+// 				 gridList.gridList({
+// 					id : "gridListHidden",
+// 					param : param
+// 				});	 
+								
+// 		} 
+		
+	}
+	
+	function previtem() {
+		var checkCnt;
+		
+		
+//		PlaySound("e");					
+// 		commonUtil.msgConfirm(sendMsg, null, null, function () { //오더번호를 입력해주세요.
+// 			$('#BARCOD').focus();            			
+// 		}); 
+		
+// 		commonUtil.msgConfirm("VALID_M2094",null,
+// 			function () {
+				location.href='/mobile/PDPK06.page?STKNUM='+'<%=STKNUM%>' + '&DPTNKY='+'<%=DPTNKY%>'+'&SEARCHCOUNT='+'<%=SEARCHCOUNT%>'+'&PREVITEM=NO';	
+// 			}, function () {
+// 				return;
+// 			}
+// 		);
+		
+		
+		
+		
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div id="searchArea">
+					<table>
+						<colgroup>
+							<col width="25%" />
+							<col width="25%" />
+							<col width="35%" />
+							<col width="15%" />
+							<col />
+						</colgroup>
+						<tbody>
+							<tr style="display:none">
+								<th CL="STD_OWNRKY" width="100">화주</th>
+								<td>
+									<input type="hidden" id="selectSKU">
+									<!-- <select Combo="WmsMaster_ComboBoxDatas,OWNER" name="OWNRKY" id="OWNRKY"">
+									</select> -->
+								</td>
+							</tr>
+							
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="tableWrap_search section" >
+				<div class="tableHeader">						 
+					<table style="width: 100%">
+						<colgroup>
+							<col width="25px" />
+							<col width="140px" />
+							<col width="180px" />
+							<col width="120px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<!-- <col width="60px" /> -->		
+							<col width="0" />
+							<col width="0" />					
+						</colgroup> 
+						<thead>
+							<tr>
+								<th CL="STD_NO">NO</td>		
+								<th CL="STD_MATNR">품목코드</th>
+								<th CL="STD_DESC01">품목명</th>
+								<th CL="STD_LOTA07">MTO</th>
+								<th CL="STD_QTYRCV1">지시수량</th>
+								<th CL="STD_QTJCMP">피킹수량</th>
+								<th CL="STD_SDUOKY">기본단위</th>
+								<th CL="STD_QTYORG">오더수량</th>
+								<th CL="STD_UOMKEY">단위</th>
+								<th CL="STD_LOTA01">LOTA01</th>
+								<th CL="STD_LOTA02">LOTA02</th>
+								<!-- <th CL="STD_STATIT">아이템상태</th> -->
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="25px" />
+							<col width="140px" />
+							<col width="180px" />
+							<col width="120px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<col width="55px" />
+							<!-- <col width="60px" />	 -->
+							
+							<col width="0" />
+							<col width="0" />
+							<col width="0" />
+							<col width="0" />
+							<col width="0" />
+							<col width="0" />
+							
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">NO</td>
+								<td GCol="text,SKUKEY">품목코드</td>
+								<td GCol="text,DESC01">품목명</td>
+								<td GCol="text,LOTA07">MTO</td>
+								<td GCol="text,QTSHPO" GF="N 20,3">지시수량</td>
+								<td GCol="text,QTJCMP" GF="N 20,3">피킹수량</td>
+								<td GCol="text,DUOMKY">기본단위</td>
+								<td GCol="text,QTYORG" GF="N 20,3">오더수량</td>
+								<td GCol="text,UOMKEY">오더단위</td>
+								<td GCol="text,LOTA01">LOTA01</td>
+								<td GCol="text,LOTA02">LOTA02</td>
+								<!-- <td GCol="text,STATDONM">아이템상태</td> -->
+	
+																	
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- gridListHidden 데이터만 가지고오기 -->
+				<div style="margin-bottom: 0px;display:none;">
+					<div class="tableHeader">
+						<table> 
+							<thead>
+								<tr class="thead">
+									<th CL="STD_TASKKY">작업지시번호</th>
+									<th CL="STD_LOCAKY3">로케이션</th>
+									<th CL="STD_MATNR">품목코드</th>
+									<th CL="STD_STKNUM">선적번호</th>
+									<th CL="STD_DESC01">품목명</th>
+									<th CL="STD_EANCOD">바코드1</th>
+									<th CL="STD_GTINCD">바코드2</th>
+									<th CL="STD_LOTA01">LOTA01</th>
+									<th CL="STD_LOTA02">LOTA02</th>
+									<th CL="STD_LOTA07">LOTA07</th>
+									<th CL="STD_LOTA14">LOTA14</th>
+									<th CL="STD_TASKKY">작업지시번호</th>
+									<th CL="STD_STATIT">문서상태값</th>
+								</tr>
+							</thead>
+						</table>
+					</div>
+					<div class="tableBody">
+						<table style="width: 900px">
+							<tbody id="gridListHidden">
+								<tr CGRow="true">
+									<td GCol="text,LOCAKY">로케이션</td>
+									<td GCol="text,SKUKEY">품목코드</td>
+									<td GCol="text,STKNUM">선적번호</td>
+									<td GCol="text,DESC01">품목명</td>								
+									<td GCol="text,EANCOD">바코드1</td>
+									<td GCol="text,GTINCD">바코드2</td>
+									<td GCol="text,LOTA01">LOTA01</td>
+									<td GCol="text,LOTA02">LOTA02</td>
+									<td GCol="text,LOTA07">LOTA07</td>	
+									<td GCol="text,LOTA14">LOTA14</td>
+									<td GCol="text,STATIT">문서상태값</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				
+			<!-- gridListHidden2 바코드 스캔 후 넘길 데이터만 가지고오기 -->
+					<div style="margin-bottom: 0px;display:none;">
+						<div class="tableBody">
+							<table style="width: 900px">
+								<tbody id="gridListSub">
+									<tr CGRow="true">
+										<td GCol="text,TASKKY">작업문서번호</td>
+										<td GCol="text,TASKIT">작업문서아이템</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>		
+			<div class="select_box">
+				<table>
+					<colgroup>
+						<col width="80px"/>
+						<col width="50px"/>
+						<col width="60px"/>
+						<col width="50px"/>
+						<col width="30px"/>
+						<col width="50px"/>
+						<col width="60px"/>
+					</colgroup>
+					<tbody>
+						<tr>
+							<th  CL='STD_COMPCNT'>완료건수</th>
+							<td CL='STD_ALL'>전체</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="COMPCNT" id="COMPCNT" readonly/>
+							</td>
+							<td CL='STD_CNT'>count</td>
+							<td CL='STD_INCLU'>중</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="COMPCNT2" id="COMPCNT2" readonly/>
+							</td>
+							<td CL='STD_CNT'>count</td>
+						</tr>
+						<!-- <tr>
+							<th CL='STD_QTCOMP_L7141'>완료수량</th>
+							<td CL='STD_ALL'>전체</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="QTCOMP_L7141" id="QTCOMP_L7141" readonly/>
+							</td>
+							<td>
+								<input type="text" class="text" name="UOMKEY2" id="UOMKEY2" style="text-align:center" readonly/>
+							</td>
+							<td CL='STD_INCLU'>중</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="QTCOMP_L7141_2" id="QTCOMP_L7141_2" readonly/>
+							</td>
+							<td>
+								<input type="text" class="text" name="UOMKEY3" id="UOMKEY3" style="text-align:center" readonly/>
+							</td>
+						</tr> -->
+					</tbody>
+				</table>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="margin-top: 5px; position:fixed;" >
+				<table>
+					<tr>
+						<td class=f_1 width="30%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>						
+						<td class=f_1 width="30%" onclick ="searchList()" >
+							<label CL='BTN_REFRESH'></label>
+						</td>
+						<td class=f_1 width="30%" onclick="previtem()">
+							<label CL='BTN_PREVITEM'></label>
+						</td>						
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->	
+		</div>
+	</div>
+</body>

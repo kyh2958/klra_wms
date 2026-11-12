@@ -1,0 +1,1527 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%	
+	String LOCAKY = request.getParameter("LOCAKY");
+	String BARCOD = request.getParameter("BARCOD");		
+	String DPTNKY = request.getParameter("DPTNKY");
+	String SHPOKY = request.getParameter("SHPOKY");
+	String SKUKEY = request.getParameter("SKUKEY");
+	String STKNUM = request.getParameter("STKNUM");	
+	String TASKKY = request.getParameter("TASKKY");
+	
+	String LOTA01 = request.getParameter("LOTA01");
+	String LOTA02 = request.getParameter("LOTA02");
+	String LOTA07 = request.getParameter("LOTA07");
+	
+	String SEARCHCOUNT = request.getParameter("SEARCHCOUNT");
+	
+	if(LOCAKY == null){
+		LOCAKY = "";
+	}
+	
+	if(BARCOD == null){
+		BARCOD = "";
+	}	
+	
+	if(DPTNKY == null){
+		DPTNKY = "";
+	}
+	
+	if(SHPOKY == null){
+		SHPOKY = "";
+	}
+	
+	if(SKUKEY == null){
+		SKUKEY = "";
+	}
+	
+	if(STKNUM == null){
+		STKNUM = "";
+	}
+	
+	if(TASKKY == null){
+		TASKKY = "";
+	}
+	
+	if(LOTA01 == null){
+		LOTA01 = "";
+	}
+	
+	if(LOTA02 == null){
+		LOTA02 = "";
+	}
+	
+	if(LOTA07 == null){
+		LOTA07 = "";
+	}
+	
+	if(SEARCHCOUNT == null){
+		SEARCHCOUNT = "";
+	}
+	
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button{ vertical-align: bottom; height: 37px; }
+input:read-only{ background-color: #e2e2e2; }
+select:disabled{ background-color: #e2e2e2; }
+.number { text-align: right }
+.tem4_content .select_box table  { width  : 98% !important; margin: auto; }
+.tem4_content .select_box .text  { padding: unset !important; margin: unset !important; height: 28px !important }
+.tem4_content table th           { padding: 0px !important; white-space: nowrap; }
+.tem4_content table td           { padding: 1px !important; }
+
+
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	$(document).ready(function(){
+		 gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsMobileOutboundPicking",
+			command : "PDPK05_DETAIL02",
+			gridMobileType : true,
+			emptyMsgType:false
+		});
+		
+		 gridList.setGrid({
+				id : "gridListSub",
+				module : "WmsMobileOutboundPicking",
+				command : "PDPK05_DETAIL02_SUB",
+				gridMobileType : true,
+				emptyMsgType : false
+			}); 
+		 
+		 gridList.setGrid({
+				id : "gridListHidden",
+				editable : false,
+				module : "WmsMobileOutboundPicking",
+				command : "PDPK05DETAIL02CNT",
+				gridMobileType : true,
+				emptyMsgType : false
+			}); 
+	    
+		
+		$("#LOCAKY").val('<%=LOCAKY%>');	
+		
+		$('#BARCOD').focus();							 		
+		
+		
+		var param = new DataMap();
+		
+		
+		//var BARCOD = $("#BARCOD").val();
+		var LOCAKY =  $("#LOCAKY").val();
+		
+		//param.put("BARCOD",  BARCOD);
+		param.put("LOCAKY",  LOCAKY);				
+		param.put("WAREKY", "<%=wareky%>");			
+		param.put("DPTNKY", '<%=DPTNKY%>');
+		param.put("STKNUM", '<%=STKNUM%>');			
+		param.put("SKUKEY", '<%=SKUKEY%>');
+		param.put("TASKKY", '<%=TASKKY%>');
+<%-- 		param.put('PLNTKY', '<%=plntky%>'); --%>
+		
+		var json = netUtil.sendData({
+			url : "/mobile/Mobile/json/PDPK05DETAIL02HEAD.data",			
+			param : param
+		});
+		
+		if(json && json.data){
+			$("#LOCASR").val(json.data.LOCASR);
+			$("#SKUKEY").val(json.data.SKUKEY);
+			$("#DESC01").val(json.data.DESC01);
+			$("#QTTAOR").val(json.data.QTTAOR);
+			$("#QTCOMP").val(json.data.QTCOMP);
+			$("#UOMKEY").val(json.data.UOMKEY);
+			$("#ALOTPCK").val(json.data.ALOTPCK);
+			$("#BQTTAOR").val(json.data.BQTTAOR);
+			$("#BUOMKEY").val(json.data.BUOMKEY);
+			$("#QTPUOM").val(json.data.QTPUOM);
+			
+			
+			valueChangeEvent($("#QTTAOR"));
+			valueChangeEvent($("#BQTTAOR"));
+			valueChangeEvent($("#QTCOMP"));
+			valueChangeEvent($("#UOMKEY"));
+			valueChangeEvent($("#BUOMKEY"));
+			
+			if($("#BUOMKEY").val() != '' && $("#BUOMKEY").val() != ' '){
+				$('#BQTSPUT').prop('readonly', false);
+			}else{
+				$('#BQTSPUT').prop('readonly', true);
+			}
+			
+			
+			searchList();						
+
+
+			
+			
+		}else{
+			
+			PlaySound("e");					
+	 		commonUtil.msgBox("VALID_M0005", null, null, function () { //조회된 데이터가 없습니다
+	 			$('#BARCOD').focus();            			
+	 		}); 	 							
+			
+			return;
+		}	
+		
+			param.put("INOUTCHK", 'IN');
+		
+		var json = netUtil.sendData({
+			url : "/mobile/Mobile/json/taskLockUpdate.data",			
+			param : param
+		});
+	
+		
+	});
+	
+	function valueChangeEvent(obj) {
+			
+			var objId  = $(obj).attr("id");
+			var objVal = $(obj).val();					
+			
+			if(objId == "QTTAOR" || objId == "BQTTAOR" || objId == "BQTSPUT"
+				|| objId == "QTCOMP_L7141" || objId == "QTCOMP_L7141_2"){
+				
+				var qttaor = new Number($("#QTTAOR").val());
+				var qtsput = new Number($("#QTSPUT").val());
+				
+				/* if(qtsput > qttaor){
+					$("#QTSPUT").val(0);
+					commonUtil.msgBox("VALID_M2072");				
+					return;
+				} */
+										
+				$(obj).val(setDecimalValue(objVal, 3));
+				
+			}else if(objId == "QTSPUT"){
+				
+				var regex = /[^0-9.,]/g;
+			    var qtsput =   Number($('#QTSPUT').val().replace(regex, ""));
+			    var qtpuom =   Number($('#QTPUOM').val().replace(regex, ""));
+				
+			    var value = setDecimalValue(qtsput/qtpuom, 3);
+				$("#BQTSPUT").val(value);
+				
+				$(obj).val(setDecimalValue(objVal, 3));
+				
+			}else if(objId == "BQTSPUT"){
+				
+				var regex = /[^0-9.,]/g;
+			    var qtsput =   Number($('#BQTSPUT').val().replace(regex, ""));
+			    var qtpuom =   Number($('#QTPUOM').val().replace(regex, ""));
+				
+			    var value = setDecimalValue(qtsput*qtpuom, 3);
+				$("#QTSPUT").val(value);
+				
+				$(obj).val(setDecimalValue(objVal, 3));
+			}
+			
+			
+			
+			
+			if(objId == "UOMKEY" || objId == "BUOMKEY"){
+				
+				
+				$("#PUT_"+objId).val(objVal);
+				
+			}
+			
+			
+		}
+	
+	function setDecimalValue(str, decimal) {
+		str = new String(str);
+		var regex = /[^0-9.]/g;
+			str.replace(',');
+		var number = Number(str.replace(regex, ""));			
+			
+		number = number ? number : 0;
+		return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+	}
+	
+	// 로케이션,바코드로 문서정보검색
+	function searchList(){						
+		
+		var param = new DataMap();
+		
+		param.put("WAREKY", "<%=wareky%>");			
+		param.put("DPTNKY", '<%=DPTNKY%>');
+		param.put("STKNUM", '<%=STKNUM%>');
+<%-- 		param.put('PLNTKY', '<%=plntky%>'); --%>
+		param.put("LOCAKY", $("#LOCAKY").val());
+		param.put("BARCOD", $("#BARCOD").val());
+		param.put("SKUKEY", $("#SKUKEY").val());
+		
+		param.put("PROGID", "PDPK05_DETAIL02");
+		
+		
+		gridList.resetGrid("gridList");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+		
+		gridList.gridList({
+			id : "gridListHidden",
+			param : param
+		});	
+						
+	}
+	
+	//reFresh
+	function reSearchList(){						
+		
+		var param = new DataMap();
+		
+		param.put("WAREKY", "<%=wareky%>");			
+		param.put("DPTNKY", '<%=DPTNKY%>');
+		param.put("STKNUM", '<%=STKNUM%>');
+		param.put("LOCAKY", '<%=LOCAKY%>');
+		param.put("BARCOD", '<%=BARCOD%>');
+		param.put("SKUKEY", '<%=SKUKEY%>');
+<%-- 		param.put('PLNTKY', '<%=plntky%>'); --%>
+		
+		param.put("PROGID", "PDPK05_DETAIL02");
+		
+		$("#LOCAKY").val('<%=LOCAKY%>');
+		$("#BARCOD").val('<%=BARCOD%>');
+		$("#QTSPUT").val(0);
+		
+		gridList.resetGrid("gridList");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+		
+		gridList.gridList({
+			id : "gridListHidden",
+			param : param
+		});	
+						
+	}
+	
+	function searchLocationList(){
+		var param = new DataMap();
+		param.put('WAREKY', '<%=wareky%>');
+<%-- 		param.put('PLNTKY', '<%=plntky%>');		 --%>
+		
+		var json = netUtil.sendData({
+	         module : "WmsInventory",
+	         command: "PDMV01LOCMA",
+	         param  : param
+	      });
+
+		var data = json.data;
+		// 1건 조회 시
+		if (data && data.length == 1) {
+			LocPopCallback(data);
+		// 다건 조회 시
+		} else if (data && data.length > 1) {
+			param.put("json", json);
+			mobile.linkPopOpen('/mobile/PDLOC_POP.page', param);
+		// 미조회 시
+		} else {
+			PlaySound("e");	
+			
+			commonUtil.msgBox("VALID_M0005", null, null, function () { //오더번호를 입력해주세요.
+	 			$('#BARCOD').focus();       
+			
+			
+	 		}); 
+						
+			return;
+		}
+	}
+		
+	function LocPopCallback(data) {
+		
+		$('#LOCAKY').val(data.get('LOCAKY'));
+		$('#BARCOD').focus(); 
+		//searchList(); 
+	}
+	
+	function start(){
+		var param = new DataMap();
+		var head = gridList.getGridData("gridList");
+		var list = gridList.getGridData("gridListSub");				
+		
+		var checkInfo=0;
+		var checkDqtcompCnt=0;
+		
+		if(head.length < 1) {
+			PlaySound("e");	
+			commonUtil.msgBox("MOBILE_M0032", null, null, function () { //조회 후 피킹완료를 진행해주세요.
+	 			$('#BARCOD').focus();            			
+	 		}); 						
+			
+			return;
+		}							
+		
+		var totalqtcomp = 0;
+		var totalqttaor = 0;
+		var totalDqtcomp = 0;
+		
+		var checkQtcomp = 0;
+		var checkQttaor = 0;
+		
+		for(var i=0; i<head.length; i++){
+			
+			var locakyItem = $('#LOCASR').val();
+			var barcodItem = $('#BARCOD').val();
+			var checkLocakyItem = gridList.getColData("gridList", i, "LOCAKY");
+			var checkBarcodItem = gridList.getColData("gridList", i, "LOTA14");
+			
+			checkQttaor += new Number(gridList.getColData("gridList", i, "QTTAOR"));
+			checkQtcomp += new Number(gridList.getColData("gridList", i, "QTCOMP"));
+			var checkDqtcomp = new Number(gridList.getColData("gridList", i, "DQTCOMP"));
+			
+			
+			var Alotpck   	   = $('#ALOTPCK').val();
+			var checkAlotpck   = gridList.getColData("gridList", i, "ALOTPCK");
+			var checkAlotpckYn = gridList.getColData("gridList", i, "ALOTPCK_YN");
+			
+			totalqtcomp += checkQtcomp;
+			totalqttaor += checkQttaor;
+			totalDqtcomp += checkDqtcomp;
+			
+			if(checkDqtcomp > 0){
+				checkDqtcompCnt++;
+			}
+			
+			if((checkQttaor != checkQtcomp) && checkAlotpckYn == 'Y'){
+				
+					checkInfo++;							
+			}
+						
+						
+		}
+		
+		if(checkQttaor != checkQtcomp){
+						
+			PlaySound("e");					
+	 		commonUtil.msgBox("MOBILE_M0041", null, null, function () { 
+	 			$('#BARCOD').focus();            			
+	 		});	 					
+			
+			return;			
+		}
+		
+		if(totalqtcomp == 0){
+			
+			PlaySound("e");					
+	 		commonUtil.msgBox("MOBILE_M0034", null, null, function () { //스캔 후 피킹완료를 진행해주세요.
+	 			$('#BARCOD').focus();            			
+	 		}); 	 					
+			
+			return;
+		}
+		
+		if(checkInfo > 0){									
+			
+			commonUtil.msgConfirm("MOBILE_M0035",null, //할당된 정보와 일치하지않습니다. 계속 진행하시겠습니까?
+				function () {
+				$("#BARCOD").val('<%=BARCOD%>');
+				$("#LOCAKY").val('<%=LOCAKY%>');
+				searchList();	
+				}, function () {
+					
+					$('#BARCOD').focus();   
+					return;
+				}
+			)
+						
+		}
+		
+		
+		var subQtcomp = 0;
+		var subQttaor = new Number($("#QTTAOR").val());
+		
+		for(var j=0; j <list.length; j++){
+			
+			subQtcomp += new Number(gridList.getColData("gridListSub", j, "QTCOMP"));
+		}
+		
+		if(subQtcomp == subQttaor){
+			
+			PlaySound("e");					
+	 		commonUtil.msgBox("OUT_M0175", null, null, function () { 
+	 			$('#BARCOD').focus();            			
+	 		}); 
+						
+			
+			return;
+		}
+		
+		
+		commonUtil.msgConfirm("OUT_M0151",null, //피킹 완료하시겠습니까?   
+				function () {
+			
+					var qttaor =$("#QTTAOR").val();
+					
+					param.put("list", list);
+					param.put("head", head);
+					param.put("TOTQTTAOR", qttaor);
+					param.put("WAREKY", "<%=wareky%>");
+			<%-- 		param.put("PLNTKY", '<%=plntky%>'); --%>
+					param.put("DPTNKY", '<%=DPTNKY%>');
+					param.put("STKNUM", '<%=STKNUM%>');
+					param.put("SKUKEY", $("#SKUKEY").val());
+					param.put("LOCAKY", '<%=LOCAKY%>');
+					
+					
+					var json = netUtil.sendData({
+						url: "/mobile/Mobile/json/PDPK05SaveEnd.data",
+						param: param
+					});
+					
+					if(json && json.data) {
+						
+						if(json.data["SEND_MSG"]){
+							
+							PlaySound("e");					
+							commonUtil.msgBox(json.data["SEND_MSG"], null, null, function () { //오더번호를 입력해주세요.
+								$('#BARCOD').focus();            			
+							}); 
+							
+							return;
+						}
+						
+						
+						
+						if(!json.data.CNT && json.data.SHPOKY){				    		
+				    		PlaySound("e");					
+							commonUtil.msgBox("OUT_M0195", json.data.SHPOKY, null, function () { //오더번호를 입력해주세요.
+								$('#BARCOD').focus();            			
+							}); 
+							
+				    	}else{
+				    		 
+				    		PlaySound("s");					
+							commonUtil.msgBox("OUT_M0196", null, null, function () { //피킹이 완료되었습니다.	
+								previtem('PASS');          			
+							}); 							
+				    	}
+					}
+					
+				}, function () {
+					$('#BARCOD').focus();   
+					return;
+				}
+			)
+				
+		
+	}
+	
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+	
+		if(gridId == "gridList" && dataLength == 0){
+			PlaySound('e');
+			gridList.resetGrid("gridList");
+		
+		}else if(gridId == "gridListHidden" && dataLength > 0){
+			
+			$("#QTCOMP_L7141").val(gridList.getColData("gridListHidden", 0, "QTCOMP_L7141"));
+			$("#QTCOMP_L7141_2").val(gridList.getColData("gridListHidden", 0, "QTCOMP_L7141_2"));
+			$("#UOMKEY2").val(gridList.getColData("gridListHidden", 0, "UOMKEY2"));
+			$("#UOMKEY3").val(gridList.getColData("gridListHidden", 0, "UOMKEY3"));
+			PlaySound("s");
+			
+			valueChangeEvent($("#QTCOMP_L7141"));
+			valueChangeEvent($("#QTCOMP_L7141_2"));
+			
+			
+		}else if(gridId == "gridList" && dataLength > 0){
+		
+		
+			var param = new DataMap();
+					
+					param.put("WAREKY", "<%=wareky%>");			
+					param.put("DPTNKY", '<%=DPTNKY%>');
+					param.put("STKNUM", '<%=STKNUM%>');
+					param.put("TASKKY", '<%=TASKKY%>');
+<%-- 					param.put('PLNTKY', '<%=plntky%>'); --%>
+					param.put("LOCAKY", $("#LOCAKY").val());
+					param.put("BARCOD", $("#BARCOD").val());
+					param.put("SKUKEY", $("#SKUKEY").val());
+					
+					param.put("PROGID", "PDPK05_DETAIL02_SUB");
+					
+					
+					gridList.resetGrid("gridListSub");
+					
+					gridList.gridList({
+						id : "gridListSub",
+						param : param
+					});
+					
+			if(LASTOB == 'V'){
+		    	
+		    	//작업문서번호, 작업번호순번, 출고문서번호, 출고문서아이템번호, 그리드 데이터 
+				var json = netUtil.sendData({
+					url : "/wms/outbound/json/DL06MAXLOTA11.data",
+					param : param
+				});		
+			    
+				if(json && json.data){
+						    	
+			    	param.put("LASTOB", LASTOB);
+			    	param.put("LLOTA11", json.data.LLOTA11);
+			    	
+					}
+			    }		
+		}else if(gridId == "gridListSub" && dataLength > 0){
+			$("#BARCOD").val('<%=BARCOD%>');
+			if("<%=BARCOD%>" != ""){
+				var e = jQuery.Event( "keypress", { keyCode: 13 } ); 
+				$("#BARCOD").trigger(e);
+			}
+		}		
+		
+				
+		$('#BARCOD').focus();
+	}
+	
+	function showMain() {
+		window.top.closePage();
+	}
+	
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+		var param = new DataMap();
+		if(gridId == "gridList" && colName == "ZONEKY"){
+			if(colValue != ""){
+				param.put("WAREKY", "<%=wareky%>");
+				param.put("ZONEKY", colValue);
+				
+				var json = netUtil.sendData({
+					module : "WmsAdmin",
+					command : "ZONMAval",
+					sendType : "map",
+					param : param
+				});
+				if(json.data["CNT"] > 0) {
+					
+					PlaySound("s");					
+					commonUtil.msgBox("VALID_M0103", colValue, null, function () { 	
+						gridList.setColValue("gridList", rowNum, "ZONEKY", "");   
+						$('#BARCOD').focus(); 
+					}); 	
+					
+					
+					return;
+				} 
+			}
+		}
+	}
+	
+	function eventKeydown(event,objId){
+
+		if(event.keyCode == "13" && objId == "BARCOD"){
+							
+				var barcod = $.trim($("#BARCOD").val());				
+				var locaky = $.trim($("#LOCAKY").val());
+				var locasr = $.trim($("#LOCASR").val());
+				var skukey = $.trim($("#SKUKEY").val());
+				
+				var nowCount = $.trim($("#QTCOMP_L7141_2").val()); 
+				
+				var qttaor =$("#QTTAOR").val();
+				var qtsput =$("#QTSPUT").val();
+						
+				if(barcod == ""){
+					
+					PlaySound("e");					
+					commonUtil.msgBox("VALID_M0936", null, null, function () { 	// 바코드 입력해주세요.
+						$('#BARCOD').focus();      			
+					}); 
+		
+					return;	
+				}
+								
+				
+				var head = gridList.getGridData("gridList");				
+				var subhead = gridList.getGridData("gridListSub"); 
+				var param = new DataMap();
+				
+				var sameLota14Yn = 'N';
+				    
+					param.put("head", head);
+					param.put("TOTQTTAOR", qttaor);
+					param.put("BARCOD", barcod);
+				    param.put("LOCAKY", locaky);
+				    param.put("SKUKEY", skukey);				    				    
+				    param.put("WAREKY", '<%=wareky%>');
+<%-- 				    param.put("PLNTKY", '<%=plntky%>');				     --%>
+				    param.put("DIFFRENT_STKKY", "Y");
+				    param.put("TASKKY", gridList.getColData("gridListSub", 0 , "TASKKY"));				    
+				    param.put("SHPOKY", gridList.getColData("gridListSub", 0 , "SHPOKY"));
+				    param.put("LOCASR", gridList.getColData("gridListSub", 0 , "LOCASR"));
+				    <%-- param.put("LOTA07", '<%=LOTA07%>'); --%>
+				    <%-- param.put("LOTA09", '<%=DPTNKY%>'); --%>
+				    param.put("STKNUM", '<%=STKNUM%>');
+				    param.put("DPTNKY", '<%=DPTNKY%>');
+				    
+				    param.put("INPUTQTY", 0);
+				    
+				    for(var i=0; i < subhead.length; i++){
+				    	
+					    if(gridList.getColData("gridListSub", i , "LOTA14") == barcod && gridList.getColData("gridListSub", i , "LOCAKY") == locasr){
+					    	
+					    	param.put("SAMETYPE", 'Y');
+					    	
+					    	if(gridList.getColData("gridListSub", i , "QTTAOR") == 0){
+					    		commonUtil.msgBox("VALID_M2117", null, null, function () { 	//이미 처리된 바코드 입니다.
+	   								$('#BARCOD').focus();      			
+	   							}); 
+	   							
+	   							return;		
+					    	}
+					    	
+					    	
+					    
+					    }					    					  
+					    
+				    } 
+				  
+				    var chktotqtcomp=0;
+					
+				    for(j=0; j < gridList.getGridData("gridList").length; j++){									
+				    						
+				    						
+				    						
+   						chktotqtcomp += new Number(gridList.getColData("gridList", j, "QTCOMP"));	
+   											
+   						
+   						if(chktotqtcomp >  qttaor ){   						
+   							PlaySound("e");					
+   							commonUtil.msgBox("MOBILE_M0041", null, null, function () { 	//총 피킹수량은 지시수량과 동일해야 합니다.
+   								$('#QTSPUT').focus();      			
+   							}); 
+   							
+   							return;
+   						}
+   						   						
+   						if(gridList.getColData("gridList", j , "LOTA14") == barcod && gridList.getColData("gridList", j , "LOCAKY") == locasr &&  gridList.getColData("gridList", j, "QTCOMP") ==  new Number(gridList.getColData("gridList", j, "QTTAOR"))){
+   							param.remove("SAMETYPE"); 
+   							sameLota14Yn = 'Y';
+   						}
+   					}
+				    	
+				
+				    param.put("TOTQTCOMP", chktotqtcomp);
+				    
+				    var json = netUtil.sendData({
+						url : "/mobile/Mobile/json/barcodCheck.data",			
+						param : param
+					});
+					
+				   
+					if(json && json.data){
+						
+						 var sendMsg = json.data["MSG"];
+				            
+			            if(sendMsg != "MOBILE_M0040" && sendMsg != "Y"){
+			            	
+			            		PlaySound('e');
+ 			            	
+			            		commonUtil.msgBox(sendMsg, null, null, function () {
+	 			            		$('#BARCOD').focus();			            			
+								}); 
+ 			   	
+			            	return;
+			            }else if(sendMsg == "MOBILE_M0040"){
+			            	
+			            	commonUtil.msgConfirm(sendMsg,null,
+			            			function () {
+			            		param.put("ETCLOTA14", 'Y');	
+			            			}, function () {
+			            				
+			            				return;
+			            			}
+			            		);			            	
+			            	
+			            }
+			            
+					}    
+					
+				
+				var json = netUtil.sendData({
+					url: "/mobile/Mobile/json/PDPK05StockValidation.data",
+					param: param
+				});
+								
+				if(json && json.data){			    						 
+					
+					if(json.data["CNT"] == 0 && !json.data["MSG"]){						
+						PlaySound("e");					
+						commonUtil.msgBox("MOBILE_M0031", null, null, function () { 
+							$('#QTSPUT').focus();            			
+						}); 
+						
+						return;
+					}else if(json.data["MSG"]){
+						
+						 var sendMsg = json.data["MSG"];
+				            
+			            if(sendMsg){
+	
+			            	PlaySound("e");					
+							commonUtil.msgBox(sendMsg, null, null, function () { 
+								$('#QTSPUT').focus();            			
+							}); 
+							
+			            	return;
+			            }
+				            
+					}
+										
+					var checkCnt = 0;						
+					var totqtcomp=0;					
+					var tcp = 0;
+					
+					var dbqtsput = new Number(json.data.QTSPUT);					
+					var useQty = new Number(json.data.USEQTY);
+										
+					if(json.data.QTSPUT == 0){
+							
+							PlaySound("e");					
+							commonUtil.msgBox("MOBILE_M0041", null, null, function () { //총 피킹수량은 지시수량과 동일해야 합니다. 
+								$('#QTSPUT').focus();            			
+							}); 
+														
+							return;
+						}	
+					
+					for(var i=0; i < gridList.getGridData("gridList").length; i++){
+						
+						var rowQttaor = new Number(gridList.getColData("gridList", i, "QTTAOR"));
+						var rowQtcomp = new Number(gridList.getColData("gridList", i, "QTCOMP"));
+						var rowDbqtcomp = new Number(gridList.getColData("gridList", i, "DQTCOMP"));
+						
+						if(rowQttaor <= 0){
+							
+						}
+						
+						
+						
+						if(gridList.getColData("gridList", i, "LOCAKY") == json.data.LOCAKY && gridList.getColData("gridList", i, "LOTA14") == json.data.LOTA14 && skukey == json.data.SKUKEY && sameLota14Yn == 'N'){
+							
+							/* if(rowQtcomp + dbqtsput < rowQttaor){
+								dbqtsput = rowQtcomp + dbqtsput;
+							}else */  
+							if((rowQttaor == 0 && dbqtsput > 0) || dbqtsput != rowQtcomp){
+								
+									if(rowDbqtcomp > 0){
+										dbqtsput = dbqtsput + rowDbqtcomp;		
+									}else{
+										dbqtsput = dbqtsput;
+									}
+									
+								
+							}else{
+								dbqtsput =	rowQttaor;	
+							}
+							
+							
+							if(dbqtsput > rowQttaor && rowQttaor != 0){
+								dbqtsput = rowQttaor;
+							}
+							
+							
+														
+							gridList.setColValue("gridList", i, "QTCOMP", dbqtsput);
+							
+							
+							var allqtcompCount = 0;
+							for(var z = 0; z < gridList.getGridData("gridList").length; z++){
+								allqtcompCount += new Number(gridList.getColData("gridList", z, "QTCOMP"));
+							}
+							
+							
+							var allqttaorCount = 0;
+							for(var z = 0; z < gridList.getGridData("gridList").length; z++){
+								allqttaorCount += new Number(gridList.getColData("gridList", z, "QTTAOR"));
+							}
+							
+							if(new Number(allqtcompCount) > new Number(allqttaorCount)){
+																
+								
+								gridList.setColValue("gridList", i, "QTCOMP", 0);
+								PlaySound("e");					
+								commonUtil.msgBox("MOBILE_M0041", null, null, function () { //총 피킹수량은 지시수량과 동일해야 합니다. 
+									$('#BARCOD').focus();            			
+								}); 
+															
+								return;
+								
+							}
+							
+							
+							checkCnt++;
+						}else{
+							
+							
+						}
+													
+					}																		
+					
+						if(checkCnt > 0){																					
+												
+							
+						
+							for(var i=0; i < gridList.getGridData("gridList").length; i++){		
+																																						
+								if(gridList.getColData("gridList", i, "LOCAKY") == json.data.LOCAKY && gridList.getColData("gridList", i, "LOTA14") == json.data.LOTA14 && skukey == json.data.SKUKEY){																																										
+									
+									gridList.setColValue("gridList", i, "QTCOMP", dbqtsput);
+									gridList.setColValue("gridList", i, "PACKID", json.data.PACKID);
+									gridList.setColValue("gridList", i, "TRNUID", json.data.TRNUID);
+									gridList.setColValue("gridList", i, "CHKQTCOMP", dbqtsput);
+																
+								}
+
+							}														
+															
+						}else{
+							
+						/* 	if(qtsput > useQty){
+								commonUtil.msgBox("MOBILE_M0037",useQty); //입력수량이 가용재고[{0}] 보다 큽니다.
+								return;
+							}
+							 */
+							for(var i=0; i < gridList.getGridData("gridList").length; i++){		
+																								
+									totqtcomp += new Number(gridList.getColData("gridList", i, "QTCOMP"));
+																	
+							}
+							
+							if(dbqtsput >= useQty){
+								dbqtsput = useQty;
+							} else{
+								dbqtsput = dbqtsput;
+							}
+							 
+							 
+							//totqtcomp += qtsput;
+							
+							if(totqtcomp > qttaor ){								
+								
+								PlaySound("e");					
+								commonUtil.msgBox("MOBILE_M0041", null, null, function () { //총 피킹수량은 지시수량과 동일해야 합니다. 
+									$('#QTSPUT').focus();            			
+								}); 
+								
+								
+								return;
+							}	
+							
+							var newData = new DataMap();
+							newData.put("LOTA14", json.data.LOTA14);
+							newData.put("LOCAKY", json.data.LOCAKY);
+							newData.put("QTCOMP", dbqtsput);
+							newData.put("CHKQTCOMP", dbqtsput);
+							newData.put("QTTAOR", 0);
+							newData.put("DQTCOMP", 0);
+							newData.put("DUOMKEY", json.data.UOMKEY);
+							newData.put("LOTA02", json.data.LOTA02);
+							newData.put("LOTA01", json.data.LOTA01);
+							newData.put("LOTA03", json.data.LOTA03);
+							newData.put("LOTA09", json.data.LOTA09);
+							newData.put("LOTA11", json.data.LOTA11);
+							newData.put("LOTA12", json.data.LOTA12);
+							newData.put("LOTA13", json.data.LOTA13);
+							
+							newData.put("OWNRKY", json.data.OWNRKY);
+							newData.put("WAREKY", json.data.WAREKY);
+							newData.put("AREAKY", json.data.AREAKY);
+							newData.put("SKUKEY", json.data.SKUKEY);							
+							newData.put("PACKID", json.data.PACKID);
+							newData.put("TRNUID", json.data.TRNUID);
+							
+							newData.put("ALOTPCK", json.data.ALOTPCK);
+							newData.put("ALOTPCK_YN", json.data.ALOTPCK_YN);							
+							
+							newData.put("TASKKY", json.data.TASKKY);
+							newData.put("TASKIT", json.data.TASKIT);							
+							newData.put("SHPOKY", json.data.SHPOKY);
+							newData.put("SHPOIT", json.data.SHPOIT);
+							
+							gridList.setAddRow("gridList", newData);
+							
+							
+							
+							var newItemData = new DataMap();
+							newItemData.put("LOTA14", json.data.LOTA14);
+							newItemData.put("LOCASR", locasr);												
+							newItemData.put("PACKID", json.data.PACKID);
+							newItemData.put("TRNUID", json.data.TRNUID);
+							newItemData.put("TASKKY", json.data.TASKKY);
+							newItemData.put("TASKIT", json.data.TASKIT);							
+
+							
+							gridList.setAddRow("gridListSub", newItemData)
+							
+							
+							newData.clear();
+							newItemData.clear();
+						}				
+																								
+			    }
+				
+				
+				var QTCOMP_L7141_2 = 0;
+				
+				for(var j=0; j < gridList.getGridData("gridList").length; j++){
+					
+					QTCOMP_L7141_2 += new Number(gridList.getColData("gridList", j, "QTCOMP"));
+						
+				}
+				
+				$("#QTCOMP_L7141_2").val(QTCOMP_L7141_2);
+				
+				$("#QTSPUT").val(dbqtsput);
+			
+				
+				valueChangeEvent($("#QTCOMP_L7141"));
+				valueChangeEvent($("#QTCOMP_L7141_2"));
+				valueChangeEvent($("#QTTAOR"));
+				valueChangeEvent($("#QTSPUT"));
+				
+				
+				
+				var gridId = "gridList";
+				for (var rowNum in gridList.getRowNumList(gridId)) {
+					var rowData = gridList.getRowData(gridId, rowNum);
+					if (barcod == rowData.get('LOTA14')) {
+						gridList.setColFocus(gridId, rowNum, 'LOTA14');
+						break;
+					}
+				}
+				
+				PlaySound('s');
+				$("#BARCOD").focus();
+		}
+		
+		//피킹수량 입력시 그리드 피킹수량 변경
+		if(event.keyCode == "13" && (objId == "QTSPUT" || objId == "BQTSPUT")){
+			var regex = /[^0-9.]/g;
+			
+			var qttaor = new Number($("#QTTAOR").val().replace(regex, ""));
+			var qtsput = new Number($("#QTSPUT").val().replace(regex, ""));
+			var qtsing = 0;
+			
+			
+			var rowFocusNum = gridList.getFocusRowNum("gridList");
+			var rowQttaor = new Number(gridList.getColData("gridList", rowFocusNum, "QTTAOR"));
+			
+			
+			if((qtsput > qttaor || qtsput > rowQttaor) && rowQttaor != 0){
+				
+				PlaySound("e");					
+				commonUtil.msgBox("MOBILE_M0042", null, null, function () { //입력수량이 지시수량보다 많습니다.
+					$('#QTSPUT').focus();            			
+				}); 
+				return;
+			}
+			
+			for(var i =0; i < gridList.getGridData("gridList").length; i++){
+				
+				
+				if(i != rowFocusNum){
+					qtsing +=  new Number(gridList.getColData("gridList", i, "QTCOMP"));
+				}else{
+					qtsing += 0; 
+				}
+				
+			}
+			
+			
+			var CHKQTCOMP = new Number(gridList.getColData("gridList", rowFocusNum, "CHKQTCOMP"));
+			
+			if(qtsing + qtsput > qttaor){
+	
+				PlaySound("e");					
+				commonUtil.msgBox("MOBILE_M0041", null, null, function () { //입력수량이 지시수량보다 많습니다.
+					$('#QTSPUT').focus();            			
+				});
+				
+				return;
+			}
+			
+			if(CHKQTCOMP < qtsput && CHKQTCOMP !=0){
+				
+				PlaySound("e");					
+				commonUtil.msgBox("MOBILE_M0050", null, null, function () { //가용수량보다 입력수량이 더 많습니다.
+					$('#QTSPUT').focus();            			
+				});
+				return;
+			}
+			
+			gridList.setColValue("gridList", rowFocusNum, "QTCOMP", qtsput);
+			
+			var QTCOMP_L7141_2=0;
+			
+			for(var j=0; j < gridList.getGridData("gridList").length; j++){
+				
+				QTCOMP_L7141_2 += new Number(gridList.getColData("gridList", j, "QTCOMP"));
+					
+			}
+			
+				$("#QTCOMP_L7141_2").val(QTCOMP_L7141_2);
+				valueChangeEvent($("#QTCOMP_L7141_2"));
+				valueChangeEvent($("#QTSPUT"));
+				$("#QTSPUT").focus();
+		}
+		
+	}
+	
+	function eventKeyup(event,objId){
+		
+		//피킹수량 입력시 box수량 변경
+	    //if ((event.keyCode >= 48 && event.keyCode <= 57) || (event.keyCode >= 96 && event.keyCode <= 105)) { 
+
+	    	if((objId == "QTSPUT" || objId == "BQTSPUT") && event.keyCode != '13'){
+	    	
+	    	
+	    	var regex = /[^0-9.,]/g;
+		    var qtsput = $('#'+objId).val().replace(regex, "");
+		    var qtpuom = $('#QTPUOM').val().replace(regex, "");
+					    	
+		    
+		    if(qtsput != $('#'+objId).val()){
+		    	
+		    	PlaySound("e");					
+				commonUtil.msgBox("VALID_M2124", $('#'+objId).val(), null, function () { //총 피킹수량은 지시수량과 동일해야 합니다.
+					$('#QTSPUT').focus();            			
+				}); 
+							
+		    	return;
+		    }
+		    
+		    
+			if(objId == "QTSPUT"){
+				var value = setDecimalValue(qtsput/qtpuom, 3);
+				$("#BQTSPUT").val(value);
+				$("#QTSPUT").val(qtsput);
+			}else if(objId == "BQTSPUT"){
+				var value = setDecimalValue(qtsput*qtpuom, 3);
+				$("#BQTSPUT").val(qtsput);
+				$("#QTSPUT").val(value);
+			}
+	       }
+		
+		//}
+		
+	}
+	
+	function gridListEventRowDblclick(gridBox, rowNum){
+		
+		var LOCAKY = gridList.getColData("gridList", rowNum, "LOCAKY");
+		var LOTA14 = gridList.getColData("gridList", rowNum, "LOTA14");
+		var QTCOMP = gridList.getColData("gridList", rowNum, "QTCOMP");	
+
+
+		$("#LOCAKY").val(LOCAKY);
+		$("#BARCOD").val(LOTA14);
+		$("#QTSPUT").val(QTCOMP);
+		
+		var qtsput = $('#QTSPUT').val().replace(",", "");
+		var qtpuom = $('#QTPUOM').val().replace(",", "");
+		
+		var regex = /[^0-9.,]/g;
+		
+	    var value = setDecimalValue(qtsput/qtpuom, 3);
+		$("#BQTSPUT").val(value);
+		
+		valueChangeEvent($("#QTSPUT"));
+				  
+	}
+		
+	
+	function previtem(GO_TYPE) {
+		
+		if(GO_TYPE != "PASS"){
+						
+			commonUtil.msgConfirm("VALID_M2094",null,
+					function () {
+							
+					var param = new DataMap();
+	
+					var LOCAKY =  $("#LOCAKY").val();
+					
+					param.put("LOCAKY",  LOCAKY);				
+					param.put("WAREKY", "<%=wareky%>");			
+					param.put("DPTNKY", '<%=DPTNKY%>');
+					param.put("STKNUM", '<%=STKNUM%>');			
+					param.put("SKUKEY", '<%=SKUKEY%>');
+					
+					param.put("INOUTCHK", 'OUT');
+					
+					var json = netUtil.sendData({
+						url : "/mobile/Mobile/json/taskLockUpdate.data",			
+						param : param
+					});
+					
+					
+					if(json && json.data){
+						
+						location.href='/mobile/PDPK05_DETAIL.page?STKNUM='+'<%=STKNUM%>'+'&DPTNKY='+'<%=DPTNKY%>'+'&BARCOD='+'<%=BARCOD%>'+'&SEARCHCOUNT='+<%=SEARCHCOUNT%>;
+						
+					}
+				
+					}, function () {
+						$('#BARCOD').focus(); 
+						return;
+					}
+				);
+			
+		}else{
+			
+			var param = new DataMap();
+			
+			var LOCAKY =  $("#LOCAKY").val();
+			
+			param.put("LOCAKY",  LOCAKY);				
+			param.put("WAREKY", "<%=wareky%>");			
+			param.put("DPTNKY", '<%=DPTNKY%>');
+			param.put("STKNUM", '<%=STKNUM%>');			
+			param.put("SKUKEY", '<%=SKUKEY%>');
+			
+			param.put("INOUTCHK", 'OUT');
+			
+			var json = netUtil.sendData({
+				url : "/mobile/Mobile/json/taskLockUpdate.data",			
+				param : param
+			});
+			
+			
+			if(json && json.data){
+				
+				location.href='/mobile/PDPK05_DETAIL.page?STKNUM='+'<%=STKNUM%>'+'&DPTNKY='+'<%=DPTNKY%>'+'&BARCOD='+'<%=BARCOD%>'+'&SEARCHCOUNT='+<%=SEARCHCOUNT%>;
+				
+			}
+		}
+		
+		
+		
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+			  <div id="searchArea">
+				<table>
+					<colgroup>
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+						</colgroup>
+					<tbody>
+						<tr>
+							<th CL='STD_LOCAKY3'>로케이션</th>
+							<td colspan="3">
+								<input type="text" class="text" name="LOCAKY" id="LOCAKY"/>
+							</td>
+							<td colspan="2" onclick ="searchLocationList()">
+								<button class="bt" style="height: 28px;">
+									<p CL='BTN_SEARCH'></p>
+								</button>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_BARCOD'>바코드</th>
+							<td colspan="5">
+								<input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_LOCAKY3'>로케이션</th>
+							<td colspan="5">
+								<input type="text" class="text" name="LOCASR" id="LOCASR" readonly/>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_SKUKEY'>품목코드</th>
+							<td colspan="5">
+								<input type="text" class="text" name="SKUKEY" id="SKUKEY" readonly/>
+							</td>
+						</tr>
+						<tr>
+							<th  CL='STD_DESC01'>품목명</th>
+							<td colspan="5">
+								<input type="text" class="text" name="DESC01" id="DESC01" readonly/>
+							</td>
+						</tr>
+						<tr>
+							<th  CL='STD_QTYRCV1'>지시수량</th>
+							<td>
+								<input type="text" class="text number" name="QTTAOR" id="QTTAOR" readonly onchange="valueChangeEvent(this)"/>
+							</td>									
+							<td>
+								<input type="text" class="text" name="UOMKEY" id="UOMKEY" readonly onchange="valueChangeEvent(this)"/>
+							</td>
+							<td>
+								<input type="text" class="text number" name="BQTTAOR" id="BQTTAOR" readonly onchange="valueChangeEvent(this)"/>
+							</td>
+							<td>
+								<input type="text" class="text" name="BUOMKEY" id="BUOMKEY" readonly onchange="valueChangeEvent(this)"/>
+							</td>
+						</tr>
+						<tr>			
+							<th  CL='STD_QTJCMP'>피킹수량</th>
+							<td>
+								<input type="text" class="text number"name="QTSPUT" id="QTSPUT" onfocus="this.select();" value="0" onchange="valueChangeEvent(this)" onkeypress="eventKeydown(event,this.id)" onkeyup="eventKeyup(event,this.id)"/>
+								<input type="hidden" class="input" name="LASTOB" id="LASTOB"/>
+								<input type="hidden" class="input" name="LLOTA11" id="LLOTA11"/>
+								<input type="hidden" class="input" name="SHPOKY" id="SHPOKY"/>
+								<input type="hidden" class="input" name="SHPOIT" id="SHPOIT"/>
+								<input type="hidden" class="input" name="QTPUOM" id="QTPUOM"/>
+							</td>
+							<td>
+								<input type="text" class="text" name="PUT_UOMKEY" id="PUT_UOMKEY" readonly/>
+							</td>
+							<td>
+								<input type="text" class="text number"name="BQTSPUT" id="BQTSPUT" onfocus="this.select();" value="0" onchange="valueChangeEvent(this)" onkeypress="eventKeydown(event,this.id)" onkeyup="eventKeyup(event,this.id)"/>							
+							</td>
+							<td>
+								<input type="text" class="text" name="PUT_BUOMKEY" id="PUT_BUOMKEY" readonly/>
+							</td>
+						</tr>									
+					</tbody>
+				</table>
+				<!-- 할당로트피킹준수 HIDDEN -->
+				<input type="hidden" class="input" name="ALOTPCK" id="ALOTPCK"/>
+			</div>
+			</div>
+			<div class="tableWrap_search section">
+				<div class="tableHeader">						 
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="40px" />
+							<col width="110px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="85px" />
+							<col width="120px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+						</colgroup> 
+						<thead>
+							<tr>
+								<th CL="STD_NO">NO</th>								
+								<th CL="STD_LOTA14">제조LOT</th>
+								<th CL="STD_LOCAAC">실로케이션</th>
+								<th CL="STD_QTJCMP">피킹수량</th>
+								<th CL="STD_QTYRCV1">지시수량</th>
+								<th CL="STD_SDUOKY">기본단위</th>
+								<th CL="STD_QTYORG">오더수량</th>
+								<th CL="STD_UOMKEY">단위</th>
+								<th CL="STD_LOTA02">플랜트</th>
+								<th CL="STD_LOTA01">저장위치</th>
+								<th CL="STD_SUPLNM">공급업체코드</th>
+								<th CL="STD_LOTA09">거래처코드MTO</th>
+								<th CL="STD_LOTA11">제조일자</th>
+								<th CL="STD_LOTA12">입고일자</th>
+								<th CL="STD_LOTA13">유통기한</th>								
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="40px" />
+							<col width="110px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="85px" />
+							<col width="120px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="75px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+									<td GCol="rownum">순번</td>
+									<td GCol="text,LOTA14">제조LOT</td>
+									<td GCol="text,LOCAKY">실로케이션</td>
+									<td GCol="text,QTCOMP" GF="N 20,3">피킹수량</td>
+									<td GCol="text,QTTAOR" GF="N 20,3">지시수량</td>
+									<td GCol="text,DUOMKY">기본단위</td>
+									<td GCol="text,QTYORG" GF="N 20,3">오더수량</td>
+									<td GCol="text,UOMKEY">오더단위</td>									
+									<td GCol="text,LOTA02">플랜트</td>
+									<td GCol="text,LOTA01">저장위치</td>
+									<td GCol="text,LOTA03">공급처코드</td>
+									<td GCol="text,LOTA09">거래처코드MTO</td>																										
+									<td GCol="text,LOTA11" GF="D">제조일자</td>
+									<td GCol="text,LOTA12" GF="D">입고일자</td>
+									<td GCol="text,LOTA13" GF="D">유통기한</td>
+									
+									<td GCol="text,DPTNKY" hidden="hidden"></td>									
+									<td GCol="text,STKNUM" hidden="hidden"></td>										
+									
+									<td GCol="text,OWNRKY" hidden="hidden"></td>
+									<td GCol="text,WAREKY" hidden="hidden"></td>									
+									<td GCol="text,AREAKY" hidden="hidden"></td>
+									<td GCol="text,SKUKEY" hidden="hidden"></td>
+									<td GCol="text,TRNUID" hidden="hidden"></td>										
+									<td GCol="text,PACKID" hidden="hidden"></td>										
+									<td GCol="text,BARCOD" hidden="hidden"></td>
+									<td GCol="text,DQTCOMP" hidden="hidden"></td>
+									<td GCol="text,ALOTPCK" hidden="hidden"></td>
+									<td GCol="text,ALOTPCK_YN" hidden="hidden"></td>
+									
+									
+									<td GCol="text,CHKQTCOMP" GF="N 20,3" hidden="hidden"></td>									
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>		
+			
+				
+			<div class="select_box">
+				<table>
+					<colgroup>
+						<col width="91px"/>
+						<col width="38px"/>
+						<col width="80px"/>
+						<col width="48px"/>
+						<col width="25px"/>
+						<col width="80px"/>
+						<col width="48px"/>
+					</colgroup>
+					<tbody>
+						<tr>
+							<th CL='STD_TOTCMP'>총 피킹수량</th>
+							<td CL='STD_ALL'>전체</td>
+							<td>
+								<input type="text" class="text number" name="QTCOMP_L7141" id="QTCOMP_L7141" readonly/>
+							</td>
+							<td>
+								<input type="text" class="text" name="UOMKEY2" id="UOMKEY2" style="text-align:center" readonly/>
+							</td>
+							<td CL='STD_INCLU'>중</td>
+							<td>
+								<input type="text" class="text number" name="QTCOMP_L7141_2" id="QTCOMP_L7141_2" readonly/>
+							</td>
+							<td>
+								<input type="text" class="text" name="UOMKEY3" id="UOMKEY3" style="text-align:center" readonly/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>					
+				
+			
+										
+			<!-- end table_body -->
+			<div class="footer_5"  style="position:fixed;" >
+				<table>
+					<tr>
+						<td class=f_1 width="30%" onclick="previtem()">
+							<label CL='BTN_PREVITEM'></label>
+						</td>					
+						<td class=f_1 width="30%" onclick ="reSearchList()" >
+							<label CL='BTN_REFRESH'></label>
+						</td>
+						<td class=f_1 width="30%" onclick="start()">
+							<label CL='BTN_FPC'></label>
+						</td>						
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->
+			
+			<!-- gridListHidden2 피킹완료에 쓰일 데이터만 가지고오기 -->
+			<div style="margin-bottom: 0px;display:none;">
+				<div class="tableBody">
+					<table style="width: 900px">
+						<tbody id="gridListSub">
+							<tr CGRow="true">
+								<td GCol="text,TASKKY">작업문서번호</td>								
+								<td GCol="text,TASKIT">작업문서아이템</td>
+								<td GCol="text,SHPOKY">출하문서번호</td>
+								<td GCol="text,LOTA14">개별바코드</td>
+								<td GCol="text,LOCASR" hidden="hidden"></td>
+								<td GCol="text,TRNUID" hidden="hidden"></td>										
+								<td GCol="text,PACKID" hidden="hidden"></td>
+								
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+			<!-- gridListHidden 데이터만 가지고오기 -->
+			<div style="margin-bottom: 0px;display:none;">
+				<div class="tableHeader">
+					<table> 
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO">순번</th>
+								<th CL="STD_STKNUM">작업지시번호</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 900px">
+						<tbody id="gridListHidden">
+							<tr CGRow="true">
+								<td GCol="text,TOTCOMPCNT">완료건수</td>
+								<td GCol="text,NOWCOMPCNT">중 count</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+		</div>
+	</div>
+</body>

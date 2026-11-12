@@ -1,0 +1,260 @@
+<%@page import="project.common.airfw.User"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<%
+	User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+<script type="text/javascript">
+	var searchFlag = 1;
+	var tabPage = 1;
+	var paramH = new DataMap();
+	var EXIST_RESUT_CNT = 0;
+
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			url : "/WcsIF/list/json/VW_LOC_GROUP.data",
+			gridMobileType : true,
+			colorType : true
+		});
+		
+		gridList.setGrid({
+			id : "gridListSub",
+			//editable : false,
+			url : "/WcsIF/list/json/VW_LOC_INFO.data",
+			gridMobileType : true
+		});
+		
+		initSearchArea();
+		
+		searchList('Search');
+	});
+	
+	function initSearchArea() {
+		$('select[name="S.WAREKY"]').multipleSelect('setSelects', ['<%=wareky%>']);
+		$('select[name="SKUL01"]').val("");
+	}
+	
+	function searchList(type){
+		var param = inputList.setRangeParam("searchArea");
+		param.put("SKUKEY", 'INIT');
+		param.put("BARCOD", 'INIT');
+		
+		if ($("#searchArea input[name='BARCOD']").val()) {
+			param.put("BARCOD", $("#searchArea input[name='BARCOD']").val());
+		}
+		
+		if ($("#searchArea input[name='SKUKEY']").val()) {
+			param.put("SKUKEY", $("#searchArea input[name='SKUKEY']").val());
+		}
+		
+		gridList.resetGrid("gridListSub");
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});  
+		
+		if (type == "SearchAll" ) {
+			param.put("SKUKEY", "");
+			param.put("BARCOD", "");
+			
+			gridList.gridList({
+				id : "gridListSub",
+				param : param
+			});	
+		}
+	}
+
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			searchList(btnName);
+		} else if (btnName == "SearchAll") {
+			searchList(btnName);
+		}
+	}
+
+	function gridListEventRowClick(gridId, rowNum, colName){
+		if(gridId == "gridList"){
+
+			EXIST_RESUT_CNT = 0;
+			
+			var LOC_GRPCD = gridList.getColData('gridList', rowNum, "LOC_GRPCD");
+			var param = new DataMap();
+			param.put("LOCGRPCD", LOC_GRPCD);
+
+			gridList.gridList({
+				id : "gridListSub",
+				param : param
+			});	
+		}
+	}
+	
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength > 1){
+			
+			for (var i = 0; i < dataLength; i++) {
+				var EXIST_BARCOD = gridList.getColData(gridId,i,"EXIST_BARCOD");
+                if (EXIST_BARCOD != "0") {
+                	EXIST_RESUT_CNT++;
+                	
+                	gridList.setColFocus("gridList", i, "LOC_GRPCD");
+                }
+	        }
+
+			if (EXIST_RESUT_CNT == 1) {
+				var headRowNum =  gridList.getFocusRowNum("gridList")
+				gridListEventRowClick("gridList", headRowNum)
+			}
+		}
+	}
+	
+	function gridListRowTextColorChange(gridId, rowNum, rowData){
+		if(gridId === "gridList"){
+			if(rowData.get("EXIST_BARCOD") != "0"){
+				return configData.GRID_COLOR_TEXT_BLUE_CLASS;
+			}
+		}
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_SEARCH" />
+					<input type="button" CB="SearchAll SEARCH BTN_SEARCHALL" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<input type="hidden" class="input" name="OWNRKY" value="<%=ownrky %>" />
+					<dl>
+						<dt CL="STD_SKUKEY">품목코드</dt>
+						<dd>
+							<input type="text" class="input" name="SKUKEY" />
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_LOTA14">개별바코드</dt>
+						<dd>
+							<input type="text" class="input" name="BARCOD" />
+						</dd>
+					</dl>
+					<!-- 
+					<dl>
+						<dt CL="STD_LOTA12">입고일자</dt>
+						<dd>
+							<input type="text" class="input" name="CREATE_DT" UIInput="R" UIFormat="C" />
+						</dd>
+					</dl>
+					 -->
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+		<div class="search_next_wrap searchRow2">
+			<div class="content-horizontal-wrap">
+				<div class='content_layout tabs content_left' style="width: calc(35% - 10px);">
+					<ul class="tab tab_style02">
+						<li><a href="#tab1-1"><span CL="WCS_GROUPLIST">그룹 리스트</span></a></li>
+						<li class="btn_zoom_wrap">
+	                        <ul>
+	                            <li><button class="btn btn_bigger"><span>확대</span></button></li>
+	                        </ul>
+	                    </li>
+					</ul>
+					<div class="table_box section" id="tab1-1">
+						<div class="table_list01">
+							<div class="scroll">
+								<table class="table_c">
+									<tbody id="gridList">
+										<tr CGRow="true">
+											<td GH="40 STD_NUMBER"  GCol="rownum">1</td>
+											<td GH="100 STD_LOTA02" GCol="text,LOTA02">플랜트</td>
+											<td GH="100 WCS_LOC_GRPNM" GCol="text,LOC_GRPNM">LOC_NM</td>
+											<td GH="100 WCS_CNT_STATE3" GCol="text,CNT_STATE3">적재(팔레트)</td>
+											<td GH="100 WCS_CNT_STATE1" GCol="text,CNT_STATE1">미적재(팔레트)</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="btn_lit tableUtil">
+							<button type="button" GBtn="find"></button>
+							<button type="button" GBtn="sortReset"></button>
+							<button type="button" GBtn="layout"></button>
+							<button type="button" GBtn="total"></button>
+							<button type="button" GBtn="excel"></button>
+							<button type='button' GBtn="subTotal"></button>
+							<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+						</div>
+					</div>
+				</div>
+			
+			<div class="content_layout tabs content_right"  style="width: calc(65% - 10px);">
+                <ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_DETAILLIST">아이템 리스트</span></a></li>
+					<li class="btn_zoom_wrap">
+                        <ul>
+                            <li><button class="btn btn_bigger"><span>확대</span></button></li>
+                        </ul>
+                    </li>
+				</ul>
+                <div class="table_box section" id="tab1-1">
+                    <div class="table_list01">
+                        <div class="scroll">
+                            <table class="table_c">
+                                <tbody id="gridListSub">
+                                    <tr CGRow="true">
+                                        <td GH="50"                 GCol="rownum">1</td>     
+                                        <td GH="120 STD_SKUKEY"     GCol="text,SKUKEY">품목코드</td>
+                                        <td GH="150 STD_LOTA14"     GCol="text,LOTA14">개별바코드</td>
+                                        <td GH="50 STD_QTSIWH"     GCol="text,QTSIWH">수량</td>        
+                                        <td GH="30 WCS_LOC_LV"     GCol="text,LOC_LV" GF="N 1">레벨</td>        
+                                        <td GH="40 WCS_LOC_HIGH" 	GCol="text,LOC_HIGH">PLT높이</td>
+                                        <td GH="100 WCS_LOC_NM"     GCol="text,LOC_NM">로케이션명</td>
+                                        <td GH="100 WCS_LOC_FLAG_NM"GCol="text,LOC_FLAG_NM" >지번상태</td>
+                                        <td GH="100 STD_LOTA11"	GCol="text,LOTA11" GF="C">제조일자</td>                   
+                                        <td GH="100 WCS_CREATE_DT"	GCol="text,CREATE_DT" GF="C">적재일</td>                   
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="btn_lit tableUtil">
+                        <button type='button' GBtn="find"></button>
+                        <button type='button' GBtn="sortReset"></button>
+                        <button type='button' GBtn="total"></button>
+                        <button type='button' GBtn="layout"></button>
+                        <button type='button' GBtn="excel"></button>
+                        <button type='button' GBtn="subTotal"></button>
+                        <span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+                    </div>
+                </div>
+            </div>
+            </div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

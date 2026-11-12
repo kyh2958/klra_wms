@@ -1,0 +1,1006 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%
+String STKNUM = request.getParameter("STKNUM");
+String DPTNKY = request.getParameter("DPTNKY");
+String TASKKY = request.getParameter("TASKKY");
+String PREVITEM = request.getParameter("PREVITEM");
+String COMPLETE_YN = request.getParameter("COMPLETE_YN");
+String SEARCHCOUNT = request.getParameter("SEARCHCOUNT");
+
+if (STKNUM == null) {
+	STKNUM = "";
+}
+
+if (DPTNKY == null) {
+	DPTNKY = "";
+}
+
+if (TASKKY == null) {
+	TASKKY = "";
+}
+
+if (PREVITEM == null) {
+	PREVITEM = "YES";
+}
+
+if (COMPLETE_YN == null) {
+	COMPLETE_YN = "N";
+}
+
+if (SEARCHCOUNT == null) {
+	SEARCHCOUNT = "";
+}
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {
+	vertical-align: bottom;
+	height: 37px;
+}
+
+input:read-only {
+	background-color: #e2e2e2;
+}
+
+select:disabled {
+	background-color: #e2e2e2;
+}
+
+.tem5_content .tableWrap_search {
+	overflow: hidden;
+}
+
+.tem4_content .select_box table {
+	width: 98% !important;
+	margin: auto;
+}
+
+.tem4_content .select_box .text {
+	padding: unset !important;
+	margin: unset !important;
+}
+
+.tem4_content table th {
+	padding: 3px !important;
+	white-space: normal;
+}
+
+.tem4_content table td {
+	padding: 3px !important;
+}
+
+.number {
+	text-align: right
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport"
+	content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp"%>
+<script>
+	var WAREKY = "<%=wareky%>";
+	
+
+	$(document).ready(function(){
+		
+		  var width = window.innerWidth;
+
+		    if (width <= 800) {
+		        $("#STKNUM").attr("inputmode", "none");
+		    } else {
+		        $("#STKNUM").attr("inputmode", "numeric");
+		    }
+		    
+		    
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsMobileOutboundPicking",
+			command : "PDLD21_DETAIL",
+			gridMobileType : true,
+			emptyMsgType:false
+		});
+		
+		if("<%=STKNUM%>" != "") {
+			$("#STKNUM").val("<%=STKNUM%>");
+			var param = inputList.setRangeParam("searchArea");
+			param.put("LANGKY", "<%=langky%>");
+			param.put("WAREKY", "<%=wareky%>");
+			
+			if(new Number(<%=SEARCHCOUNT%>) < 2){
+				param.put("TASKKY", "<%=TASKKY%>");
+			}
+				
+			searchList(param);
+		}
+		
+		$("#STKNUM").focus();
+				
+	});
+	
+	var goFlag = true;
+	
+	if("<%=PREVITEM%>" == "NO"){
+		goFlag = false;
+	}
+	
+	// 작업지시번호로 문서정보검색
+	function searchList(resParam){		
+		
+		if(!validate.check("searchArea")){
+			return;
+		}
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");
+<%-- 		param.put('PLNTKY', '<%=plntky%>'); --%>
+		param.put("PROGID", "PK05");
+		param.put("KIOSK_MTYPE", "<%=mtype%>");
+		
+		if(resParam != null && resParam !=''){
+			param.put('TASKKY', resParam.get("TASKKY"));	
+		}
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	
+		/*
+		gridList.gridList({
+			id : "gridListHidden",
+			param : param
+		});
+		*/
+		
+		searchedParam = new DataMap();
+		searchedParam.putObject(structuredClone(param.map));
+	}
+	
+	function startNoLink(){
+
+	    var head = gridList.getSelectData("gridList");
+
+	    if(head.length < 1){
+	        PlaySound('e');
+	        commonUtil.msgBox("MOBILE_M0039", null, null, function () {
+	            $('#BARCOD').focus();
+	        });
+	        return;
+	    }
+	    
+	    if (isAlreadyLoadCompleted(head)) {
+	        PlaySound('e');
+	        commonUtil.msgBox("이미 상차 완료 된 건입니다.", null, null, function () {
+	            $('#BARCOD').focus();
+	        });
+	        return;
+	    }
+
+	    commonUtil.msgConfirm(
+	        "MOBILE_M0063",   // 
+	        null,
+	        function () {
+	        	start("Y");   // 미연동 값
+	        },
+	        function () {
+	            $('#BARCOD').focus();   // NO
+	        }
+	    );
+	}
+	function isAlreadyLoadCompleted(head) {
+	    if (!head || head.length < 1) {
+	        return false;
+	    }
+
+	    for (var i = 0; i < head.length; i++) {
+	        var rowNum = head[i].get ? head[i].get("GRowNum") : head[i].GRowNum;
+
+	        if (rowNum == null || rowNum == undefined || rowNum === "") {
+	            rowNum = gridList.getRowNumIndex
+	                ? gridList.getRowNumIndex("gridList", head[i])
+	                : i;
+	        }
+
+	        if (gridList.getColData("gridList", rowNum, "FCKCOM") != "V") {
+	            return false;
+	        }
+	    }
+
+	    return true;
+	}
+	
+	function start(noLinkYn){
+		var param = new DataMap();
+		var head = gridList.getSelectData("gridList");					
+		var totallen = gridList.getGridData("gridList").length;
+		var checkedCount = gridList.getSelectRowNumList("gridList").length;
+		var BARCOD = $("#BARCOD").val();
+		var checkCnt=0;
+		var messageAskCode = "SYSTEM_M0129";	//상차완료 하시겠습니까?
+		var messageDoneCode = "SYSTEM_M0133";	//상차완료되었습니다.
+		
+		var sendecmsYN = "N"					//출고처리 수행여부
+
+		if(head.length < 1) {
+			
+			PlaySound('e');
+			commonUtil.msgBox("MOBILE_M0039", null, null, function () { //체크박스 선택 후 상차완료를 진행해주세요.				
+				$('#BARCOD').focus();   
+			}); 
+			
+			return;
+		}							
+		if (isAlreadyLoadCompleted(head)) {
+	        PlaySound('e');
+	        commonUtil.msgBox("이미 상차 완료 된 건입니다.", null, null, function () {
+	            $('#BARCOD').focus();
+	        });
+	        return;
+	    }
+		// 부분상차
+		if (gridList.getSelectRowNumList("gridList").length < totallen) {
+			messageAskCode = "SYSTEM_M0137";
+			messageDoneCode = "SYSTEM_M0138";
+		}
+		
+		if (head[0].map.PTNRKY == "P1200" && head[0].map.TLOTA01 == "3500" && head[0].map.TLOTA02 == "P200") {
+			sendecmsYN = "Y";
+		}
+
+		//상차완료 하시겠습니까?		
+		commonUtil.msgConfirm(messageAskCode,null, function () {				
+			param.put("head", head);
+			param.put("WAREKY", "<%=wareky%>");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");		
+			param.put("BARCOD", BARCOD);
+			param.put("STKNUM", '<%=STKNUM%>');
+			param.put("TASKKY", '<%=TASKKY%>');
+
+			param.put("TOTALCNT", totallen);	
+			if (noLinkYn == "Y") {
+			    param.put("NO_LINK_YN", "Y");
+			} //미연동 구분값 던져주기
+
+			var json = netUtil.sendData({
+				url: "/mobile/Mobile/json/PDLD21SaveEnd.data",
+				param: param
+			});
+			
+			if(json && json.data) {
+				if(!json.data.CNT && json.data.BARCODS){
+					PlaySound("e");	
+		    		commonUtil.msgBox("OUT_M0195", json.data.SHPOKY, null, function () {
+		    			$('#STKNUM').focus();  
+					}); 
+					return;
+		    	}else{
+		    						
+		    		PlaySound("s");	
+		    		
+		    		// 2025.03.20 WCS 프로시져 호출 (MOVEOUT)
+		    		if (1 && json.data.BARCODS != "") {
+		    			var wcsParam = new DataMap();
+		    			wcsParam.put("ORD_TYPE", 'MOVEOUT');	// 요청유형 ('LOCK', 'MOVEOUT', 'CANCEL')
+		    			wcsParam.put("IND_BCD",  json.data.BARCODS);	// 바코드목록
+		    			
+		    		    var result = netUtil.sendData({
+		    		    	url : "/WcsIF/map/json/CALL_UPDATE_TB_PLT_STOCK.data", 
+		    		    	param : wcsParam
+		    			});
+		    		}
+		    		
+		    		// 출고처리
+		    		if (sendecmsYN == "Y") {
+		    			param.put("WAREKY", "<%=wareky%>");
+		    			param.put("OWNRKY", "<%=ownrky%>");
+		    			param.put("LANGKY", "<%=langky%>");		
+		    			param.put("STKNUM", $("#STKNUM").val());
+		    			param.put("STAT02", 'V');
+		    			param.put("STAT03", 'V');
+		    			param.put("STAT04", 'V');
+		    			param.put("STAT05", 'V');
+		    			param.put("STAT06", 'V');
+
+		    			var json = netUtil.sendData({
+		    				module : "WmsOutboundDL082",
+		    				command : "DL081",
+		    				param : param
+		    			});
+		    			
+		    			if(json && json.data.length) {
+		    				var selectedHead = new Array(); 
+		    		        var sendEcmsURL = "/wms/outbound/json/sendEcmsDL081Bundle.data";
+		    		        selectedHead[0] = json.data[0];
+		    		        
+		    		        // 상차완료
+		    				if (selectedHead[0].STATNM != "상차완료") {
+		    					alert("상차처리 후 출고 해주세요\n상태: " + selectedHead[0].STATNM);
+		    					return; 
+		    				}
+		    				
+		    		        param.put("loopHeadList", selectedHead);
+		    		        
+		    		        json = netUtil.sendData({
+		    		            url : sendEcmsURL,
+		    		            param : param,
+		    		            async : false,	// 동기처리 적용
+		    	                callBackFunction : function(returnData){
+		    	                	if (returnData.data.sucessCnt > 0) {
+		    	                		alert('출고처리 되었습니다.');
+		    	                		searchList();
+		    	                	}else {
+		    	                		// 실패, 관리자에게 문의 바랍니다.
+		    	                	}
+		    	                }
+		                    });
+		    			}
+		    		}
+		    		else {
+		    			commonUtil.msgBox(messageDoneCode, null, null, function () { 
+							searchList();
+						}); 
+		    		}
+
+					return;
+		    	}	
+			}
+		}, function () {
+			$('#STKNUM').focus();   
+			return;
+		});
+	}
+	
+	function startKiosk(plt){
+		
+		
+		var param = new DataMap();
+		var head = gridList.getSelectData("gridList");					
+		var totallen = gridList.getGridData("gridList").length;
+		var checkedCount = gridList.getSelectRowNumList("gridList").length;
+		var BARCOD = $("#BARCOD").val();
+		var checkCnt=0;
+		var messageAskCode = "SYSTEM_M0129";	//상차완료 하시겠습니까?
+		var messageDoneCode = "SYSTEM_M0133";	//상차완료되었습니다.
+		
+		if(head.length < 1) {
+			
+			PlaySound('e');
+			commonUtil.msgBox("MOBILE_M0039", null, null, function () { //체크박스 선택 후 상차완료를 진행해주세요.				
+				$('#BARCOD').focus();   
+			}); 
+			
+			return;
+		}							
+		 if (isAlreadyLoadCompleted(head)) {
+		        PlaySound('e');
+		        commonUtil.msgBox("이미 상차 완료 된 건입니다.", null, null, function () {
+		            $('#BARCOD').focus();
+		        });
+		        return;
+		    }
+
+		// 부분상차
+		if (gridList.getSelectRowNumList("gridList").length < totallen) {
+			messageAskCode = "SYSTEM_M0137";
+			messageDoneCode = "SYSTEM_M0138";
+		}
+
+		//상차완료 하시겠습니까?		
+		commonUtil.msgConfirm(messageAskCode,null, function () {				
+			param.put("head", head);
+			param.put("plt", [plt]);
+			param.put("WAREKY", "<%=wareky%>");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");		
+			param.put("BARCOD", BARCOD);
+			param.put("STKNUM", '<%=STKNUM%>');
+			param.put("TASKKY", '<%=TASKKY%>');
+			param.put("PALLET_GB", "<%=mtype.equals("P") ? "10" : "20"%>");
+			param.put("TOTALCNT", totallen);	
+			param.put("KIOSK_MTYPE", "<%=mtype%>");
+			//  파렛트 수량 전달
+			if (window._PLT_DATA) {
+			    param.put("PLT_DATA", window._PLT_DATA);
+			}
+			
+
+			var json = netUtil.sendData({
+				url: "/mobile/Mobile/json/PDLD21KioskSaveEnd.data",	// 컨트롤러, 서비스 복사해서 명칭 다르게 호출하기
+				param: param
+			});
+			
+			if(json && json.data) {
+				if(!json.data.CNT && json.data.BARCODS){
+					PlaySound("e");	
+		    		commonUtil.msgBox("OUT_M0195", json.data.SHPOKY, null, function () {
+		    			$('#STKNUM').focus();  
+					}); 
+					return;
+		    	}else{
+		    						
+		    		PlaySound("s");	
+		    		
+		    		// 2025.03.20 WCS 프로시져 호출 (MOVEOUT)
+		    		if (1 && json.data.BARCODS != "") {
+		    			var wcsParam = new DataMap();
+		    			wcsParam.put("ORD_TYPE", 'MOVEOUT');	// 요청유형 ('LOCK', 'MOVEOUT', 'CANCEL')
+		    			wcsParam.put("IND_BCD",  json.data.BARCODS);	// 바코드목록
+		    			
+		    		    var result = netUtil.sendData({
+		    		    	url : "/WcsIF/map/json/CALL_UPDATE_TB_PLT_STOCK.data", 
+		    		    	param : wcsParam
+		    			});
+		    		}
+		    		
+					commonUtil.msgBox(messageDoneCode, null, null, function () { 
+						searchList();
+					}); 
+					return;
+					
+		    	}	
+			}
+		}, function () {
+			$('#STKNUM').focus();   
+			return;
+		});
+	}
+		
+	function reset() {
+		gridList.resetGrid("gridList");
+		$("#COMPCNT").val("");
+		$("#COMPCNT2").val("");
+		
+		$('#BARCOD').val("");
+		$('#STKNUM').val("");
+		$('#STKNUM').focus();
+	}
+	
+	function cancel(){
+
+	    var head = gridList.getSelectData("gridList");
+	    var stknum = $.trim($("#STKNUM").val());
+
+	    if(stknum == ""){
+	        PlaySound('e');
+	        commonUtil.msgBox("VALID_M2125", null, null, function () {
+	            $('#STKNUM').focus();
+	        });
+	        return;
+	    }
+
+	    if(head.length < 1){
+	        PlaySound('e');
+	        commonUtil.msgBox("MOBILE_M0039", null, null, function () {
+	            $('#BARCOD').focus();
+	        });
+	        return;
+	    }
+
+	    commonUtil.msgConfirm('SYSTEM_M0128', null, function () {
+
+	        var param = new DataMap();
+	        param.put("head", head);
+	        param.put("WAREKY", "<%=wareky%>");
+	        param.put("OWNRKY", "<%=ownrky%>");
+	        param.put("LANGKY", "<%=langky%>");
+	        param.put("STKNUM", stknum);
+	        param.put("TASKKY", "<%=TASKKY%>");
+
+	        // 1. 팔렛트 정보 유무 조회
+	        var checkJson = netUtil.sendData({
+	            module : "WmsMobileOutboundPicking_COPY",
+	            command : "PDL05_PALLETCHECK",
+	            param : param
+	        });
+
+	        // 2. 기본은 기존 취소
+	        var cancelUrl = "/wms/outbound/json/DL05CheckCancel.data";
+	        var palletYn = "";
+	        var noLinkYn = "";
+
+	        // 3. 배열 응답 기준으로 PALLET_YN 추출
+	        if(checkJson && checkJson.data && checkJson.data.length > 0){
+	            palletYn = checkJson.data[0].PALLET_YN;
+	            noLinkYn = checkJson.data[0].NO_LINK_YN;
+	        }
+
+	     // 4. 미연동 취소
+	        if(noLinkYn == "Y"){
+
+	            param.put("NO_LINK_YN", "Y");
+
+	            cancelUrl = "/wms/outbound/json/DL05CheckCancel.data";
+
+	        // 5. 연동 취소
+	        }else if(palletYn == "Y"){
+
+	            cancelUrl = "/wms/outbound/json/PDL05CheckCancel.data";
+	        }
+
+	        // 6. 분기된 URL로 취소 실행
+	        var json = netUtil.sendData({
+	            url : cancelUrl,
+	            param : param
+	        });
+
+	        if(json && json.data) {
+	            if(json.data.MSG == 'FAIL'){
+	                PlaySound("e");
+	                commonUtil.msgBox("OUT_M0195", json.data.MSG_DOC_NO, null, function () {
+	                    $('#STKNUM').focus();
+	                });
+	                return;
+	            } else {
+	                PlaySound("s");
+	                commonUtil.msgBox('SYSTEM_M0127', null, null, function () {
+	                    $("#BARCOD").focus().val("");
+	                    searchList();
+	                });
+	                return;
+	            }
+	        }
+
+	        PlaySound("e");
+	        commonUtil.msgBox("처리 중 오류가 발생했습니다.", null, null, function () {
+	            $('#STKNUM').focus();
+	        });
+
+	    }, function () {
+	        $('#STKNUM').focus();
+	        return;
+	    });
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		
+		if(gridId == "gridList" && dataLength == 0){
+			PlaySound('e');
+			gridList.resetGrid("gridList");
+			
+			
+		}else if(gridId == "gridList" && dataLength > 0){
+			// 조회 결과 기준 납품처 제한
+			
+			var compcnt2 = 0;
+			var box = 0
+			var plt = 0;
+			
+			var tdDesc01Index = $("#gridList").closest("div.tableWrap_search").find(".tableHeader th").filter(function(i){
+				if($(this).attr('CL') == 'STD_DESC01'){
+					return i;
+				}
+			}).index();
+
+			for(var i=0; i < dataLength; i++){
+	 			if(gridList.getColData(gridId, i, "FCKCOM") == "V"){
+	 				gridList.setRowCheck(gridId, i, true);
+	 				gridList.setRowReadOnly(gridId, i, true, ["rowCheck"]);
+	 				gridList.setRowCss(gridId, i, {'color':'blue'});
+	 				compcnt2++;
+	 			} 
+	 			
+	 			if(gridList.getColData(gridId, i, "STATDO") == "FSH"){
+	 				gridList.setColValue(gridId, i, "STATDO", "출고완료");
+	 			}else if(gridList.getColData(gridId, i, "STATDO") == "FCK") {
+	 				gridList.setColValue(gridId, i, "STATDO", "상차완료");
+	 			}else if(gridList.getColData(gridId, i, "STATDO") == "FPC") {
+	 				gridList.setColValue(gridId, i, "STATDO", "피킹완료");
+	 			}else {
+	 				gridList.setColValue(gridId, i, "STATDO", " ");
+	 			}
+
+	 			$("#gridList tr:eq("+i+") td:eq("+tdDesc01Index+")").text(gridList.getColData(gridId,i,"DESC01").replace(/깨끗한나라|보솜이|프레미뇽|디어스킨|메디프렌즈/g, ""));
+
+	 			box += gridList.getColData(gridId, i, "BOX")*1;
+	 			plt += gridList.getColData(gridId, i, "PLT")*1;
+	 		}
+		
+			for (var z = 0; z < dataLength; z++) {
+			    if (gridList.getColData(gridId, z, "FCKCOM") != "V") {
+			        gridList.setRowCheck(gridId, z, true);
+			    }
+			}
+
+			// 자동선택 후 선택건수 다시 세팅
+			var selectHeadRownum = gridList.getSelectRowNumList("gridList");
+			$("#COMPCNT2").val(selectHeadRownum.length);
+			
+			$("#COMPCNT2").val(compcnt2);   //현재까지 완료된 건수
+			$("#COMPCNT").val(dataLength);	//전체 건수
+			
+			if ($("#COMP_BOX").length && $("#COMP_PLT").length) {
+				$("#COMP_BOX").val(box);
+				$("#COMP_PLT").val(setDecimalValue(plt, 3));
+			}
+		}
+	}
+
+	
+	function eventKeydown(event,objId){
+		if(event.keyCode == "13" && objId == "STKNUM"){
+			if(validate.check("searchArea")){
+				
+				var key = $.trim($("#STKNUM").val());
+				
+				if(key == ""){
+					PlaySound("e");					
+					commonUtil.msgBox("VALID_M2125", null, null, function () { //지시번호를 입력해주세요.
+						$('#STKNUM').focus();            			
+					}); 
+					return;	
+				}
+				
+				var param = inputList.setRangeParam("searchArea");
+				param.put("STKNUM", $("#STKNUM").val());
+				param.put("WAREKY", "<%=wareky%>");
+				//$("#STKNUM").select();
+				goFlag = true;
+
+			  	var json = netUtil.sendData({
+					url : "/mobile/Mobile/json/OrderCheck.data",			
+					param : param
+				});
+				
+			  	var msgCheck = 0;
+			  	
+				if(json && json.data){
+					if(json.data.CNT == 0){														
+						msgCheck++;
+						
+					}else if(json.data.CNT > 0 && json.data.MSG != 'Y'){
+						var msgList = json.data.MSG.split("†");
+		                var msgTxt = commonUtil.getMsg(msgList[0],(msgList.length > 1 ? msgList[1].split("/") : null));
+		                
+
+
+		                PlaySound("e");					
+						commonUtil.msgBox(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null), null, function () { //출하문서번호 [{0}] 작업상태가 [{1}] 입니다.
+							$('#STKNUM').focus();            			
+						}); 
+						//return;
+						
+						if (msgList[0] == "MOBILE_M0060") {
+							reset();
+						}else{
+							searchList(param);
+						}
+					}else{
+						searchList(param);
+					}																							
+				}
+				
+				if(msgCheck > 0){
+					PlaySound("e");
+					setTimeout(() => {
+						commonUtil.msgBox("MOBILE_M0049", null, null, function () {  //존재하지 않는 지시번호입니다.
+							$('#STKNUM').focus();															  
+							return;    			
+						}); 
+					}, 100);
+				}					
+			}
+		}else if (event.keyCode == "13" && objId == "BARCOD") {
+
+			var head = gridList.getGridData("gridList");
+			var key = $.trim($("#BARCOD").val());
+			var param = new DataMap();
+			var taskkyList = new Array();
+			
+			if(key == ""){
+				PlaySound("e");					
+				commonUtil.msgBox("VALID_M0936", null, null, function () { //오더번호를 입력해주세요.
+					$('#BARCOD').focus();    
+					return;	
+				}); 			
+			}
+
+			var barcod = $.trim($("#BARCOD").val());
+			var comCnt = $.trim($("#COMPCNT2").val());
+			var diffCnt = 0;
+
+			for(var i=0; i<head.length; i++){
+				if(gridList.getColData("gridList", i, "SKUKEY") == barcod){
+					if(gridList.getColData('gridList', i, "FCKCOM") == "V"){
+						
+						if ($("#gridList tr:eq("+i+")").css("color") == 'rgb(255, 0, 0)') {
+							gridList.setRowCss('gridList', i, {'color':'blue'});
+							//$('#BARCOD').val('');
+						} else {
+							gridList.setRowReadOnly('gridList', i, false, ["rowCheck"]);
+							gridList.setRowCss('gridList', i, {'color':'red'});
+							gridList.setRowCheck("gridList", i, true);
+						}
+						
+						diffCnt = 0
+						break;
+					}
+					
+					PlaySound('s');
+					diffCnt = 0;
+					break;
+				}else{
+					diffCnt++;
+				}
+			}								
+			
+			if(diffCnt >= 1){
+				PlaySound("e");					
+				commonUtil.msgBox("MOBILE_M0047", null, null, function () { //조회된 데이터가 없습니다
+					$('#BARCOD').focus();            			
+				}); 
+			}
+
+			var selectHeadRownum = gridList.getSelectRowNumList("gridList");
+
+			$("#COMPCNT2").val(selectHeadRownum.length);
+			$('#BARCOD').focus();
+		}
+	}
+	
+	function searchStknumList(){
+		var param = new DataMap();
+		param.put('WAREKY', '<%=wareky%>');
+<%-- 	param.put('PLNTKY', '<%=plntky%>'); --%>
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("STATIT", "FPC");
+		
+		mobile.linkPopOpen('/mobile/PDPK05_DOC_POP.page', param);
+	}
+	
+	// 팝업 callback
+	function DocPopCallback (data) {
+		$('#STKNUM').val(data.get('STKNUM'));
+		
+		var param = new DataMap();
+		param.put("TASKKY", data.get('TASKKY'));
+		
+		goFlag = true;
+		searchList(param);
+	}
+	
+	//납품처 확인
+	function isNoLinkOnlyDptnky() {
+
+    var noLinkPtnrkyList = ["P2003500", "P1003500", "P3003500"];
+    var rows = gridList.getSelectData("gridList");
+
+    for (var i = 0; i < rows.length; i++) {
+
+        var ptnrky = "";
+
+        if (rows[i].get) {
+            ptnrky = $.trim(rows[i].get("PTNRKY"));
+        } else if (rows[i].map) {
+            ptnrky = $.trim(rows[i].map.PTNRKY);
+        } else {
+            ptnrky = $.trim(rows[i].PTNRKY);
+        }
+
+        if ($.inArray(ptnrky, noLinkPtnrkyList) > -1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+	
+	function openLoadConfirmPop() {
+
+	    var head = gridList.getSelectData("gridList");
+	    
+	    if (head.length < 1) {
+	        commonUtil.msgBox("MOBILE_M0039");
+	        return;
+	    }
+	    if (isNoLinkOnlyDptnky()) {
+	        PlaySound('e');
+	        commonUtil.msgBox(
+	            "해당 납품처는 연동 상차처리 대상이 아닙니다.\n상차처리(미연동) 버튼으로 처리해 주세요.",
+	            null,
+	            null,
+	            function () {
+	                $('#BARCOD').focus();
+	            }
+	        );
+	        return;
+	    }
+	    if (isAlreadyLoadCompleted(head)) {
+	        PlaySound('e');
+	        commonUtil.msgBox("이미 상차 완료 된 건입니다.", null, null, function () {
+	            $('#BARCOD').focus();
+	        });
+	        return;
+	    }
+	    
+	    var totallen = gridList.getGridData("gridList").length;
+	    var targetCnt = 0;
+
+	    for (var i = 0; i < totallen; i++) {
+	        if (gridList.getColData("gridList", i, "FCKCOM") != "V") {
+	            targetCnt++;
+	        }
+	    }
+
+	    var selectedTargetCnt = 0;
+	    var selRows = gridList.getSelectRowNumList("gridList");
+	    for (var j = 0; j < selRows.length; j++) {
+	        var r = selRows[j];
+	        if (gridList.getColData("gridList", r, "FCKCOM") != "V") {
+	            selectedTargetCnt++;
+	        }
+	    }
+
+	    if (targetCnt > 0 && selectedTargetCnt < targetCnt) {
+	        PlaySound('e');
+	        commonUtil.msgBox(
+	            "전체선택 후에만 상차완료 처리가 가능합니다.\n전체선택 후 다시 진행해 주세요.",
+	            null,
+	            null,
+	            function () { $('#BARCOD').focus(); }
+	        );
+	        return;
+	    }
+
+	    var stknum = $("#STKNUM").val();
+	    var wareky = "<%=wareky%>";
+	    var taskky = "<%=TASKKY%>";
+	    var palletGb = "<%=mtype.equals("P") ? "10" : "20"%>";
+
+	    var url = "/mobile/PDLD21_LOAD_CONFIRM_POP.page"
+	          + "?STKNUM=" + encodeURIComponent(stknum)
+	          + "&WAREKY=" + encodeURIComponent(wareky)
+	          + "&TASKKY=" + encodeURIComponent(taskky)
+	          + "&PALLET_GB=" + encodeURIComponent(palletGb);
+
+	    mobile.linkPopOpen(url, null);
+	}
+	
+	function gridListEventRowCheckAll(gridId, checkType) {
+		for(var i = 0; i < gridList.getGridData(gridId).length; i++){
+			if(gridList.getColData(gridId, i, "FCKCOM") == "V"){
+				gridList.setRowCheck(gridId, i, true);	
+			}
+		}
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		
+		var rowCheck = gridList.getSelectType(gridId, rowNum);
+		
+		if(gridId == "gridList" && colName == "rowCheck"){
+			var selectHeadRownum = gridList.getSelectRowNumList("gridList");
+			$("#COMPCNT2").val(selectHeadRownum.length);
+		}
+
+		gridList.setRowCheck(gridId, rowNum, !rowCheck);	
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum, colName){
+		 if (gridId == "gridList" && colName == "SKUKEY") {
+			
+			$("#BARCOD").val(gridList.getColData(gridId, rowNum, "SKUKEY"));
+			eventKeydown({'keyCode':13},'BARCOD')
+		}
+	}
+	
+	function setDecimalValue(str, decimal) {
+		str = new String(str);
+		var regex = /[^0-9.]/g;
+		var number = Number(str.replace(regex, ""));
+		number = number ? number : 0;
+		return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+	}
+	
+	function linkPopCloseEvent(data){
+	
+		
+		if (data !== null) {
+			startKiosk(data);
+		}
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div id="searchArea">
+					<table>
+						<colgroup>
+							<col width="80px" />
+							<col width="200px" />
+							<col width="*" />
+							<col width="80px" />
+						</colgroup>
+						<tbody>
+							<tr style="display: none">
+								<th CL="STD_OWNRKY" width="100">화주</th>
+								<td><input type="hidden" id="selectSKU"> <!-- <select Combo="WmsMaster_ComboBoxDatas,OWNER" name="OWNRKY" id="OWNRKY"">
+									</select> --></td>
+							</tr>
+							<tr>
+								<th CL='STD_STKNUM'>선적번호</th>
+								<td colspan="2"><input type="text" class="text"
+									name="STKNUM" id="STKNUM" 
+									onfocus="this.select();"
+									onkeydown="eventKeydown(event,this.id)" /></td>
+								<!-- <td onclick ="searchStknumList()"> 기존 팝업 화면에서 밑에 엔터키와 동일기능으로 변경-->
+								<td onclick="eventKeydown({keyCode:13}, 'STKNUM')">
+									<button class="bt" style="height: 32px;">
+										<p CL='BTN_SEARCH'></p>
+									</button>
+								</td>
+							</tr>
+							<!-- <tr>
+								<th CL='STD_BARCOD'>바코드</th>	
+								<td colspan="3">
+									<input type="text" class="text" name="BARCOD" id="BARCOD" inputmode="none" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/>
+								</td>
+							</tr> -->
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<%
+			if (mtype.equals("P")) {
+			%>
+			<jsp:include page="./PDLD21_PS.jsp" flush="false" />
+			<%
+			} else {
+			%>
+			<jsp:include page="./PDLD21_ELSE.jsp" flush="false" />
+			<%
+			}
+			%>
+
+			<!-- end table_body -->
+			<div class="footer_5" style="position: fixed;">
+				<table>
+					<tr>
+						<td class='f_1' width="25%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>
+						<%
+						if (!wareky.equals("1100")) {
+						%>
+						<td class='f_1' width="20%" onclick="reset()">
+						    <label CL='BTN_RESET'></label>
+						</td>
+						<%
+						}
+						%>
+						<td class='f_1' width="20%" onclick="cancel()"><label
+							CL='BTN_CARINCANCEL'></label></td>
+						<%
+						if (wareky.equals("1100")) {
+						%>
+						<td class='f_1' width="22%" onclick="openLoadConfirmPop()">
+					    <label>상차처리(연동)</label>
+						</td>
+						<td class='f_1' width="22%" onclick="startNoLink()">
+							<label>상차처리(미연동)</label>
+						</td>
+						<%
+						} else {
+						%>
+						<td class='f_1' width="45%" onclick="start()">
+							<label CL='BTN_COMPLE'></label>
+						</td>									
+						<%
+						}
+						%>
+					</tr>
+				</table>
+			</div>
+			<!-- end footer_5 -->
+		</div>
+	</div>
+</body>

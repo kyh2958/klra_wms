@@ -1,0 +1,338 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>인터페이스 상세내역</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript">
+
+	window.resizeTo('1250','600');
+	
+	var iftbl;
+	var ifid;
+	var bwart;
+	var rfcfn;
+	var rfctbl;
+	var rfcp1;
+	var rfcp2;
+	var ifstat;
+	
+	$(document).ready(function(){
+		var data = page.getLinkPopData();
+		dataBind.dataNameBind(data, "searchArea");
+		
+		ifid = data.get("IFID");
+		iftbl = data.get("IFTBL");
+		bwart = data.get("BWART");
+		bwartnm = data.get("BWARTNM");
+		rfcfn = data.get("RFCFN");
+		rfctbl = data.get("RFCTBL");
+		rfcp1 = data.get("RFCP1");
+		rfcp2 = data.get("RFCP2");
+		ifstat = data.get("IFSTAT");
+		
+		$("#IFID").val(ifid);
+		$("#IFKNM").val(data.get("IFKNM"));
+		$("#IFTBL").val(iftbl);
+// 		$("#LASTDAT").val(iflastdat);
+		$("#BWARTNM").val(bwartnm);
+		$("#RFCFN").val(rfcfn);
+		$("#RFCTBL").val(rfctbl);
+		$("#RFCP1").val(rfcp1);
+		$("#RFCP2").val(rfcp2);
+		setHead(iftbl);
+		
+		if (ifid == "ROH_IF_220") {
+			searchList();
+		}
+	});
+
+	/** HEAD 셋팅 및 조회처리 **/
+	function setHead(iftbl) {
+		$("#resetTable").empty();
+		$("#resetUtil").empty();
+		//CLEAR
+		var html='<table class="table_c">';
+			html +='<tbody id="gridListSub">';
+			html +='<tr id="appendBodyGrid" CGRow="true">';
+			html +='</tr>';
+			html +='</tbody>';
+			html +='</table>';
+// 			html +='</div>';
+		$("#resetTable").html(html);
+
+		var util = '<div class="btn_lit tableUtil">';
+			util += '<button type="button" GBtn="find"></button>';
+			util += '<button type="button" GBtn="sortReset"></button>';
+			util += '<button type="button" GBtn="add"></button>';
+// 			util += '<button type="button" GBtn="excelUpload" id="excelUpload"></button>';
+// 			util += '<button type="button" GBtn="layout"></button>';
+// 			util += '<button type="button" GBtn="total"></button>';
+			util += '<button type="button" GBtn="excel"></button>';
+			util += '<span class="txt_total" >총 건수 : <span GInfoArea="true">0</span></span>';
+			util += '</div>';
+		$("#resetUtil").html(util);
+
+		// 매핑컬럼 조회
+		var param = new DataMap();
+		param.put("IFID", ifid);
+		var jcol = netUtil.sendData({
+			url : "/IF/list/json/IFCOL.data",
+			param : param
+		});
+
+		var xcolH = new Array();
+		var xcolI = new Array();
+		if(jcol && jcol.data) {
+			for(var i=0; i<Object.keys(jcol.data).length; i++) {
+				if(jcol.data[i].VIEWAT == "V") {
+					xcolH.push(jcol.data[i].COLNM);
+					if(jcol.data[i].SYSFR == "WMS") {
+						xcolI.push(jcol.data[i].SOURCE);
+					} else {
+						xcolI.push(jcol.data[i].TARGET);
+					}
+				}
+			}
+		}
+
+//-----------------------------------------------------------
+//        WMS측 컬럼으로 셋팅
+//-----------------------------------------------------------
+
+		/** rownum 추가 **/
+		$("#appendBodyGrid").append('<td GH="40" GCol="rownum">1</td>');
+		
+		var typstr = "";
+		
+		if (ifid != "ROH_IF_220") {
+			$("#appendBodyGrid").append('<td GH="60 처리상태" GCol="text,PRCFLG" ></td>');
+		}
+		
+		for(var i=0; i < xcolH.length; i++){
+			var width = xcolH[i].length > 10 ? 160 : (xcolH[i].length > 6 ? 130 : 100);
+
+			if(xcolI[i] == "QTYPRD" || xcolI[i] == "MENGE" || xcolI[i] == "MENGE_B" || xcolI[i] == "QTYGOD"
+			|| xcolI[i] == "QTYBAD" || xcolI[i] == "QTSHP" || xcolI[i] == "ZQTSACT" || xcolI[i] == "QTADJU"
+			|| xcolI[i] == "LFIMG") {
+				typstr = 'GF="N 20,3"';
+			} else if(xcolH[i].search(/일자/) != -1){
+				typstr = 'GF="D"';
+			} else {
+				typstr = "";
+			}
+			$("#appendBodyGrid").append('<td GH="'+width+' '+xcolH[i]+'" GCol="text,'+xcolI[i]+'" '+typstr+'></td>');
+		}
+
+		if (ifid != "ROH_IF_220") {
+			$("#appendBodyGrid").append('<td GH="250 로그순번" GCol="text,LOGSEQNO" ></td>');
+			$("#appendBodyGrid").append('<td GH="300 에러내용" GCol="text,PRCETX" ></td>');
+			$("#appendBodyGrid").append('<td GH="100 생성일자" GCol="text,CREDAT" GF="D"></td>');
+			$("#appendBodyGrid").append('<td GH="100 생성시간" GCol="text,CRETIM" GF="T"></td>');
+			$("#appendBodyGrid").append('<td GH="100 생성자" GCol="text,CREUSR" ></td>');
+			$("#appendBodyGrid").append('<td GH="100 수정일자" GCol="text,LMODAT" GF="D"></td>');
+			$("#appendBodyGrid").append('<td GH="100 수정시간" GCol="text,LMOTIM" GF="T"></td>');
+			$("#appendBodyGrid").append('<td GH="100 수정자" GCol="text,LMOUSR" ></td>');
+		}
+
+		$('.closer').click();
+		
+		gridList.setGrid({
+	    	id : "gridListSub",
+			module : "Erpif",
+			command : "IFRECEIVE",
+			colorType : true,
+			emptyMsgType : false
+		});
+	}
+
+	function fn_closing(){
+		this.close();
+	}
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			searchList();
+		} else if(btnName == "Close"){
+			fn_closing();
+		} else if(btnName == "Download"){
+			excelDownload();
+		}
+	}
+	
+	var timerId = 0;
+	var ingCnt;
+	
+	function showCnt() {
+		cnt.value = ingCnt;
+	}
+
+	function searchList(){
+		if(ifstat == "ON") {
+			alert("시작[ON] 상태일 경우에는 수동으로 데이터수신 불가합니다.");
+			return;
+		}
+		
+		// 데이터 수신 요청 하시겠습니까?
+		if(ifid != "ROH_IF_220" && !commonUtil.msgConfirm("ITF_M0037")){
+			return;
+		}
+
+		// 로딩바 노출
+		loadingOpen();
+		setTimeout(function(){
+			var param = new DataMap();
+			param.put("IFID", ifid);
+			param.put("IFTBL", iftbl);
+			param.put("BWART", bwart);
+			param.put("RFCFN", rfcfn);
+			param.put("RFCTBL", rfctbl);
+			param.put("RFCP1", rfcp1);
+			param.put("RFCP2", rfcp2);
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("WERKS", $("#WERKS").val()); // SAP재고 수신 : 플랜트 셋팅
+			param.put("VBELN", $("#VBELN").val()); // 출고예정정보 실시간 수신 : 자재문서 셋팅
+	
+			// 금일 MAXSEQ 조회 - 데이터수신후 재조회시 이전 SEQNO 이후의 수신데이터만 조회하도록 사용
+			var json = netUtil.sendData({
+				url : "/IF/map/json/IFRCVMAXPREVSEQ.data",
+				param : param
+			});
+			
+			if(json && json.data){
+				param.put("PREVSEQNO", json.data.SEQNO);
+			}
+			
+			// 데이터 수신요청
+			var json = netUtil.sendData({
+				url : "/rfc/json/rfcCall.data",
+				param : param
+			});
+			
+			if(json.row_count > 0) {
+				if (ifid == "ROH_IF_220") {
+					// 자재코드가 존재하는것만 목록으로 만들기
+					
+					json.data = json.data
+						// MATNR 값이 없는, 품목코드 7자리 아닌 행 제거
+					    .filter(item => item.MATNR && item.MATNR.trim() !== "" && item.MATNR.replace(/^0+/, '').length == 7)
+					    .map(item => {
+					    	item.MATNR = item.MATNR.replace(/^0+/, '');
+					    	item.LIFNR = item.LIFNR.replace(/^0+/, '');
+					        return item;
+					    });
+					//console.dir(json)
+					gridList.appendJson('gridListSub', json); 
+				} else {
+					commonUtil.msgBox("ITF_M0035"); //데이터 수신 완료했습니다.
+					
+					// 수신완료 데이터 조회
+					gridList.gridList({
+						id : "gridListSub",
+						param : param
+					});
+				}
+				
+			} else {
+				commonUtil.msgBox("ITF_M0036"); //수신된 데이터가 없습니다.
+			}
+		
+			// 로딩바 숨김
+			loadingClose();
+		}, 1);
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum){
+		
+		var IFID = $("#IFID").val()
+
+		if(gridId == "gridListSub"){
+			
+			if (IFID == "ROH_IF_220") {
+				var data = gridList.getRowData(gridId, rowNum);
+
+				gridList.removeRow(gridId, rowNum, false);
+
+				setTimeout(function(){
+					self.close();
+				}, 100)
+				
+				window.opener.rowDblclickCallback(data);
+			}
+		}
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search APPLY BTN_REQUEST">
+					<input type="button" CB="Close CHECK BTN_CLOSE">
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap" style="padding:0px 0px 25px 10px;">
+					<dl>
+						<dd>
+							<table style="width:1300px;">
+								<tr style="height:30px;">
+									<td style="width:250px;">인터페이스ID : <input type="text" id="IFID" style="width:80px;" readonly></td>
+									<td style="width:300px;">인터페이스명 : <input type="text" id="IFKNM" style="width:210px;" readonly></td>
+									<td style="width:150px;">IF테이블 : <input type="text" id="IFTBL" style="width:80px;" readonly></td>
+									<td style="width:300px;">문서유형 : <input type="text" id="BWARTNM" style="width:250px;" readonly></td>
+								</tr>
+								<tr>
+									<td style="width:250px;">RFC,REST : <input type="text" id="RFCFN" style="width:200px;" readonly></td>
+									<td style="width:300px;">RFC Tbl. : <input type="text" id="RFCTBL" style="width:80px;" readonly></td>
+									<td style="width:150px;">데이터수신범위 : <input type="text" id="RFCP2" style="width:80px;" readonly></td>
+									<td style="width:300px;">
+										플랜트 : <input type="text" id="WERKS" style="width:80px;">
+										납품문서 : <input type="text" id="VBELN" style="width:150px;">
+									</td>
+								</tr>
+							</table>
+						</dd>
+					</dl>
+				</div>
+			</div>
+		</div>
+		<div class="search_next_wrap" style="height:470px;">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tabs1-1" CL='ITF_RCVINFO'><span>수신정보</span></a></li> 
+				</ul>
+				
+				<div class="table_box section" id="tabs1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table id="resetTable" class="table_c">
+							</table>
+						</div>
+					</div>
+					
+					<div class="btn_lit tableUtil" id="resetUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

@@ -1,0 +1,755 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript" src="/common/js/chart/chartJs/Chart.js"></script>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css">
+<style type="text/css">
+
+.table_list01 tr th.first, .table_list01 tr td {
+	border-right: 1px solid #eaeaea;
+	border-left: 1px solid #eaeaea;
+	border-bottom: 1px solid #dadfe2;
+	border-top : 1px solid #dadfe2;
+}
+
+.chart_layer { padding: 10px 0px; display: inline; }
+.chart_layer .row { display: block; }
+.chart_layer .row div { display: table-cell; width: 15%; font-size: 1.2rem; border-right: 1px solid black; padding: 10px;}
+.dounutChart  { max-height: 180px; width: 100% !important; }
+.dailyChart   { max-height: 180px; width: 100% !important; }
+.progressChart { height: 100% !important; }
+
+.top_layout {height: 400px !important;}
+.bottom_layout {height: calc(100% - 410px) !important;}
+</style>
+<script type="text/javascript">
+	$(document).ready(function() {
+		var mtype = '<%=mtype%>';
+		if('%' == mtype) {
+			$('select[name="SKUG05"]').val('20');
+		} else {
+			$('select[name="SKUG05"]').val(mtype);
+		}
+		
+		//dashboardSearchList();	//20230831 로딩시 호출 제거
+	})
+	
+	var chartList = [];
+	var searchedParam = {};
+	
+	var tempWareky = '<%= wareky %>';
+	function dashboardSearchList(lastWareKey) {
+		var param = dataBind.paramData("searchArea");
+		
+		if (lastWareKey) {
+			tempWareky = lastWareKey;
+		}
+		
+		var WAREKY = lastWareKey ? lastWareKey : tempWareky;
+		param.put('WAREKY', WAREKY);
+		
+		drawChartOutboundComp(param); // outboundComp
+		drawChartInboundComp(param);  // inboundComp
+		
+		drawOutboundDaily(param);
+		drawInboundDaily(param);
+		
+		drawChartInboundProgress(param);
+		drawChartOutboundProgress(param);
+		
+		searchedParam = param;
+		
+		setComma();
+	}
+	
+	function setComma(){
+		$('.dash_count').each(function(){
+			var don = $(this).text();
+			don = don.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+			$(this).text(don);
+		});
+	}
+
+	function drawChartOutboundComp(param) {
+		var tag = document.getElementById('outboundComp');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var outCompData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_OUTBOUND_COMP",
+			sendType : "map",
+			param : param
+		});
+		
+		var OUT_ORD     = 0;
+		var OUT_CMP     = 0;
+		var OUT_NEW     = 0;
+		var OUT_UNIT    = '';
+		var OUT_PERCENT = 100;
+		
+		if (outCompData && outCompData.data) {
+			OUT_ORD     = outCompData.data.OUT_ORD     ? outCompData.data.OUT_ORD     :  0;
+			OUT_CMP     = outCompData.data.OUT_CMP     ? outCompData.data.OUT_CMP     :  0;
+			OUT_NEW     = outCompData.data.OUT_NEW     ? outCompData.data.OUT_NEW     :  0;
+			OUT_UNIT    = outCompData.data.OUT_UNIT    ? outCompData.data.OUT_UNIT    : '';
+			OUT_PERCENT = outCompData.data.OUT_PERCENT ? outCompData.data.OUT_PERCENT :  0;
+		}
+		
+		// 테이블에 값 세팅
+		$('#OUT_ORD').text(OUT_ORD);
+		$('#OUT_CMP').text(OUT_CMP);
+		$('#OUT_NEW').text(OUT_NEW);
+		$('.OUT_UNIT').text(OUT_UNIT);
+		
+		// 차트 생성
+		var options = {
+			  title: "출고완료 (" + OUT_PERCENT + "%)" 
+			, type: "doughnut"
+			, data: [OUT_PERCENT, 100 - OUT_PERCENT]
+			, labels: ['출고완료', '미완료']
+			, background: [
+				'#9DCEFF',
+				'#F2F3F6'
+			]
+		}
+		
+		drawChart(context, options);
+	}
+	
+	function drawChartInboundComp(param) {
+		var tag = document.getElementById('inboundComp');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var inCompData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_INBOUND_COMP",
+			sendType : "map",
+			param : param
+		});
+		
+		var IN_ORD     = 0;
+		var IN_CMP     = 0;
+		var IN_NEW     = 0;
+		var IN_UNIT    = '';
+		var IN_PERCENT = 100;
+		
+		if (inCompData && inCompData.data) {
+			IN_ORD     = inCompData.data.IN_ORD     ? inCompData.data.IN_ORD     :  0;
+			IN_CMP     = inCompData.data.IN_CMP     ? inCompData.data.IN_CMP     :  0;
+			IN_NEW     = inCompData.data.IN_NEW     ? inCompData.data.IN_NEW     :  0;
+			IN_UNIT    = inCompData.data.IN_UNIT    ? inCompData.data.IN_UNIT    : '';
+			IN_PERCENT = inCompData.data.IN_PERCENT ? inCompData.data.IN_PERCENT :  0;
+		}
+		
+		// 테이블에 값세팅
+		$("#IN_ORD").text(IN_ORD);
+		$("#IN_CMP").text(IN_CMP);
+		$("#IN_NEW").text(IN_NEW);
+		$(".IN_UNIT").text(IN_UNIT);
+		
+		// 차트 생성
+		var options = {
+			  title: "입고완료 (" + IN_PERCENT + '%)'
+			, type: "doughnut"
+			, data: [IN_PERCENT, 100 - IN_PERCENT]
+			, labels: ['입고완료', '미완료']
+			, background: [
+				'#6ED9AC',
+				'#F2F3F6'
+			]
+		}
+		drawChart(context, options);
+	}
+	
+	function drawOutboundDaily (param) {
+		var tag = document.getElementById('outboundDaily');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var outDailyData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_OUTBOUND_DAILY",
+			sendType : "list",
+			param : param
+		});
+		
+		var dataList = [];
+		if (outDailyData      &&
+			outDailyData.data &&
+			outDailyData.data.length > 0
+		) {
+			for (var i = 0; i < outDailyData.data.length; i ++) {
+				dataList.push(outDailyData.data[i].OUT_PERCENT);
+			}
+		}
+		
+		var options = {
+			  title: "일별현황"
+			, type: "line"
+			, data: dataList
+			, labels: getDateList(param)
+			, max: 100
+			, background: [
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF'
+			]
+		}
+		
+		drawChart(context, options);
+	}
+	
+	function drawInboundDaily (param) {
+		var tag = document.getElementById('inboundDaily');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var inDailyData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_INBOUND_DAILY",
+			sendType : "list",
+			param : param
+		});
+		
+		var dataList = [];
+		if (inDailyData      &&
+			inDailyData.data &&
+			inDailyData.data.length > 0
+		) {
+			for (var i = 0; i < inDailyData.data.length; i ++) {
+				dataList.push(inDailyData.data[i].IN_PERCENT);
+			}
+		}
+		
+		var options = {
+			  title: "일별현황"
+			, type: "line"
+			, data: dataList
+			, labels: getDateList(param)
+			, max: 100
+			, background: [
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF',
+				'#9DCEFF'
+			]
+		}
+		drawChart(context, options);
+	}
+	
+	function drawChartInboundProgress(param) {
+		var tag = document.getElementById('inboundProgress');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var inProgData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_INBOUND_PROG",
+			sendType : "map",
+			param : param
+		});
+		
+		var dataList = [];
+		var IN_NEW     = 0;
+		var IN_CMP     = 0;
+		
+		if (inProgData && inProgData.data) {
+			IN_NEW     = inProgData.data.IN_NEW ? inProgData.data.IN_NEW : 0;
+			IN_CMP     = inProgData.data.IN_CMP ? inProgData.data.IN_CMP : 0;
+		}
+		
+		dataList.push(IN_NEW);
+		dataList.push(IN_CMP);
+		
+		var backgroundColors = [
+			'rgba(255, 99 , 132, 0.2)',
+			'rgba(54 , 162, 235, 0.2)',
+			'rgba(255, 206, 86 , 0.2)',
+		];
+		
+		var options = {
+			  title: "입고진행현황"
+			, type: "bar"
+			, labels: ['입고예정', '입고완료']
+			, data: dataList
+			, background: backgroundColors
+			, max : 100
+		}
+		drawChart(context, options);
+	}
+	
+	function drawChartOutboundProgress(param) {
+		var tag = document.getElementById('outboundProgress');
+		if (!tag) { return; }
+		var context = tag.getContext('2d');
+		
+		var outProgData = netUtil.sendData({
+			module : "WmsSystem",
+			command : "DASHBOARD_OUTBOUND_PROG",
+			sendType : "map",
+			param : param
+		});
+		
+		var dataList = [];
+
+		var OUT_NEW = 0;
+		var OUT_FAL = 0;
+		var OUT_FPC = 0;
+		var OUT_FCK = 0;
+		var OUT_CMP = 0;
+		
+		if (outProgData && outProgData.data) {
+			OUT_NEW = outProgData.data.OUT_NEW ? outProgData.data.OUT_NEW : 0;
+			OUT_FAL = outProgData.data.OUT_FAL ? outProgData.data.OUT_FAL : 0;
+			OUT_FPC = outProgData.data.OUT_FPC ? outProgData.data.OUT_FPC : 0;
+			OUT_FCK = outProgData.data.OUT_FCK ? outProgData.data.OUT_FCK : 0;
+			OUT_CMP = outProgData.data.OUT_CMP ? outProgData.data.OUT_CMP : 0;
+		}
+		
+		dataList.push(OUT_NEW);
+		dataList.push(OUT_FAL);
+		dataList.push(OUT_FPC);
+		dataList.push(OUT_FCK);
+		dataList.push(OUT_CMP);
+		
+		var backgroundColors = [
+			'rgba(255, 99 , 132, 0.2)',
+			'rgba(54 , 162, 235, 0.2)',
+			'rgba(255, 206, 86 , 0.2)',
+			'rgba(75 , 192, 192, 0.2)',
+			'rgba(153, 102, 255, 0.2)',
+		];
+		
+		var borderColors = [
+			'rgba(255, 99 , 132, 1)',
+			'rgba(54 , 162, 235, 1)',
+			'rgba(255, 206, 86 , 1)',
+			'rgba(75 , 192, 192, 1)',
+			'rgba(153, 102, 255, 1)',
+		]
+		
+		var options = {
+			  title: "출고진행현황"
+			, type: "bar"
+			, labels: ['출고예정', '할당', '피킹', '상차', '출고완료']
+			, data: dataList
+			, border    : borderColors
+			, background: backgroundColors
+			, max : 100
+		}
+		drawChart(context, options);
+	}
+	
+	function drawChart(context, options) {
+/**
+		new Chart(chart, {
+			type: 'bar', // 막대, line : 꺾은선 그래프
+			data: {
+					labels: ['x축 배열'],
+					datasets: [
+					{
+						label: '라벨1',
+						data: ['y축 배열'],
+						backgroundColor: Color
+					},
+					{
+						label: '라벨2',
+						type: 'line', // default : 상단 type에 설정한 'bar'
+						data: ['y축 배열'],
+						backgroundColor: 'transparent', // 투명한
+						borderColor: 'Color',
+// 						borderDash: [0 ,6],
+// 						borderCapStyle: 'round', // 점선 그래프, 점의 모양
+						lineTension: 0, // line 볼록정도
+						pointRadius: 5, // 포인트 크기
+						pointStyle: 'rect', // 직사각형, triangle : 삼각형, default : circle (원형)
+						pointBackgroundColor: 'Color', // default : 'transparent'
+					}
+				]
+			},
+			options: {
+				title: {
+					display: true,
+					text: '제목',
+					fontSize: 10
+				},
+				scales: {
+					xAxes: [{
+						gridLines: {
+							drawOnChartArea: false
+						}
+					}],
+					yAxes: [{
+						ticks: {
+							display: true,
+							min: 0,   //y축 최솟값
+							max: 999, //y축 최댓값
+							stepSize: 1
+						}
+					}]
+				},
+				legend: { // 범례
+					position: 'bottom',
+					labels: {
+						usePointStyle: true, // 지정된 포인트 모양에 따라 범례 아이콘 생성
+						boxWidth: 10,
+						padding: 10
+					}
+				}
+			}
+		});
+*/
+		var detail = {};
+		
+		var max =   options.max ?
+					options.max :
+					Math.max(...options.data);
+		var stepSize =  options.stepSize ?
+						options.stepSize :
+							options.max      ?
+							options.max / 10 :
+								Math.max(...options.data) / 10;
+		
+		switch (options.type) {
+			case "bar" : 
+				detail = {
+					title: {
+						display: true,
+						text: options.title,
+						fontSize: 15
+					}
+					, scales: {
+						yAxes: [{
+							ticks: {
+								  beginAtZero: true
+								, min: 0
+								, max: max
+								, stepSize: stepSize
+							}
+						}]
+					}
+					, responsive: true
+					, legend: {
+						display: false
+					}
+				}; break;
+			case "line" :
+				detail = {
+					title: {
+						display: true,
+						text: options.title,
+						fontSize: 15
+					}
+					, scales: {
+						yAxes: [{
+							ticks: {
+	 							  display: false
+								, beginAtZero: true
+								, min: 0
+								, max: max
+								, stepSize: stepSize
+							}
+						}]
+					}
+					, responsive: true
+					, legend: {
+						display: false
+					}
+				}; break;
+			case "doughnut" :
+				detail = {
+					title: {
+						display: true,
+						text: options.title,
+						fontSize: 15
+					}
+					, scales:  {}
+					, responsive: true
+					, legend: {
+						display: false
+					}
+				}; break;
+			default : break;
+		}
+		
+		var config = {
+			  type: options.type
+			, data: {
+				  labels: options.labels
+				, datasets: [{
+					  data: options.data
+					, backgroundColor: options.background
+					, borderColor: options.border
+					, borderWidth: 1
+					, fill: false // line 형태일 때, 선 안쪽을 채우는지 안채우는지
+				}]
+			}
+			, options: detail
+		}
+		
+		
+// 		chart = new Chart(context, config);
+// 		chartList.push(chart);
+
+		var chart = chartList.find(x => {
+			return x.chart.canvas.id == context.canvas.id
+		});
+		
+		if (!chart) {
+			console.debug('not exist');
+			chart = new Chart(context, config);
+			chartList.push(chart);
+		} else {
+			console.debug('exist', config);
+			
+		/** update 사용 시 title 변경이 되지 않아
+			HTML 태그 삭제 후 새로 그려줌.
+			
+			chart.config = config;
+			chart.update();
+		*/
+			
+			var canvas = $('#' + chart.canvas.id);
+			var td     = canvas.closest('td');
+			var clazz  = canvas.attr('class');
+			
+			var newCanvas = '<canvas id="' + chart.canvas.id + '" class="' + clazz + '">' + '</canvas>'
+			if (td.length > 0) {
+				$(td).html(newCanvas);
+			} else {
+				var div = canvas.closest('div');
+				$(div).html(newCanvas);
+			}
+			
+			/** chartList에서 삭제*/
+			var idx = chartList.indexOf(chart);
+			chartList.splice(idx, 1)
+			
+			var tag = document.getElementById(chart.canvas.id);
+			var context = tag.getContext('2d');
+			
+			chart = new Chart(context, config);
+			chartList.push(chart);
+		}
+		
+		return chart;
+	}
+	
+	function getDateList(param) {
+		var dateList = [];
+		
+		var sDate  = param.get('DATE');
+		var sYear  = sDate.substring(0,4);
+		var sMonth = sDate.substring(4,6);
+		var sDay   = sDate.substring(6,8);
+		
+		var year, month, day;
+		for (var i = 4; i >= 0; i--) {
+			var date = new Date(Number(sYear), Number(sMonth) - 1, Number(sDay));
+			date.setDate(date.getDate() - i);
+			
+			year  = date.getFullYear();
+			month = date.getMonth() + 1;
+			day   = date.getDate();
+			
+			if (month < 10) { month = "0" + month }
+// 			dateList.push('' + year + month + day);
+			dateList.push(month + '월 ' + day + '일');
+		}
+		
+		return dateList;
+	}
+	
+	function commonBtnClick(btnName){
+		if (btnName == "Search"){
+			dashboardSearchList();
+		} else if (btnName == "OpenPop"){
+			openDashboardPopup();
+		}
+	}
+	
+	function openDashboardPopup () {
+		var url  = '/dashBoardPopup.page';
+		var option = "top=100,left=100,width=850,height=800,resizable=yes";
+		
+		window.open(url, 'dashBoardPop', option);
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "WmsSystem,DASHBOARD_COMBO"){
+			var param = new DataMap();
+			param.put("LANGKY", "<%=langky%>");
+			return param;
+		}
+	}
+</script>
+<style>
+	.dashboard {
+		position: relative;
+		width:100%;
+		height:100%;
+		
+		top: 50%;
+		left:50%;
+		transform:translate(-35%, -30%)
+	}
+</style>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+
+		<div class='dashboard' style=''>
+			<div class="left" style='float:left; padding:10px'>
+				<img src="/common/theme/webdek/images/login/login_img01.png">
+			</div>
+			<div class="right" style='' >
+			    <ul>
+			        <li style='float:left; padding:10px'>
+			            <div class="img_box">
+			                <img src="/common/theme/webdek/images/login/login_img02.png">
+			            </div>
+			        </li>
+			        <li style='float:left; padding:10px 0px'>
+			            <div class="img_box">
+			                <img src="/common/theme/webdek/images/login/login_img03.png">
+			            </div>
+			        </li>
+			        <li style='float:left; padding:0px 10px 0px 10px'>
+			            <div class="img_box">
+			                <img src="/common/theme/webdek/images/login/login_img04.png">
+			            </div>
+			        </li>
+			    </ul>
+			</div>
+		</div>
+		
+		<!-- //2023.08.31 대시보드 미호출 처리
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_SEARCH" />
+					<input type="button" CB="OpenPop SEARCH BTN_DASHPOP" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_SKUGBN">제품군 구분</dt>
+						<dd>
+							<select name="SKUG05" class="input" Combo="WmsSystem,DASHBOARD_COMBO"></select>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_DATE">일자</dt>
+						<dd>
+							<input type="text" class="input" name="DATE" UIFormat="C 0 N" validate="required"/>
+						</dd>
+					</dl>
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+		
+		<div class="search_next_wrap">
+			<div class="content_layout tabs top_layout">
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<table class="table_c" style="width: 100%; margin-top: 10px;">
+							<colgroup>
+								<col width="18%">
+								<col width="*">
+								<col width="*">
+								<col width="*">
+								<col width="30%">
+							</colgroup>
+							<tbody id="gridList">
+								<tr CGRow="true">
+									<td><canvas class="dounutChart" id="outboundComp">출고완료</canvas></td>
+									<td>
+										<div class="dash_count"          id="OUT_ORD">수량</div>
+										<div class="dash_title OUT_UNIT">(단위)</div>
+										<div class="dash_title">총 출고량</div>
+									</td>
+									<td>
+										<div class="dash_count"          id="OUT_CMP">수량</div>
+										<div class="dash_title OUT_UNIT">(단위)</div>
+										<div class="dash_title">출고완료</div>
+									</td>
+									<td>
+										<div class="dash_count dash_red" id="OUT_NEW">수량</div>
+										<div class="dash_title OUT_UNIT">(단위)</div>
+										<div class="dash_title">미 출고량</div>
+									</td>
+									<td><canvas class="dailyChart" id="outboundDaily">일별 현황</canvas></td>
+								</tr>
+								<tr CGRow="true">
+									<td><canvas class="dounutChart" id="inboundComp">입고완료</canvas></td>
+									<td>
+										<div class="dash_count" id="IN_ORD">수량</div>
+										<div class="dash_title IN_UNIT">(단위)</div>
+										<div class="dash_title">총 입고량</div>
+									</td>
+									<td>
+										<div class="dash_count" id="IN_CMP">수량</div>
+										<div class="dash_title IN_UNIT">(단위)</div>
+										<div class="dash_title">입고완료</div>
+									</td>
+									<td>
+										<div class="dash_count dash_red" id="IN_NEW">수량</div>
+										<div class="dash_title IN_UNIT">(단위)</div>
+										<div class="dash_title">미 입고량</div>
+									</td>
+									<td><canvas class="dailyChart" id="inboundDaily">일별 현황</canvas></td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<div class="content-horizontal-wrap h-wrap-min bottom_layout">
+				<div class="content_layout tabs content_left">
+					<div class="table_box section" id="tab1-1">
+						<div class="table_list01">
+							<canvas class="progressChart" id="inboundProgress"/>
+						</div>
+					</div>
+				</div>
+				
+				<div class="handlerH_wrap">
+					<div class="handlerH"></div>
+				</div>
+				
+				<div class="content_layout tabs content_right">
+					<div class="table_box section" id="tab1-1">
+						<div class="table_list01">
+							<canvas class="progressChart" id="outboundProgress"/>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		 -->
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

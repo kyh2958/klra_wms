@@ -1,0 +1,278 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%	String STKNUM = request.getParameter("STKNUM");
+	String TASKKY = request.getParameter("TASKKY");
+	String PREVITEM = request.getParameter("PREVITEM");
+	String SEARCHCOUNT = request.getParameter("SEARCHCOUNT");
+
+	if(STKNUM == null){
+		STKNUM = "";
+	}
+	
+	if(TASKKY == null){
+		TASKKY = "";
+	}
+	
+	if(PREVITEM == null){
+		PREVITEM = "YES";
+	}
+	
+	if(SEARCHCOUNT == null){
+		SEARCHCOUNT = "";
+	}
+
+	
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:disabled {
+	background-color: #e2e2e2;
+}
+button {
+	vertical-align: bottom;
+    height: 37px;
+}
+.tem5_content .tableWrap_search {overflow: hidden;}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			//module : "WcsIF",					  
+			//command : "VW_LOC_GROUP",
+			url : "/WcsIF/list/json/VW_LOC_GROUP.data", 
+			gridMobileType : true,
+			emptyMsgType:false
+		});
+
+		searchList();
+	});
+	
+	function searchList(resParam){		
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("SKUKEY", 'INIT');
+		param.put("BARCOD", 'INIT');
+
+		if(resParam != null && resParam !=''){
+			param.put('BARCOD', resParam.get("BARCOD"));	
+		}
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});				
+	}
+	
+	//refresh 검색
+	function reSearchList(){		
+		
+	}
+
+	// 더블클릭 이벤트	
+	function gridListEventRowDblclick(gridId, rowNum){
+ 		var LOTA02 = gridList.getColData("gridList", rowNum, "LOTA02");
+		var LOCGRPCD = gridList.getColData("gridList", rowNum, "LOC_GRPCD");		
+		var LOCLINE = gridList.getColData("gridList", rowNum, "LOC_LINE");
+		
+		location.href="/mobile/PDWCS_DETAIL.page?LOTA02="+LOTA02+"&LOCGRPCD="+LOCGRPCD+"&LOCLINE="+LOCLINE;
+	}
+	
+	// 그리드 클릭 시 rowNum 변수 저장
+	function gridListEventRowClick(gridId, rowNum) {
+		selectedRowNum = rowNum;
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength == 0){
+			PlaySound('e');
+			gridList.resetGrid("gridList");
+			//$("#TOTCOMPCNT").val(0);
+			//$("#NOWCOMPCNT").val(0);			
+			
+			commonUtil.msgBox("VALID_M0005", null, null, function () {  //조회된 데이터가 없습니다.
+				$('#BARCOD').focus();            			
+			}); 
+		}else if(gridId == "gridList" && dataLength > 1){
+			PlaySound("s");
+			
+			var dataList = gridList.getGridData(gridId);
+            var rowData;
+
+			for(var i = 0; i< dataLength;i++){
+				rowData = dataList[i];
+                var EXIST_BARCOD = rowData.get("EXIST_BARCOD");
+
+                console.log(EXIST_BARCOD)
+                if (EXIST_BARCOD != "0") {
+                	gridList.setRowCss(gridId, i, {'color':'blue'});
+                	gridList.setColFocus(gridId, i, 'LOC_GRPNM');
+                }
+            }
+		}
+	}
+
+	
+	function eventKeydown(event,objId){
+		if(event.keyCode == "13"){
+			if(validate.check("searchArea")){
+				
+				var key = $.trim($("#BARCOD").val());
+				if(key == ""){
+					PlaySound('e');
+					
+					commonUtil.msgBox("VALID_M2125", null, null, function () {  //지시번호를 입력해주세요.
+						$('#STKNUM').focus();            			
+					}); 
+
+					return;	
+				}
+				
+				var param = inputList.setRangeParam("searchArea");
+				param.put("BARCOD", $("#BARCOD").val());
+				param.put("WAREKY", "<%=wareky%>");
+				$("#BARCOD").select();
+				searchList(param);
+			}
+		}
+	}
+	
+	// 팝업 callback
+	function DocPopCallback (data) {
+	}
+	
+	//리셋 버튼
+	function reset(){
+		gridList.resetGrid('gridList');
+		
+		$('#BARCOD').val('');
+		$("#TOTCOMPCNT").val(0);
+		$("#NOWCOMPCNT").val(0);
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="75%" />
+					</colgroup>
+					<tbody>
+						<tr style="display:none">
+							<th CL="STD_OWNRKY" width="100">화주</th>
+							<td colspan="2">
+								<input type="hidden" id="selectSKU">
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_LOTA14'>개별바코드</th>
+							<td colspan="2">
+								<input type="text" class="text" inputmode="none" name="BARCOD" id="BARCOD" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section" >
+				<div class="tableHeader">						 
+					<table style="width: 100%">
+						<colgroup>
+							<col width="25px" />
+							<!-- <col width="25px" /> -->
+							<col width="50px" />
+							<col width="35px" />
+							<col width="35px" />
+						</colgroup> 
+						<thead>
+							<tr>		
+								<th CL="STD_LOTA02">LOTA02</th>
+								<!-- <th CL="WCS_LOC_GRPCD">LOC_GRPCD</th> -->
+								<th CL="WCS_LOC_GRPNM">LOC_GRPNM</th>																									
+								<th CL="WCS_CNT_STATE3">적재(팔레트)</th>																
+								<th CL="WCS_CNT_STATE1">미적재(팔레트)</th>																
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="25px" />
+							<!-- <col width="25px" /> -->
+							<col width="50px" />
+							<col width="35px" />
+							<col width="35px" />								
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="text,LOTA02">플랜트</td>
+								<!-- <td GCol="text,LOC_GRPCD">LOC_GRPCD</td> -->
+								<td GCol="text,LOC_GRPNM">LOC_NM</td>
+								<td GCol="text,CNT_STATE3">적재(팔레트)</td>
+								<td GCol="text,CNT_STATE1">미적재(팔레트)</td>													
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- 
+			<div class="select_box" style='display:none;'>
+				<table>
+					<colgroup>
+						<col width="80px"/>
+						<col width="50px"/>
+						<col width="50px"/>
+						<col width="60px"/>
+						<col width="50px"/>
+						<col width="50px"/>
+						<col width="60px"/>
+					</colgroup>
+					<tbody>
+						<tr>
+							<th  CL='STD_COMPCNT'>완료건수</th>
+							<td CL='STD_ALL'>전체</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="TOTCOMPCNT" id="TOTCOMPCNT" readonly/>
+							</td>
+							<td CL='STD_CNT'>count</td>
+							<td CL='STD_INCLU'>중</td>
+							<td>
+								<input type="text" class="text gridColInputNumber" name="NOWCOMPCNT" id="NOWCOMPCNT" readonly/>
+							</td>
+							<td CL='STD_CNT'>count</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			 -->
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;" >
+				<table>
+					<tr>
+						<td class=f_1 width="30%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>						
+						<td class=f_1 width="30%" onclick ="searchList()" >
+							<label CL='BTN_REFRESH'></label>
+						</td>
+						<td class=f_1 width="30%" onclick="reset()">
+							<label CL='BTN_RESET'></label>
+						</td>						
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->	
+		</div>
+	</div>
+</body>

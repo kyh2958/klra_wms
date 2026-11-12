@@ -1,0 +1,123 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+<%
+    User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+<style>
+    input[type="checkbox"]{height:unset;} 
+    #searchArea .top_layout{height:220px;}
+</style>
+<script type="text/javascript">
+	var dblIdx = 0;
+	var subIdx = 0;
+	var searchType = 0;
+	var paramH = new DataMap();
+	var menuky = configData.MENU_ID;
+	var searchedParam = null;
+	var selectedRowNum = 0;
+	
+	$(document).ready(function(){
+
+		gridList.setGrid({
+	        id : "gridList",
+	        module : "DL042",
+	        editable : false,
+	        command : "DL4X_CARINFO"
+	    });
+
+		var data = page.getLinkPopData();
+		searchList(data);
+	});
+	
+	function searchList(param){
+		gridList.gridList({
+	    	id : "gridList",
+	    	param : param
+	    });
+	}	
+	
+	function fn_closing(){
+		this.close();
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum){
+		var data = gridList.getRowData("gridList", rowNum);
+		window.opener.carInfoCallback(data);
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>	
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">								
+				</div>				
+				<div class="fl_r">			
+					<!-- <input type="button" CB="Search SEARCH STD_SYSTO" /> -->
+				</div>			        
+			</div>
+			<div class="search_inner">
+			</div>
+			<div class="search_next_wrap">
+				<div class="content_layout tabs top_layout">
+					<ul class="tab tab_style02">
+						<li><a href="#tab1-1"><span CL="STD_LIST">리스트</span></a></li>
+						<li class="btn_zoom_wrap">
+							<ul>
+								<li><button class="btn btn_bigger"><span>확대</span></button></li>
+							</ul>
+						</li>
+					</ul>
+					<div class="table_box section" id="tab1-1">
+						<div class="table_list01">
+							<div class="scroll">
+								<table class="table_c">
+									<tbody id="gridList">
+										<tr CGRow="true">
+											<td GH="40" GCol="rownum">1</td>
+	                                        <td GH="100 STD_VSTEL"	GCol="text,SHIP_POINT">출하지점</td>
+	                                        <td GH="100 STD_DRVCMP"	GCol="text,CARRIER">운송사</td>
+	                                        <td GH="100 TMS_VEHICLE_ID"	GCol="text,VEHICLE_ID">차량ID</td>
+	                                        <td GH="100 STD_VEHINO"	GCol="text,VEHICLE_NO">차량번호</td>
+	                                        
+	                                        <td GH="60 STD_CARTON"	GCol="text,VEHICLE_CLASS">톤수</td>
+	                                        <td GH="60 STD_DRIVER"	GCol="text,DRIVER_NAME">이름</td>
+	                                        <td GH="100 STD_WADT01"	GCol="text,CONTACT_NO">연락처</td>
+	                                        
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="btn_lit tableUtil">
+							<button type='button' GBtn="find"></button>
+							<button type='button' GBtn="sortReset"></button>
+							<button type='button' GBtn="total"></button>
+							<button type='button' GBtn="subTotal"></button>
+							<button type='button' GBtn="layout"></button>
+							<button type='button' GBtn="excel"></button>
+							<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+						</div>
+					</div>
+				</div>
+			</div>		
+		</div>	
+	</div>		
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

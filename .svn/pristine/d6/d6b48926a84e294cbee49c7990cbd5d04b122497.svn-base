@@ -1,0 +1,946 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%  
+    String BARCOD = request.getParameter("BARCOD");     
+    String SHPOKY = request.getParameter("SHPOKY");
+    String SKUKEY = request.getParameter("SKUKEY");
+    String STKNUM = request.getParameter("STKNUM");
+    String DPTNKY = request.getParameter("DPTNKY"); 
+    String LOTA07 = request.getParameter("LOTA07"); 
+    String LOTA01 = request.getParameter("LOTA01"); 
+    String LOTA02 = request.getParameter("LOTA02"); 
+    String SEARCHCOUNT = request.getParameter("SEARCHCOUNT");
+    
+    
+    if(BARCOD == null){
+        BARCOD = "";
+    }   
+    
+    
+    if(SHPOKY == null){
+        SHPOKY = "";
+    }
+    
+    if(SKUKEY == null){
+        SKUKEY = "";
+    }
+    
+    if(STKNUM == null){
+        STKNUM = "";
+    }
+    
+    if(DPTNKY == null){
+    	DPTNKY = "";
+    }
+    
+    if(LOTA07 == null){
+    	LOTA07 = "";
+    }
+    
+    if(SEARCHCOUNT == null){
+    	SEARCHCOUNT = "";
+    }
+    
+    
+    
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button{ vertical-align: bottom; height: 37px; }
+input:read-only{ background-color: #e2e2e2; }
+select:disabled{ background-color: #e2e2e2; }
+.number { text-align: right }
+.tem4_content .select_box table  { width  : 98% !important; margin: auto; }
+.tem4_content .select_box .text  { padding: unset !important; margin: unset !important; height: 28px !important }
+.tem4_content table th           { padding: 0px !important; white-space: nowrap; }
+.tem4_content table td           { padding: 1px !important; }
+
+
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+
+	$(document).ready(function(){
+		
+		gridList.setGrid({
+		    id : "gridList",
+		    editable : false,
+		    module : "WmsMobileOutboundPicking_COPY",
+		    command : "PDPK05_DETAIL02",
+		    gridMobileType : true,
+		    emptyMsgType:false
+		});
+		
+		gridList.setGrid({
+	        id : "gridListSub",
+	        module : "WmsMobileOutboundPicking_COPY",
+	        command : "PDPK05_DETAIL02_SUB",
+	        gridMobileType : true,
+	        emptyMsgType : false
+	    });
+		
+		gridList.setGrid({
+	        id : "gridListHidden",
+	        editable : false,
+	        module : "WmsMobileOutboundPicking_COPY",
+	        command : "PDPK05DETAIL02CNT",
+	        gridMobileType : true,
+	        emptyMsgType : false
+	    });
+		
+		$('#BARCOD').focus();
+		
+		var param = new DataMap();
+	    
+	    param.put("STKNUM", '<%=STKNUM%>');         
+	    param.put("SKUKEY", '<%=SKUKEY%>');
+	    param.put("WAREKY", '<%=wareky%>');
+	    param.put("DPTNKY", '<%=DPTNKY%>');
+	    param.put("LOTA07", '<%=LOTA07%>');
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+      	   
+		
+		
+		headSearch();
+	});
+	
+	function headSearch(){
+		
+		var param = new DataMap();
+	    
+	    param.put("STKNUM", '<%=STKNUM%>');         
+	    param.put("SKUKEY", '<%=SKUKEY%>');
+	    param.put("WAREKY", '<%=wareky%>');
+	    param.put("DPTNKY", '<%=DPTNKY%>');
+	    param.put("LOTA07", '<%=LOTA07%>');
+		 var json = netUtil.sendData({
+	            url : "/mobile/Mobile_COPY/json/PDPK05DETAIL02HEAD.data",           
+	            param : param
+	        });
+		    
+		    if(json && json.data){
+	            $("#SKUKEY").val(json.data.SKUKEY);
+	            $("#DESC01").val(json.data.DESC01);
+	            
+	            $("#QTSHPO").val(json.data.QTSHPO);
+	            $("#DUOMKY").val(json.data.DUOMKY);
+	            $("#DUOMKY2").val(json.data.DUOMKY);
+	            $("#BQTSHPO").val(json.data.BQTSHPO);
+	            $("#BUOMKY").val(json.data.BUOMKY);
+	            
+	            $("#QTJCMP").val(json.data.QTJCMP);
+	            $("#PUT_DUOMKY").val(json.data.DUOMKY);
+	            $("#BQTJCMP").val(json.data.BQTJCMP);
+	            $("#PUT_BUOMKY").val(json.data.BUOMKY);
+	            $("#BUOMKEY").val(json.data.BUOMKY);
+	            $("#QTPUOM").val(json.data.QTPUOM);
+	            
+	            $("#LOTA07").val(json.data.LOTA07);
+	            $("#MTYPE").val(json.data.MTYPE);
+	            
+	            valueChangeEvent($("#QTSHPO"));
+				valueChangeEvent($("#BQTSHPO"));
+				valueChangeEvent($("#QTJCMP"));
+				valueChangeEvent($("#BQTJCMP"));
+				
+				
+		    }
+		    
+		    $('#BARCOD').focus();
+	}
+	
+	//reFresh
+	function reSearchList(){						
+		
+		gridList.resetGrid("gridList");
+		
+		var param = new DataMap();
+	    
+	    param.put("STKNUM", '<%=STKNUM%>');         
+	    param.put("SKUKEY", '<%=SKUKEY%>');
+	    param.put("WAREKY", '<%=wareky%>');
+	    param.put("DPTNKY", '<%=DPTNKY%>');
+	    param.put("LOTA07", $('#LOTA07').val());
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+      	   
+		
+		
+		headSearch();
+	}
+	
+	
+	
+	function eventKeydown(event,objId){
+
+        if(event.keyCode == "13" && objId == "BARCOD"){
+        	
+        	
+    		var qtshpo =$("#QTSHPO").val();
+    		var qtjcmp =$("#QTJCMP").val();
+    		if(qtshpo - qtjcmp ==0){
+			    
+    			PlaySound("e");                 
+			    commonUtil.msgBox("OUT_M0132", null, null, function () {  // 바코드 입력해주세요.
+			    	$("#BARCOD").val('');  
+			    });
+    			return;
+    		}
+                            
+			var barcod = $.trim($("#BARCOD").val());                
+			var skukey = $.trim($("#SKUKEY").val());
+			
+			
+			var qttaor =$("#QTTAOR").val();
+			var qtsput =$("#QTSPUT").val();
+			        
+			if(barcod == ""){
+			    
+			    PlaySound("e");                 
+			    commonUtil.msgBox("VALID_M0936", null, null, function () {  // 바코드 입력해주세요.
+			        $('#BARCOD').focus();               
+			    }); 
+			
+			    return; 
+			}
+			
+
+			var param = new DataMap();
+			
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("WAREKY", '<%=wareky%>');
+			param.put("STKNUM", '<%=STKNUM%>');
+			param.put("SKUKEY", '<%=SKUKEY%>');
+			param.put("LOTA01", '<%=LOTA01%>');
+			param.put("LOTA02", '<%=LOTA02%>');
+			param.put("BARCOD", barcod);			
+			
+			
+			
+			
+			var json = netUtil.sendData({
+			    url : "/mobile/Mobile_COPY/json/barcodCheckHL.data",          
+			    param : param
+			});
+			
+			if(json && json.data){
+				
+				var sendMsg = json.data["MSG"];
+				if($.trim(sendMsg) != ""){
+
+                    PlaySound('e');
+
+					commonUtil.msgBox(sendMsg, null, null, function () {
+						//$('#BARCOD').focus();
+						if(sendMsg != 'MOBILE_M0054') {	// 해당 바코드와 맞는 품목이 아닙니다.
+							mobile.linkPopOpen('/mobile/PDPK06HL_PDLOC_POP_COPY.page', param);
+						}
+					});
+
+					return;
+				}else{
+					
+					if(new Number(json.data.LOCCNT) >= 1){
+						
+						mobile.linkPopOpen('/mobile/PDLOC_POP_COPY.page', param);
+						return;
+					}
+				}
+			}
+        }
+	}
+	
+	var param_tmp = new DataMap();
+	
+	function noDataCallback(data) {
+		var param = data
+		var skukey = data.get("SKUKEY")
+		
+//     	commonUtil.msgBox("MOBILE_M0052");
+    	commonUtil.msgBox("IN_M0079",skukey);
+    	return;
+	}
+	
+	function LocPopCallback(data) {
+// 		var barcod = $.trim($("#BARCOD").val());
+		var barcod = data.get("LOTA14");
+		if(barcod ==undefined){
+			 barcod = $.trim($("#BARCOD").val());
+		}
+		var skukey = $.trim($("#SKUKEY").val());
+		var mtype = $.trim($("#MTYPE").val());
+		var lota07 = $.trim($("#LOTA07").val());
+		var qtshpo = $.trim($("#QTSHPO").val());
+		var qtjcmp = $.trim($("#QTJCMP").val());		
+		
+		var qttaor =$("#QTTAOR").val();
+		        
+		if(barcod == ""){
+		    
+		    PlaySound("e");                 
+		    commonUtil.msgBox("VALID_M0936", null, null, function () {  // 바코드 입력해주세요.
+		        $('#BARCOD').focus();               
+		    }); 
+		
+		    return; 
+		}else{
+			
+			var param = new DataMap();
+			
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("WAREKY", '<%=wareky%>');
+			param.put("STKNUM", '<%=STKNUM%>');
+			param.put("SKUKEY", '<%=SKUKEY%>');
+			param.put("DPTNKY", '<%=DPTNKY%>');
+			param.put("BARCOD", barcod);
+			param.put("LOCAKY", data.get('LOCAKY'));
+			if(mtype == "P"){
+				param.put("LOTA07", lota07);
+				param.put("QTSHPO", qtshpo);
+				param.put("QTJCMP", qtjcmp);
+				
+				param_tmp = param;
+				mobile.linkPopOpen('/mobile/PDMTO_POP_COPY.page', param);
+				
+				return;
+			}else{
+				stockValidation(param);
+			}
+		}
+		
+	
+
+	}
+	
+	function MtoPopCallback(qty){
+		stockValidation(param_tmp);
+	}
+	
+	function stockValidation(param){
+		var json = netUtil.sendData({
+            url: "/mobile/Mobile_COPY/json/PDPK05StockValidation.data",
+            param: param
+        });
+        
+        
+        if(json && json.data){
+            
+            var sendMsg = json.data["MSG"];
+            
+            if(json.data["MSG"] != "OK"){
+                commonUtil.msgBox(sendMsg, null, null, function () {
+                       $('#BARCOD').focus();                                   
+                   });
+                return;
+            }
+            
+            
+            var jsonObj = {data: json.data.StkkyList};
+              
+            //gridList.appendJson('gridList', jsonObj);
+            gridList.prependJson('gridList', jsonObj);
+            headSearch();
+        }
+	}
+	
+	function setDecimalValue(str, decimal) {
+		str = new String(str);
+		var regex = /[^0-9.]/g;
+			str.replace(',');
+		var number = Number(str.replace(regex, ""));			
+			
+		number = number ? number : 0;
+		return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+	}
+	
+	function valueChangeEvent(obj) {
+		
+		var objId  = $(obj).attr("id");
+		var objVal = $(obj).val();					
+		
+		if(objId == "QTSHPO" || objId == "BQTSHPO" || objId == "QTJCMP" || objId == "BQTJCMP"
+			|| objId == "QTCOMP_L7141" || objId == "QTCOMP_L7141_2"){
+			
+			var qttaor = new Number($("#QTSHPO").val());
+			var qtsput = new Number($("#QTJCMP").val());
+			
+			/* if(qtsput > qttaor){
+				$("#QTSPUT").val(0);
+				commonUtil.msgBox("VALID_M2072");				
+				return;
+			} */
+									
+			$(obj).val(setDecimalValue(objVal, 3));
+			
+		}else if(objId == "QTSPUT"){
+			
+			var regex = /[^0-9.,]/g;
+		    var qtsput =   Number($('#QTSPUT').val().replace(regex, ""));
+		    var qtpuom =   Number($('#QTPUOM').val().replace(regex, ""));
+			
+		    if(qtpuom == 0){return;}
+		    
+		    var value = setDecimalValue(qtsput/qtpuom, 3);
+			$("#BQTSPUT").val(value);
+			
+			$(obj).val(setDecimalValue(objVal, 3));
+			
+		}else if(objId == "BQTSPUT"){
+			
+			var regex = /[^0-9.,]/g;
+		    var qtsput =   Number($('#BQTSPUT').val().replace(regex, ""));
+		    var qtpuom =   Number($('#QTPUOM').val().replace(regex, ""));
+					  
+		    
+		    var value = setDecimalValue(qtsput*qtpuom, 3);
+			$("#QTSPUT").val(value);
+			
+			$(obj).val(setDecimalValue(objVal, 3));
+		}
+		
+		
+		
+		
+		if(objId == "UOMKEY" || objId == "BUOMKEY"){
+			
+			
+			$("#PUT_"+objId).val(objVal);
+			
+		}
+		
+		
+	}
+	
+	function gridListEventRowDblclick(gridBox, rowNum){
+		
+		var LOCAKY = gridList.getColData("gridList", rowNum, "LOCAKY");
+		var LOTA14 = gridList.getColData("gridList", rowNum, "LOTA14");
+		var QTCOMP = gridList.getColData("gridList", rowNum, "QTCOMP");	
+		
+		$("#BARCOD").val(LOTA14);
+		$("#QTSPUT").val(QTCOMP);
+		$("#LOCAKY").val(LOCAKY);
+		$("#ROW_QTCOMP").val(QTCOMP);
+		
+		valueChangeEvent($("#QTSPUT"));
+				  
+	}
+	
+	
+function saveCnt(){
+		
+	var barcod = $.trim($("#BARCOD").val());	
+	var qtsput = $.trim($("#QTSPUT").val());
+	var locaky = $.trim($("#LOCAKY").val()); 
+	
+	if(barcod == ""){
+		
+		PlaySound("e");					
+		commonUtil.msgBox("VALID_M0936", null, null, function () { 	// 바코드 입력해주세요.
+			$('#BARCOD').focus();      			
+		}); 
+
+		return;	
+	}
+	
+	
+	if(locaky == ""){
+		
+		PlaySound("e");					
+		commonUtil.msgBox("MOBILE_M0055", null, null, function () { 	// 해당 작업을 하시려면 하단 개별바코드를 더블클릭하시기 바랍니다.
+			$('#BARCOD').focus();      			
+		}); 
+
+		return;	
+	}
+	
+	
+	if(qtsput == "" || qtsput <= 0){
+		PlaySound("e");					
+		commonUtil.msgBox("MOBILE_M0005", null, null, function () { 	// 0보다 큰 수량을 입력해 주세요.
+			$('#QTSPUT').focus();      			
+		}); 
+		return;			
+	}
+	
+	commonUtil.msgConfirm("OUT_M0253", null, 
+			function (){
+		
+		var param = new DataMap();
+		
+		
+		
+		
+
+	    param.put("STKNUM", '<%=STKNUM%>');         
+	    param.put("SKUKEY", '<%=SKUKEY%>');
+	    param.put("DPTNKY", '<%=DPTNKY%>');	    
+	    param.put("WAREKY", '<%=wareky%>');
+	    param.put("LOCAKY", locaky);	    
+	    param.put("BARCOD", barcod);
+	    param.put("QTSPUT", qtsput);
+	    param.put("LOTA07", $('#LOTA07').val());
+	    
+		 var json = netUtil.sendData({
+	            url : "/mobile/Mobile_COPY/json/PDPK05DETAIL02_SAVECNT.data",           
+	            param : param
+	        });
+		    
+		    if(json && json.data){
+	            
+		    	var sendMsg = json.data["MSG"];
+				
+				if(sendMsg != "OK" && sendMsg !="OUT_M0254"){
+					commonUtil.msgBox(sendMsg, null, null, function () {
+                        $('#BARCOD').focus();                                   
+                    });
+					
+					return;
+					
+				}else{
+					
+					if(sendMsg == "OUT_M0254"){
+						commonUtil.msgBox(sendMsg, null, null, function () {
+							reSearchList();                        
+	                    });
+					}else{
+						$("#QTSPUT").val(0);
+						reSearchList();   
+					}
+					
+				}
+				
+				
+		    	 
+		    }
+	},
+			
+			function () { 
+			$('#BARCOD').focus();    
+			return;
+	}); 
+	
+		
+	}
+	
+function deleteTask(){
+	
+	var barcod = $.trim($("#BARCOD").val());
+	var qtcomp = new Number($("#ROW_QTCOMP").val());
+	var locaky = $.trim($("#LOCAKY").val()); 
+	
+	if(barcod == ""){
+		
+		PlaySound("e");					
+		commonUtil.msgBox("VALID_M0936", null, null, function () { 	// 바코드 입력해주세요.
+			$('#BARCOD').focus();      			
+		}); 
+
+		return;	
+	}
+	
+	if(locaky == ""){
+		
+		PlaySound("e");					
+		commonUtil.msgBox("MOBILE_M0055", null, null, function () { 	// 해당 작업을 하시려면 하단 개별바코드를 더블클릭하시기 바랍니다.
+			$('#BARCOD').focus();      			
+		}); 
+
+		return;	
+	}
+	
+	var MSG = "OUT_M0257";
+	
+	if(qtcomp <= 0){
+		
+		MSG = "OUT_M0258";
+			
+	}
+	
+	
+	//바코드 [{0}]을(를) 삭제 하시겠습니까?
+	commonUtil.msgConfirm(MSG, [barcod], 
+			function (){
+		
+		var param = new DataMap();
+		
+		
+		
+		
+
+	    param.put("STKNUM", '<%=STKNUM%>');         
+	    param.put("SKUKEY", '<%=SKUKEY%>');
+	    param.put("DPTNKY", '<%=DPTNKY%>');	    
+	    param.put("WAREKY", '<%=wareky%>');
+	    param.put("LOCAKY", locaky);	    
+	    param.put("BARCOD", barcod);
+	    param.put("LOTA07", $('#LOTA07').val());
+	    
+		 var json = netUtil.sendData({
+	            url : "/mobile/Mobile_COPY/json/PDPK05DETAIL02_DELETE.data",           
+	            param : param
+	        });
+		    
+		    if(json && json.data){
+	            
+		    	var sendMsg = json.data["MSG"];
+				
+				if(sendMsg != "OK"){
+					commonUtil.msgBox(sendMsg, null, null, function () {
+                        $('#BARCOD').focus();                                   
+                    });
+					
+					return;
+					
+				}else{
+					
+						commonUtil.msgBox("OUT_M0256", null, null, function () {
+							$("#QTSPUT").val(0);
+							reSearchList();                        
+	                    });
+										
+				}
+				
+				
+		    	 
+		    }
+	},
+			
+			function () { 
+			$('#BARCOD').focus();    
+			return;
+	}); 
+	
+		
+	}
+	
+function previtem() {
+		
+
+		location.href='/mobile/PDPK06HL_DETAIL_COPY.page?STKNUM='+'<%=STKNUM%>'+'&BARCOD='+'<%=BARCOD%>'+'&DPTNKY='+'<%=DPTNKY%>'+'&SEARCHCOUNT='+'<%=SEARCHCOUNT%>';
+
+}
+</script>
+</head>
+<body>
+    <div class="main_wrap">
+        <div class="tem4_content">
+            <div class="select_box" id="bindArea">
+              <div id="searchArea">
+                <table>
+                    <colgroup>
+                            <col width="20%" />
+                            <col width="20%" />
+                            <col width="20%" />
+                            <col width="20%" />
+                            <col width="20%" />
+                        </colgroup>
+                    <tbody>
+                        <tr>
+                            <th CL='STD_BARCOD'>바코드</th>
+                            <td colspan="5">
+                                <input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th CL='STD_SKUKEY'>품목코드</th>
+                            <td colspan="5">
+                                <input type="text" class="text" name="SKUKEY" id="SKUKEY" readonly/>
+                                <input type="hidden" class="text" name="LOTA07" id="LOTA07" readonly/>
+                                <input type="hidden" class="text" name="MTYPE" id="MTYPE" readonly/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th  CL='STD_DESC01'>품목명</th>
+                            <td colspan="5">
+                                <input type="text" class="text" name="DESC01" id="DESC01" readonly/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th  CL='STD_QTYRCV1'>지시수량</th>
+                            <td>
+                                <input type="text" class="text number" name="QTSHPO" id="QTSHPO" readonly onchange="valueChangeEvent(this)"/>
+                            </td>                                   
+                            <td>
+                                <input type="text" class="text" name="DUOMKY" id="DUOMKY" readonly onchange="valueChangeEvent(this)"/>
+                            </td>
+                            <td>
+                                <input type="text" class="text number" name="BQTSHPO" id="BQTSHPO" readonly onchange="valueChangeEvent(this)"/>
+                            </td>
+                            <td>
+                                <input type="text" class="text" name="BUOMKY" id="BUOMKY" readonly onchange="valueChangeEvent(this)"/>
+                            </td>
+                        </tr>
+                        <tr>            
+                            <th  CL='STD_QTJCMP'>피킹수량</th>
+                            <td>
+                                <input type="text" class="text number"name="QTJCMP" id="QTJCMP" onchange="valueChangeEvent(this)"  readonly/>
+                                <!-- <input type="hidden" class="input" name="LASTOB" id="LASTOB"/>
+                                <input type="hidden" class="input" name="LLOTA11" id="LLOTA11"/>
+                                <input type="hidden" class="input" name="SHPOKY" id="SHPOKY"/>-->
+                                <input type="hidden" class="test" name="ROW_QTCOMP" id="ROW_QTCOMP"/>
+                                <input type="hidden" class="input" name="QTPUOM" id="QTPUOM"/> 
+                            </td>
+                            <td>
+                                <input type="text" class="text" name="PUT_DUOMKY" id="PUT_DUOMKY" readonly/>
+                            </td>
+                            <td>
+                                <input type="text" class="text number"name="BQTJCMP" id="BQTJCMP" readonly/>                           
+                            </td>
+                            <td>
+                                <input type="text" class="text" name="PUT_BUOMKY" id="PUT_BUOMKY" readonly/>
+                            </td>
+                        </tr>  
+                         <tr>            
+                            <th  CL='STD_QTSPUT'>입력수량</th>
+                            <td>
+                                <input type="text" class="text number"name="QTSPUT" id="QTSPUT" onchange="valueChangeEvent(this)" />
+                            </td>
+                            <td>
+                                <input type="text" class="text" name="DUOMKY2" id="DUOMKY2" readonly/>
+                            </td>
+                            <td>
+                                <input type="text" class="text number" name="BQTSPUT" id="BQTSPUT" readonly/>
+                            </td>
+                            <td>
+                                <input type="text" class="text" name="BUOMKEY" id="BUOMKEY" readonly/>
+                            </td>                           
+                        </tr>                                  
+                    </tbody>
+                </table>
+                <!-- 할당로트피킹준수 HIDDEN -->
+                <input type="hidden" class="input" name="LOCAKY" id="LOCAKY"/>
+            </div>
+            </div>
+            <div class="tableWrap_search section">
+                <div class="tableHeader">                        
+                    <table style="width: 100%;">
+                        <colgroup>
+                            <col width="40px" />
+                            <col width="110px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="105px" />
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="85px" /> -->
+<!--                             <col width="120px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+                        </colgroup> 
+                        <thead>
+                            <tr>
+                                <th CL="STD_NO">NO</th>                             
+                                <th CL="STD_LOTA14">제조LOT</th>
+                                <th CL="STD_LOCAAC">실로케이션</th>
+                                <th CL="STD_QTJCMP">피킹수량</th>
+<!--                                 <th CL="STD_QTYRCV1">지시수량</th> -->
+                                <th CL="STD_SDUOKY">기본단위</th>
+<!--                                 <th CL="STD_QTYORG">오더수량</th> -->
+<!--                                 <th CL="STD_UOMKEY">단위</th> -->
+                                <th CL="STD_LOTA02">플랜트</th>
+                                <th CL="STD_LOTA01">저장위치</th>
+                                <th CL="STD_LOTA07">MTO/MTS</th>
+<!--                                 <th CL="STD_SUPLNM">공급업체코드</th> -->
+<!--                                 <th CL="STD_LOTA09">거래처코드MTO</th> -->
+<!--                                 <th CL="STD_LOTA11">제조일자</th> -->
+<!--                                 <th CL="STD_LOTA12">입고일자</th> -->
+<!--                                 <th CL="STD_LOTA13">유통기한</th>                                -->
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+                <div class="tableBody">
+                    <table style="width: 100%;">
+                        <colgroup>
+                            <col width="40px" />
+                            <col width="110px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="75px" />
+                            <col width="105px" />
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="85px" /> -->
+<!--                             <col width="120px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="75px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+<!--                             <col width="0px" /> -->
+                        </colgroup>
+                        <tbody id="gridList">
+                            <tr CGRow="true">
+                                    <td GCol="rownum">순번</td>
+                                    <td GCol="text,LOTA14">제조LOT</td>
+                                    <td GCol="text,LOCAKY">실로케이션</td>
+                                    <td GCol="text,QTCOMP" GF="N 20,2">피킹수량</td>
+<!--                                     <td GCol="text,QTTAOR" GF="N 20,3">지시수량</td> -->
+                                    <td GCol="text,DUOMKY">기본단위</td>
+<!--                                     <td GCol="text,QTYORG" GF="N 20,3">오더수량</td> -->
+<!--                                     <td GCol="text,UOMKEY">오더단위</td>                                     -->
+                                    <td GCol="text,LOTA02">플랜트</td>
+                                    <td GCol="text,LOTA01">저장위치</td>
+                                    <td GCol="text,LOTA07">MTO/MTS</td>
+<!--                                     <td GCol="text,LOTA03">공급처코드</td> -->
+<!--                                     <td GCol="text,LOTA09">거래처코드MTO</td>                                                                                                         -->
+<!--                                     <td GCol="text,LOTA11" GF="D">제조일자</td> -->
+<!--                                     <td GCol="text,LOTA12" GF="D">입고일자</td> -->
+<!--                                     <td GCol="text,LOTA13" GF="D">유통기한</td> -->
+                                    
+<!--                                     <td GCol="text,DPTNKY" hidden="hidden"></td>                                     -->
+<!--                                     <td GCol="text,STKNUM" hidden="hidden"></td>                                         -->
+                                    
+<!--                                     <td GCol="text,OWNRKY" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,WAREKY" hidden="hidden"></td>                                     -->
+<!--                                     <td GCol="text,AREAKY" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,SKUKEY" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,TRNUID" hidden="hidden"></td>                                         -->
+<!--                                     <td GCol="text,PACKID" hidden="hidden"></td>                                         -->
+<!--                                     <td GCol="text,BARCOD" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,DQTCOMP" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,ALOTPCK" hidden="hidden"></td> -->
+<!--                                     <td GCol="text,ALOTPCK_YN" hidden="hidden"></td> -->
+                                    
+                                    
+<!--                                     <td GCol="text,CHKQTCOMP" GF="N 20,3" hidden="hidden"></td>                                  -->
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>      
+            
+                
+<!--             <div class="select_box"> -->
+<!--                 <table> -->
+<!--                     <colgroup> -->
+<!--                         <col width="91px"/> -->
+<!--                         <col width="38px"/> -->
+<!--                         <col width="80px"/> -->
+<!--                         <col width="48px"/> -->
+<!--                         <col width="25px"/> -->
+<!--                         <col width="80px"/> -->
+<!--                         <col width="48px"/> -->
+<!--                     </colgroup> -->
+<!--                     <tbody> -->
+<!--                         <tr> -->
+<!--                             <th CL='STD_TOTCMP'>총 피킹수량</th> -->
+<!--                             <td CL='STD_ALL'>전체</td> -->
+<!--                             <td> -->
+<!--                                 <input type="text" class="text number" name="QTCOMP_L7141" id="QTCOMP_L7141" readonly/> -->
+<!--                             </td> -->
+<!--                             <td> -->
+<!--                                 <input type="text" class="text" name="UOMKEY2" id="UOMKEY2" style="text-align:center" readonly/> -->
+<!--                             </td> -->
+<!--                             <td CL='STD_INCLU'>중</td> -->
+<!--                             <td> -->
+<!--                                 <input type="text" class="text number" name="QTCOMP_L7141_2" id="QTCOMP_L7141_2" readonly/> -->
+<!--                             </td> -->
+<!--                             <td> -->
+<!--                                 <input type="text" class="text" name="UOMKEY3" id="UOMKEY3" style="text-align:center" readonly/> -->
+<!--                             </td> -->
+<!--                         </tr> -->
+<!--                     </tbody> -->
+<!--                 </table> -->
+<!--             </div>                   -->
+                
+            
+                                        
+            <!-- end table_body -->
+            <div class="footer_5"  style="position:fixed;" >
+                <table>
+                    <tr>
+                        <td class=f_1 width="25%" onclick="previtem()">
+                            <label CL='BTN_PREVITEM'></label>
+                        </td>                   
+                        <td class=f_1 width="25%" onclick ="reSearchList()" >
+                            <label CL='BTN_REFRESH'></label>
+                        </td>    
+                        <td class=f_1 width="25%" onclick ="saveCnt()" >
+                            <label CL='BTN_CNTCHANGE'></label>
+                        </td>     
+                        <td class=f_1 width="25%" onclick ="deleteTask()" >
+                            <label CL='BTN_DELETE'></label>
+                        </td>                                            
+                    </tr>
+                </table>
+            </div><!-- end footer_5 -->
+            
+            <!-- gridListHidden2 피킹완료에 쓰일 데이터만 가지고오기 -->
+            <div style="margin-bottom: 0px;display:none;">
+                <div class="tableBody">
+                    <table style="width: 900px">
+                        <tbody id="gridListSub">
+                            <tr CGRow="true">
+                                <td GCol="text,TASKKY">작업문서번호</td>                              
+                                <td GCol="text,TASKIT">작업문서아이템</td>
+                                <td GCol="text,SHPOKY">출하문서번호</td>
+                                <td GCol="text,LOTA14">개별바코드</td>
+                                <td GCol="text,LOCASR" hidden="hidden"></td>
+                                <td GCol="text,TRNUID" hidden="hidden"></td>                                        
+                                <td GCol="text,PACKID" hidden="hidden"></td>
+                                
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- gridListHidden 데이터만 가지고오기 -->
+            <div style="margin-bottom: 0px;display:none;">
+                <div class="tableHeader">
+                    <table> 
+                        <thead>
+                            <tr class="thead">
+                                <th CL="STD_NO">순번</th>
+                                <th CL="STD_STKNUM">작업지시번호</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+                <div class="tableBody">
+                    <table style="width: 900px">
+                        <tbody id="gridListHidden">
+                            <tr CGRow="true">
+                                <td GCol="text,TOTCOMPCNT">완료건수</td>
+                                <td GCol="text,NOWCOMPCNT">중 count</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</body>

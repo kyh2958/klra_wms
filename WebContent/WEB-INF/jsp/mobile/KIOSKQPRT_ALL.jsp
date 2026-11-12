@@ -1,0 +1,4636 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%@ include file="/mobile/include/head.jsp"%>
+<script type="text/javascript" src="/mobile/js/jquery-barcode.min.js"></script>
+<style>
+/* @page {
+	size: A4;
+	margin: 5mm;
+	size: landscape;
+} */
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+@media print {
+    @page portraitPage {
+        size: A4 portrait;
+        margin: 5mm;
+    }
+
+    @page landscapePage {
+        size: A4 landscape;
+        margin: 5mm;
+    }
+
+    .print-portrait {
+        page: portraitPage;
+    }
+
+    .print-landscape {
+        page: landscapePage;
+    }
+}
+
+@media print {
+    .print-action-bar {
+        display: none !important;
+    }
+
+    #outOrderHlPageBreak,
+    #invoicePageBreak,
+    #linerPageBreak,
+    #transferPageBreak {
+        display: none !important;
+    }
+
+    .force-page-break {
+        break-before: page;
+        page-break-before: always;
+    }
+}
+
+@media print {
+    #kiosk_moveSheet_wrap {
+        transform: none !important;
+        width: 100% !important;
+    }
+
+    .moveSheet.sheet {
+        width: 100% !important;
+        min-height: 190mm;
+    }
+
+    .moveSheet .slip {
+        padding: 8px;
+    }
+}
+@media print {
+    .confirm-wrap {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .confirm-wrap table,
+    .confirm-wrap tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+}
+
+body #kiosk_moveSheet_wrap {
+	margin: 0;
+	font-family: "Malgun Gothic", Arial, sans-serif;
+	font-size: 12px;
+}
+
+.moveSheet.sheet {
+	display: flex;
+	width: 100%;
+	background-color: white;
+	page-break-after: always;
+	break-after: page;
+}
+
+.moveSheet.sheet:last-child {
+	page-break-after: auto;
+	break-after: auto;
+}
+
+.moveSheet .slip {
+	width: 25%;
+	box-sizing: border-box;
+	border-right: 2px dashed #000;
+	padding: 10px;
+}
+
+.moveSheet .slip:last-child {
+	border-right: 2px dashed transparent;
+}
+
+.moveSheet .header {
+	text-align: center;
+	margin-bottom: 4px;
+	border-top: none;
+	border-left: none;
+	border-right: none;
+}
+
+.moveSheet .header .title {
+	font-size: 14px;
+}
+
+.moveSheet .logo img {
+	width: 70%;
+}
+
+.moveSheet .barcode_header, .moveSheet .barcode_footer {
+	border: 0px solid #000;
+	margin: auto;
+	text-align: center;
+	font-size: 10px;
+}
+
+.moveSheet .title {
+	font-weight: bold;
+	margin-bottom: 4px;
+}
+
+.moveSheet table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+
+.moveSheet th, .moveSheet td {
+	border: 1px solid #000;
+	padding: 2px;
+	height: 20px;
+	text-align: center;
+}
+
+.moveSheet .x2H {
+	height: 56px;
+}
+
+.moveSheet th {
+	background: #f5f5f5;
+	font-weight: normal;
+	text-align: left;
+	width: 22%;
+	font-size: 12px;
+}
+
+.moveSheet .section-title {
+	text-align: center;
+	font-weight: bold;
+	background: #eee;
+}
+
+.moveSheet .section-title td {
+	writing-mode: vertical-lr;
+	letter-spacing: 2px;
+	width: 7%;
+}
+
+.moveSheet th, .moveSheet td {
+	text-align: center;
+}
+
+.moveSheet .footer {
+	margin-top: 4px;
+	text-align: center;
+	font-size: 10px;
+}
+
+.print-action-bar {
+	position: sticky;
+	top: 0;
+	z-index: 999;
+	background: #ffffff;
+	padding: 16px;
+	text-align: center;
+	border-bottom: 1px solid #ddd;
+}
+
+.btn-print {
+	min-width: 220px;
+	height: 64px;
+	padding: 0 32px;
+	border: none;
+	border-radius: 14px;
+	background: #3663ff;
+	color: #fff;
+	font-size: 28px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.btn-print:active {
+	transform: scale(0.98);
+}
+
+.template-sheet {
+	display: none !important;
+}
+
+.moveSheet .header {
+	overflow: hidden;
+}
+
+.moveSheet .barcode_header, .moveSheet .barcode_footer {
+	width: 100%;
+	max-width: 100%;
+	overflow: hidden;
+	box-sizing: border-box;
+}
+
+.moveSheet .barcode_header>div, .moveSheet .barcode_footer>div,
+	.moveSheet .barcode_header canvas, .moveSheet .barcode_footer canvas,
+	.moveSheet .barcode_header img, .moveSheet .barcode_footer img {
+	max-width: 100% !important;
+}
+#invoiceArea > .kiosk-paper-doc {
+    page-break-after: always;
+    break-after: page;
+}
+
+#invoiceArea > .kiosk-paper-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+
+/* 거래명세서 주소 한 줄 처리 */
+.kiosk-paper-doc td[id^='inv_supplier_addr_'],
+.kiosk-paper-doc td[id^='inv_client_addr_'] {
+    font-size: 11px !important;
+    letter-spacing: -0.7px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 팔레트 회수 값 */
+td[id^='inv_return_pallet_'] {
+    text-align: right !important;
+    padding-right: 8px !important;
+}
+
+.kiosk-paper-doc.invoice-client-only .kiosk-paper-page {
+    page-break-after: auto !important;
+    break-after: auto !important;
+}
+/* 원지 */
+.liner-paper {
+    width: 100%;
+    font-family: "Malgun Gothic", Arial, sans-serif;
+    font-size: 11px;
+    color: #000;
+    background: #fff;
+    box-sizing: border-box;
+    page-break-after: always;
+    break-after: page;
+}
+
+.liner-paper:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+
+.liner-paper table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.liner-paper th,
+.liner-paper td {
+    border: 1px solid #000;
+    padding: 3px;
+    height: 26px;
+    text-align: center;
+    vertical-align: middle;
+    word-break: break-all;
+    font-size: 14px;
+}
+
+.liner-paper th {
+    background: #f1f1f1;
+    font-weight: bold;
+}
+
+.liner-paper .left {
+    text-align: left !important;
+}
+
+.liner-paper .right {
+    text-align: right !important;
+}
+
+.liner-paper .vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.liner-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.liner-safety {
+    width: 25%;
+}
+
+
+
+.liner-title-box {
+    width: 42%;
+    text-align: center;
+    padding-top: 28px;
+}
+
+.liner-title {
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 8px;
+    border-bottom: 1px solid #000;
+    display: inline-block;
+    padding-bottom: 4px;
+}
+
+
+.liner-barcode-box{
+    text-align:right;
+    vertical-align:top;
+    padding-right:8px !important;
+}
+
+.liner-barcode-box{
+    position:relative;
+    right:-38px;
+}
+
+.liner-barcode{
+    width:250px;
+    margin-left:auto;
+    margin-right:0;
+    display:block;
+}
+.liner-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 20px;
+    margin: 6px 0 10px !important;
+}
+
+.liner-item-table th,
+.liner-item-table td {
+    height: 28px;
+    font-size: 10.5px;
+    padding: 2px;
+}
+
+.liner-sign {
+    margin-top: 6px;
+}
+.liner-sign .no-right {
+    border-right: 0 !important;
+}
+
+.liner-sign .no-left {
+    border-left: 0 !important;
+}
+.liner-sign th,
+.liner-sign td {
+    height: 26px;
+}
+
+.liner-notice {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.liner-driver-sign {
+    margin-top: 6px;
+    text-align: right;
+    font-size: 11px;
+}
+
+.liner-inner-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.liner-inner-table th,
+.liner-inner-table td {
+    border-top: 0 !important;
+    border-bottom: 0 !important;
+    height: 26px;
+    padding: 2px 4px;
+    font-size: 11px;
+    text-align: left !important;
+    white-space: nowrap;
+}
+.liner-inner-table th,
+.liner-inner-table td {
+    text-align: left !important;
+}
+
+.liner-no-inner-border th,
+.liner-no-inner-border td {
+    border-left: 0 !important;
+    border-right: 0 !important;
+}
+
+.liner-no-inner-border th:first-child,
+.liner-no-inner-border td:first-child {
+    border-left: 0 !important;
+}
+
+.liner-no-inner-border th:last-child,
+.liner-no-inner-border td:last-child {
+    border-right: 0 !important;
+}
+
+.liner-contact-table th,
+.liner-contact-table td {
+    text-align: left !important;
+}
+
+.liner-container-table th,
+.liner-container-table td {
+    text-align: left !important;
+}
+
+.liner-inner-table tr:first-child th,
+.liner-inner-table tr:first-child td {
+    border-top: 0 !important;
+}
+
+.liner-inner-table tr:last-child th,
+.liner-inner-table tr:last-child td {
+    border-bottom: 0 !important;
+}
+.liner-paper .vertical-label {
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    letter-spacing: 0 !important;
+    line-height: 1.4;
+    font-weight: bold;
+    text-align: center !important;
+    vertical-align: middle !important;
+    background: #fff;
+    white-space: normal;
+}
+.liner-container-table th,
+.liner-container-table td {
+    text-align:left !important;
+    padding-left:6px;
+}
+.liner-container-main{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+.liner-container-main th,
+.liner-container-main td{
+    border:1px solid #000;
+    height:28px;
+    padding:2px 6px;
+    text-align:center;
+    vertical-align:middle;
+}
+
+.liner-car-main th,
+.liner-car-main td {
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+    vertical-align: middle !important;
+}
+
+.liner-car-main th {
+    text-align: center !important;
+    background: #f1f1f1;
+}
+
+.liner-car-summary {
+    text-align: left !important;
+    white-space: nowrap;
+    word-spacing: 15px;
+}
+
+.liner-car-summary span {
+    word-spacing: 0;
+    margin-right: 30px;
+}
+.kiosk-paper-barcode-text {
+    width: 110px;
+    text-align: center;
+    margin-left: auto;
+    margin-right: 50;
+    margin-top: -4px;
+    font-size: 11px;
+    line-height: 12px;
+}
+
+.liner-barcode-text {
+    width: 110px;
+    text-align: center;
+    margin-left: auto;
+    margin-right: 0;
+    margin-top: -4px;
+    font-size: 11px;
+    line-height: 12px;
+}
+
+/* 이송명세서 타이틀에 밑줄 */
+#transferArea .kiosk-paper-title p{
+    display:inline-block;
+    border-bottom:1px solid #000;
+    padding-bottom:4px;
+}
+
+/* 반출확인 크기 조정 */
+#transferArea .takeout-confirm-table {
+    width: 170px !important;
+    height: 78px !important;
+    table-layout: fixed !important;
+}
+
+#transferArea .takeout-confirm-table th,
+#transferArea .takeout-confirm-table td {
+    height: 78px !important;
+    padding:0 !important;
+    font-size:10px !important;
+}
+/* 이송명세서 인수증 날짜만 위로 */
+#transferArea .transfer-copy[data-copy-type='RECEIPT'] ul.trn-receipt-date {
+    margin-top: 8px !important;
+}
+
+/* 이송명세서 인수증 선적번호만 위로 */
+#transferArea .transfer-copy:last-child .ship-no {
+    margin-top: 100px !important;
+}
+
+/* 이송명세서 세로 제목(납품정보 등) */
+#transferArea .vertical{
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 0;
+    line-height: 1.15;
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+#transferArea th.vertical{
+   /*  writing-mode: horizontal-tb !important; */
+    text-orientation: initial !important;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+/* 이송명세서 납품정보만 */
+#transferArea .trn-delivery-title{
+    writing-mode: initial !important;
+    text-orientation: initial !important;
+    display: table-cell;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+.no-border-table,
+.no-border-table td,
+.no-border-table th{
+    border:none !important;
+}
+
+.liner-paper .nowrap {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    font-size: 11px !important;
+}
+
+
+/* 거래명세서 공급자 + 공급받는자 선적번호 */
+#invoiceArea .invoice-copy[data-copy-type='SUPPLIER'] .ship-no,
+#invoiceArea .invoice-copy[data-copy-type='CLIENT'] .ship-no {
+    margin-top: 95px !important;
+   /*  margin-right: -8px !important; */
+    text-align: right !important;
+    font-size: 11px !important;
+    line-height: 11px !important;
+}
+
+/* 거래명세서 인수증 선적번호 */
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .ship-no {
+    margin-top: 27px !important;
+    /* margin-right: -8px !important; */
+    text-align: right !important;
+    font-size: 11px !important;
+    line-height: 11px !important;
+}
+/* 거래명세서 인수증 - 반출확인 */
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .inv-takeout-confirm-table {
+    width: 150px !important;
+    height: 86px !important;
+    table-layout: fixed !important;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .inv-takeout-confirm-table th,
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .inv-takeout-confirm-table td {
+    height: 86px !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+}
+
+/* 거래명세서 인수증 - 도착시간/하차시간 */
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .trn-receipt-time-table {
+    width: 190px !important;
+    margin-left: auto;
+    margin-top: 8px !important;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .trn-receipt-time-table th {
+    height: 20px !important;
+    font-size: 11px !important;
+    padding: 0 !important;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT'] .trn-receipt-time-table td {
+    height: 40px !important;
+}
+
+/* PS 거래명세서 인수증 하단 확인 문구 */
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT']
+.invoice-receipt-confirm {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    text-align: left;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT']
+.invoice-receipt-message {
+    text-align: left;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT']
+.invoice-receipt-sign {
+    white-space: nowrap;
+    text-align: right;
+}
+
+#invoiceArea .invoice-copy[data-copy-type='RECEIPT']
+.invoice-receipt-sign span {
+    display: inline-block;
+    width: 160px;
+}
+</style>
+
+<script>
+	var sendEcmsList = new Array(); 
+
+	function getUrlParam(name) {
+	    var qs = new URLSearchParams(location.search);
+	    return qs.get(name) || "";
+	}
+	
+	function isHlUnloadedPrint() {
+	    return getUrlParam("PRINT_MODE") === "HL_UNLOADED";
+	}
+
+	function isInvoiceClientOnlyPrint() {
+	    return getUrlParam("PRINT_MODE") === "INVOICE_CLIENT_ONLY";
+	}
+	//출고지시서 바코드
+	function setOutOrderBarcode($target, text) {
+	    $target.empty();
+
+	    if (!text) {
+	        return;
+	    }
+
+	    $target.barcode(String(text), "code128", {
+	        barWidth : 2,
+	        barHeight : 75,
+	        showHRI : false
+	    });
+	}
+	//거래명세서 바코드
+	function setInvoiceDocBarcode($target, text) {
+	    $target.empty();
+
+	    if (!text) {
+	        return;
+	    }
+
+	    $target.barcode(String(text), "code128", {
+	    	barWidth : 2.0,
+	        barHeight : 38,
+	        showHRI : false
+	    });
+	}
+	
+	function printMoveSlip() {
+
+	    // 강내이송건 자동출고처리
+	    if (sendEcmsList && sendEcmsList.length > 0) {
+
+	        for (var i = 0; i < sendEcmsList.length; i++) {
+
+	            var param = new DataMap();
+
+	            param.put("WAREKY", "<%=wareky%>");
+	            param.put("OWNRKY", "<%=ownrky%>");
+	            param.put("LANGKY", "<%=langky%>");
+	            param.put("STKNUM", sendEcmsList[i]);
+
+	            param.put("STAT02", "V");
+	            param.put("STAT03", "V");
+	            param.put("STAT04", "V");
+	            param.put("STAT05", "V");
+	            param.put("STAT06", "V");
+
+	            var json = netUtil.sendData({
+	                module : "WmsOutboundDL082",
+	                command : "DL081",
+	                param : param,
+	                async : false
+	            });
+
+	            if (json && json.data && json.data.length > 0) {
+
+	                var selectedHead = [];
+	                var sendEcmsURL = "/wms/outbound/json/sendEcmsDL081Bundle.data";
+
+	                selectedHead[0] = json.data[0];
+
+	                // 상차완료
+	                if (selectedHead[0].STATNM != "상차완료") {
+	                    alert("상차처리 후 출고 해주세요\n상태: " + selectedHead[0].STATNM);
+	                    return;   // 출력도 막을지 여부는 업무정책에 따라 유지/변경
+	                }
+
+	                param.put("loopHeadList", selectedHead);
+
+	                json = netUtil.sendData({
+	                    url : sendEcmsURL,
+	                    param : param,
+	                    async : false
+	                });
+
+	                if (json && json.data && json.data.sucessCnt > 0) {
+	                    console.log("출고처리 되었습니다.");
+	                } else {
+	                    // 실패 처리 로그/알림 필요
+	                    console.log("출고처리 실패");
+	                }
+	            }
+	        }
+	    }
+
+	 	// ★ 추가 : 프린트 설정창이 닫힌 후 실행되도록 afterprint 이벤트 등록
+	    window.onafterprint = function() {
+	        window.onafterprint = null;
+	        window.close();
+	    };
+
+	 	// ★ 변경 : afterprint 이벤트를 먼저 등록한 후 프린트 설정창 호출
+	    window.focus();
+	    window.print();
+	}
+
+	function ceil2(num) {
+	    num = parseFloat(num || 0);
+	    return Math.ceil(num * 100) / 100;
+	}
+	function formatDate(dateStr) {
+		if (!dateStr || dateStr.length !== 8) {
+			return "";
+		}
+
+		return dateStr.substring(0, 4) + "." + dateStr.substring(4, 6) + "."
+				+ dateStr.substring(6, 8);
+	}
+
+	(function() {
+
+		function getStknumListFromUrl() {
+			var qs = new URLSearchParams(location.search);
+
+			return (qs.get("STKNUM") || "").split(",").map(function(v) {
+				return (v || "").trim();
+			}).filter(function(v) {
+				return v.length > 0;
+			});
+		}
+
+		function getLogoSrc(row) {
+			var vndr = (row.IF_VNDR_CD || "").toUpperCase();
+
+			if (vndr.indexOf("AJ") > -1) {
+				return "/mobile/img/logo_aj.png";
+			}
+
+			if (vndr.indexOf("KPP") > -1) {
+				return "/mobile/img/logo_kpp.png";
+			}
+
+			return "/mobile/img/logo_kpp.png";
+		}
+
+		function nvl(v) {
+			return (v == null) ? "" : v;
+		}
+        //이동전표
+		function fetchMoveSlipData(stknum) {
+			var param = new DataMap();
+			param.put("STKNUM", stknum);
+
+			return netUtil.sendData({
+				module : "WmsMobileOutboundPicking_COPY",
+				command : "TB_WMS_PALLET_IF",
+				sendType: "listMobile2",
+				param : param
+			});
+		}
+        //출고지시서 HL 
+		function fetchOutOrderHlData(stknum) {
+		    var param = new DataMap();
+		    param.put("STKNUM", stknum);
+		    param.put("WAREKY", "<%=wareky%>");
+		    param.put("OWNRKY", "<%=ownrky%>");
+		   
+		    return netUtil.sendData({
+		        module : "WmsMobileOutboundPicking_COPY",
+		        command : "KIOSK_OUTORDER_HL",
+		        sendType : "list",
+		        param : param
+		    });
+		}
+		
+        //거래명세서
+		function fetchInvoiceData(stknum) {
+
+		    var param = new DataMap();
+		    var dealky = getUrlParam("DEALKY");
+		
+		    param.put("STKNUM", stknum);
+		    param.put("WAREKY", "<%=wareky%>");
+		    param.put("OWNRKY", "<%=ownrky%>");
+		
+		    if (dealky) {
+		        param.put("DEALKY", dealky);
+		    }
+		
+		    return netUtil.sendData({
+		        module : "WmsMobileOutboundPicking_COPY",
+		        command : "KIOSK_INVOICE",
+		        sendType : "list",
+		        param : param
+		    });
+		}
+        
+		// 원지 HEADER
+		function fetchLinerHeadData(stknum) {
+		    var param = new DataMap();
+		    param.put("STKNUM", stknum);
+		    param.put("WAREKY", "<%=wareky%>");
+		    param.put("OWNRKY", "<%=ownrky%>");
+
+		    return netUtil.sendData({
+		        module : "WmsMobileOutboundPicking_COPY",
+		        command : "KIOSK_LINER_HEAD",
+		        sendType : "list",
+		        param : param
+		    });
+		}
+
+		function fetchLinerItemData(stknum, dptnky) {
+		    var param = new DataMap();
+
+		    param.put("STKNUM", stknum);
+		    param.put("DPTNKY", dptnky);
+		    param.put("WAREKY", "<%=wareky%>");
+		    param.put("OWNRKY", "<%=ownrky%>");
+
+		    return netUtil.sendData({
+		        module : "WmsMobileOutboundPicking_COPY",
+		        command : "KIOSK_LINER_ITEM",
+		        sendType : "list",
+		        param : param
+		    });
+		}
+
+		 
+		
+		// 이송명세서
+		function fetchTransferData(stknum) {
+		    var param = new DataMap();
+		    param.put("STKNUM", stknum);
+		    param.put("WAREKY", "<%=wareky%>");
+		    param.put("OWNRKY", "<%=ownrky%>");
+
+		    return netUtil.sendData({
+		        module : "WmsMobileOutboundPicking_COPY",
+		        command : "KIOSK_TRANSFER",
+		        sendType : "list",
+		        param : param
+		    });
+		}
+		
+		function getAllRows(stknums) {
+			var allRows = [];
+			var i, json, rows, j;
+
+			for (i = 0; i < stknums.length; i++) {
+				json = fetchMoveSlipData(stknums[i]);
+
+				if (json && json.data && json.data.length > 0) {
+					rows = json.data;
+
+					for (j = 0; j < rows.length; j++) {
+					    if (nvl(rows[j].WMS_DPTNKY) === "0000") {
+					        continue;
+					    }
+
+					    allRows.push(rows[j]);
+					}
+				}
+			}
+
+			return allRows;
+		}
+
+		function setBarcode($target, text, height) {
+			$target.empty();
+
+			if (!text) {
+				return;
+			}
+
+			var barcodeText = String(text);
+			var barWidth = 1;
+
+			// 문자열이 짧을 때만 조금 두껍게
+			if (barcodeText.length <= 8) {
+				barWidth = 2;
+			}
+
+			$target.barcode(barcodeText, "code128", {
+				barWidth : barWidth,
+				barHeight : height,
+				showHRI : true
+			});
+		}
+
+		function fillTypeQty($slip, row) {
+			var $typeCells = $slip.find(".pltType");
+			var $qtyCells = $slip.find(".pltQty");
+			var itemList = row.ITEM_LIST || [];
+
+			$typeCells.text("");
+			$qtyCells.text("");
+
+			for (var i = 0; i < itemList.length && i < 4; i++) {
+				$typeCells.eq(i).text(nvl(itemList[i].ITEM));
+				$qtyCells.eq(i).text(nvl(itemList[i].DLV_QTY));
+			}
+		}
+		
+		function autoFitInvoiceItemText($root) {
+		    $root.find(".item-table tbody td:nth-child(2), .item-table tbody td:nth-child(9)").each(function () {
+		        var $td = $(this);
+		        var text = $.trim($td.text());
+
+		       /*  if (text.length > 45) {
+		            $td.css("font-size", "7px");
+		        } else if (text.length > 35) {
+		            $td.css("font-size", "8px");
+		        } else if (text.length > 25) {
+		            $td.css("font-size", "9px");
+		        } else {
+		            $td.css("font-size", "10.5px");
+		        } */
+		        if (text.length > 45) {
+		            $td.css("font-size", "9px");
+		        } else if (text.length > 35) {
+		            $td.css("font-size", "10px");
+		        } else if (text.length > 25) {
+		            $td.css("font-size", "11px");
+		        } else {
+		            $td.css("font-size", "12px");
+		        }
+		    });
+		}
+		//거래명세서 hl
+		function isHlInvoice(list) {
+		    var mtype = String(getUrlParam("M_TYPE") || "").toUpperCase();
+		
+		    if (mtype !== "P") {
+		        return true;   // PS가 아니면 HL
+		    }
+		
+		    return false;
+		}
+		
+		function getHlQty(row, names) {
+		    for (var i = 0; i < names.length; i++) {
+		        if (row[names[i]] != null && row[names[i]] !== "") {
+		            return row[names[i]];
+		        }
+		    }
+		    return "";
+		}
+
+	function replaceHlInvoiceItemTable($root) {
+    for (var copy = 1; copy <= 3; copy++) {
+    	var receiptSignHtml = (copy == 3)
+        ? '인수인 : <span style="display:inline-block;width:190px;"></span>(날인 또는 서명)'
+        : '';
+        var html = ''
+        + '<table class="item-table hl-item-table" style="margin-top:6px;">'
+        + '    <colgroup>'
+        + '        <col width="3%">'
+        + '        <col width="35%">'
+        + '        <col width="14%">'
+        + '        <col width="7%">'
+        + '        <col width="7%">'
+        + '        <col width="9%">'
+        + '        <col width="9%">'
+        + '        <col>'
+        + '    </colgroup>'
+        + '    <thead>'
+        + '        <tr>'
+        + '            <th rowspan="2">No</th>'
+        + '            <th rowspan="2">제 품 명</th>'
+        + '            <th rowspan="2">바코드번호</th>'
+        + '            <th colspan="2">수량</th>'
+        + '            <th rowspan="2">입고단가</th>'
+        + '            <th rowspan="2">공급가액</th>'
+        + '            <th rowspan="2">비고</th>'
+        + '        </tr>'
+        + '        <tr>'
+        + '            <th>백(팩)</th>'
+        + '            <th>박스</th>'
+        + '        </tr>'
+        + '    </thead>'
+        + '    <tbody id="invoiceHlItemBody_' + copy + '"></tbody>'
+        + '    <tfoot>'
+        + '        <tr>'
+        + '            <td></td>'
+        + '            <td>합&nbsp;&nbsp;계</td>'
+        + '            <td></td>'
+        + '            <td id="inv_hl_total_pack_' + copy + '" class="right"></td>'
+        + '            <td id="inv_hl_total_box_' + copy + '" class="right"></td>'
+        + '            <td></td>'
+        + '            <td id="inv_hl_total_vat_price_' + copy + '" class="right"></td>'
+        + '            <td></td>'
+        + '        </tr>'
+        + '    </tfoot>'
+        + '</table>'
+        + '<table class="hl-total-table">'
+        + '    <colgroup>'
+        + '        <col width="65%">'
+        + '        <col width="12%">'
+        + '        <col width="11%">'
+        + '        <col width="12%">'
+        + '    </colgroup>'
+        + '    <tr>'
+        + '        <th rowspan="2" class="receipt-sign">' + receiptSignHtml + '</th>'
+        + '        <th>공급가액</th>'
+        + '        <th>부가세</th>'
+        + '        <th>합계</th>'
+        + '    </tr>'
+        + '    <tr>'
+     
+        + '        <td id="inv_hl_supply_price_' + copy + '" class="right"></td>'
+        + '        <td id="inv_hl_vat_' + copy + '" class="right"></td>'
+        + '        <td id="inv_hl_sum_price_' + copy + '" class="right"></td>'
+        + '    </tr>'
+        + '</table>';
+
+        $root.find(".invoice-copy").eq(copy - 1).find(".item-table").replaceWith(html);
+    }
+}
+		
+		//거래명세서 바인딩
+		function bindInvoice($root, list, printType) {
+		    if (!list || list.length === 0) return;
+		
+		    var head = list[0];
+		    var isHl = isHlInvoice(list);
+		
+		    if (isHl) {
+		        $root.addClass("invoice-hl-doc");
+		        replaceHlInvoiceItemTable($root);
+		    }
+		
+		    for (var copy = 1; copy <= 3; copy++) {
+		        setTextIn($root, "inv_stknum_" + copy, head.STKNUMNM || head.STKNUM);
+		        setInvoiceDocBarcode($root.find("[id='inv_barcode_" + copy + "']"), head.STKNUM);
+		        setTextIn($root, "inv_barcode_text_" + copy, head.STKNUM);
+		
+		        setTextIn($root, "inv_delivery_date_" + copy, head.DELIVERY_DATE || head.RQSHPD);
+		        setTextIn($root, "inv_print_date_" + copy, head.PRTDAT);
+		
+		        setTextIn($root, "inv_supplier_bizno_" + copy, head.SUPPLIER_BIZNO);
+		        setTextIn($root, "inv_supplier_tel_" + copy, head.SUPPLIER_TEL);
+		        setTextIn($root, "inv_supplier_nm_" + copy, head.SUPPLIER_NM);
+		        setTextIn($root, "inv_supplier_ceo_" + copy, head.SUPPLIER_CEO);
+		        setTextIn($root, "inv_supplier_addr_" + copy, head.SUPPLIER_ADDR);
+		        setTextIn($root, "inv_supplier_sector_dtl_" + copy, head.SUPPLIER_SECTOR_DTL);
+		        setTextIn($root, "inv_supplier_sector_" + copy, head.SUPPLIER_SECTOR);
+		
+		        setTextIn($root, "inv_client_bizno_" + copy, head.CLIENT_BIZNO);
+		        setTextIn($root, "inv_client_tel_" + copy, head.CLIENT_TEL);
+		        setTextIn($root, "inv_client_nm_" + copy, head.CLIENT_NM);
+		        setTextIn($root, "inv_client_ceo_" + copy, head.CLIENT_CEO);
+		        setTextIn($root, "inv_client_addr_" + copy, head.CLIENT_ADDR);
+		        setTextIn($root, "inv_client_sector_dtl_" + copy, head.CLIENT_SECTOR_DTL);
+		        setTextIn($root, "inv_client_sector_" + copy, head.CLIENT_SECTOR);
+		
+		        setTextIn($root, "inv_delivery_nm_" + copy, head.DELIVERY_NM || head.DPTNNM);
+		        setTextIn($root, "inv_delivery_tel_" + copy, head.DELIVERY_TEL || head.TELNO);
+		        setTextIn($root, "inv_delivery_addr_" + copy, head.DELIVERY_ADDR || head.ADDR);
+		        setTextIn($root, "inv_delivery_info_" + copy, head.CARNO || head.DRIVE_INFO);
+		        setTextIn($root, "inv_driver_tel_" + copy, head.DRIVERCEL);
+		
+		        var cbmText = nvl(head.CBM || head.RETURN_PALLET);
+		        if (cbmText !== "" && cbmText.indexOf("CBM:") !== 0) {
+		            cbmText = "CBM:" + cbmText;
+		        }
+		
+		        setTextIn($root, "inv_return_pallet_" + copy, cbmText);
+		        setTextIn($root, "inv_employee_info_" + copy, head.PERNE_INFO || head.EMPLOYEE_INFO);
+		        setTextIn($root, "inv_delivery_memo_" + copy, head.DOCTXT);
+		    }
+		
+		    var totalQty = 0;
+		    var totalWeight = 0;
+		    var totalPrice = 0;
+		    var totalVatPrice = 0;
+		
+		    var totalPack = 0;
+		    var totalBox = 0;
+		    var totalSupplyPrice = 0;
+		    var totalVat = 0;
+		    var totalSumPrice = 0;
+		
+		    var html = "";
+		
+		    function toNum(v) {
+		        if (v == null || v === "") return 0;
+		        return Number(String(v).replace(/,/g, ""));
+		    }
+		
+		    for (var i = 0; i < list.length; i++) {
+		        var row = list[i];
+		
+		        if (isHl) {
+		            var packQty = toNum(getHlQty(row, ["PACK_QTY", "BAG_QTY", "QTY_PACK", "QTY_BAG", "QTY"]));
+		            var boxQty = toNum(getHlQty(row, ["BOX_QTY", "QTY_BOX", "BOX"]));
+		            var supplyPrice = toNum(row.VAT_PRICE || row.SUPPLY_PRICE || row.AMT || row.UNIT_PRICE);
+		            var vat = toNum(row.VAT || row.VAT_AMT);
+		            var sumPrice = toNum(row.TOTAL_PRICE || row.SUM_PRICE);
+		
+		            totalPack += packQty;
+		            totalBox += boxQty;
+		            totalSupplyPrice += supplyPrice;
+		            totalVat += vat;
+		            totalSumPrice += sumPrice;
+		
+		            html += "<tr>";
+		            html += "<td>" + (i + 1) + "</td>";
+		            html += "<td class='hl-item-name'>" + nvl(row.ITEM_NM || row.DESC01) + "</td>";
+		            html += "<td>" + nvl(row.EANCOD || row.BARCODE) + "</td>";
+		            html += "<td class='right'>" + nvl(getHlQty(row, ["PACK_QTY", "BAG_QTY", "QTY_PACK", "QTY_BAG", "QTY"])) + "</td>";
+		            html += "<td class='right'>" + nvl(getHlQty(row, ["BOX_QTY", "QTY_BOX", "BOX"])) + "</td>";
+		            html += "<td class='right'>" + fmtComma(row.UNIT_PRICE) + "</td>";
+		            html += "<td class='right'>" + fmtComma(row.VAT_PRICE || row.SUPPLY_PRICE || row.AMT) + "</td>";
+		
+		            var hlRemarkText = nvl(row.REMARK || row.BIGO);
+		            var hlRemarkText2 = nvl(row.BIGO2);
+		
+		            if (hlRemarkText2 !== "") {
+		                hlRemarkText += "<br>" + hlRemarkText2;
+		            }
+		
+		            html += "<td class='hl-remark'>" + hlRemarkText + "</td>";
+		            html += "</tr>";
+		
+		        } else {
+		            totalQty += toNum(row.QTY);
+		            totalWeight += toNum(row.WEIGHT);
+		            totalPrice += toNum(row.UNIT_PRICE);
+		            totalVatPrice += toNum(row.VAT_PRICE);
+		
+		            html += "<tr>";
+		            html += "<td>" + (i + 1) + "</td>";
+		            html += "<td class='left'>" + nvl(row.ITEM_NM || row.DESC01) + "</td>";
+		            html += "<td>" + nvl(row.BASIS_WEIGHT) + "</td>";
+		            html += "<td>" + nvl(row.ITEM_SPEC) + "</td>";
+		            html += "<td class='right'>" + nvl(row.QTY) + "</td>";
+		            html += "<td class='right'>" + nvl(row.WEIGHT) + "</td>";
+		            html += "<td class='right'>" + fmtComma(row.UNIT_PRICE) + "</td>";
+		            html += "<td class='right'>" + fmtComma(row.VAT_PRICE) + "</td>";
+		
+		            var remarkText = nvl(row.REMARK || row.BIGO);
+		            var remarkText2 = nvl(row.BIGO2);
+		
+		            if (remarkText2 !== "") {
+		                remarkText += "<br>" + remarkText2;
+		            }
+		
+		            html += "<td>" + remarkText + "</td>";
+		            html += "</tr>";
+		        }
+		    }
+		
+		    var maxRowCnt = 16;
+		
+		    for (var r = list.length; r < maxRowCnt; r++) {
+		        if (isHl) {
+		            html += "<tr>";
+		            html += "<td>" + (r + 1) + "</td>";
+		            html += "<td class='hl-item-name'>&nbsp;</td>";
+		            html += "<td>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td>&nbsp;</td>";
+		            html += "</tr>";
+		        } else {
+		            html += "<tr>";
+		            html += "<td>" + (r + 1) + "</td>";
+		            html += "<td class='left'>&nbsp;</td>";
+		            html += "<td>&nbsp;</td>";
+		            html += "<td>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td class='right'>&nbsp;</td>";
+		            html += "<td>&nbsp;</td>";
+		            html += "</tr>";
+		        }
+		    }
+		
+		    for (var copy = 1; copy <= 3; copy++) {
+		        if (isHl) {
+		            $root.find("[id='invoiceHlItemBody_" + copy + "']").html(html);
+		
+		            setTextIn($root, "inv_hl_total_pack_" + copy, fmtComma(head.TOTAL_PACK || totalPack));
+		            setTextIn($root, "inv_hl_total_box_" + copy, fmtComma(head.TOTAL_BOX || totalBox));
+		            setTextIn($root, "inv_hl_total_vat_price_" + copy, fmtComma(head.TOTAL_VAT_PRICE || totalSupplyPrice));
+
+		            setTextIn($root, "inv_hl_supply_price_" + copy, fmtComma(head.TOTAL_SUPPLY_PRICE || totalSupplyPrice));
+		            setTextIn($root, "inv_hl_vat_" + copy, fmtComma(head.TOTAL_VAT || totalVat));
+		            setTextIn($root, "inv_hl_sum_price_" + copy, fmtComma(head.TOTAL_SUM_PRICE || totalSumPrice));
+		        } else {
+		            $root.find("[id='invoiceItemBody_" + copy + "']").html(html);
+		            autoFitInvoiceItemText($root);
+		
+		            setTextIn($root, "inv_total_qty_" + copy, head.TOTAL_QTY || totalQty);
+		            setTextIn($root, "inv_total_weight_" + copy, head.TOTAL_WEIGHT || totalWeight);
+		            setTextIn($root, "inv_total_price_" + copy, head.TOTAL_PRICE || totalPrice);
+		            setTextIn($root, "inv_total_vat_price_" + copy, head.TOTAL_VAT_PRICE || totalVatPrice);
+		        }
+		    }
+		   //ps 출고지시서 공급자로 보이도록
+		    if (printType === "CLIENT_ONLY") {
+		        $root.addClass("invoice-client-only");
+		        $root.find(".invoice-copy").hide();
+		        $root.find(".invoice-copy[data-copy-type='SUPPLIER']").show();
+		    }
+		}
+
+		
+		function fmtComma(v) {
+		    if (v == null || v === "") return "";
+
+		    var num = Number(String(v).replace(/,/g, ""));
+
+		    if (isNaN(num)) {
+		        return v;
+		    }
+
+		    return num.toLocaleString();
+		}
+		
+		function bindLiner($root, head, itemList) {
+		    if (!head) return;
+
+		    setTextIn($root, "liner_prtdat", head.PRTDAT);
+		    setTextIn($root, "liner_stknum", head.STKNUMNM || head.STKNUM);
+		    setLinerBarcodeIn($root, "liner_barcode", head.STKNUM);
+		    setTextIn($root, "liner_barcode_text", head.STKNUM);
+		    setTextIn($root, "liner_tdlnr", head.TDLNR);
+		    setTextIn($root, "liner_carno", head.CARNO);
+		    setTextIn($root, "liner_carton", head.CARTON);
+		    setTextIn($root, "liner_loadton", Number(head.LOADTON || 0) === 0 ? "" : head.LOADTON);
+		    setTextIn($root, "liner_carart", head.CARART);
+		    setTextIn($root, "liner_loadvolume", Number(head.LOADVOLUME || 0) === 0 ? "" : head.LOADVOLUME);
+		    setTextIn($root, "liner_drivercel", head.DRIVERCEL);
+		    setTextIn($root, "liner_disptime", nvl(head.DTDIS) + " " + nvl(head.UZDIS));
+
+		    setTextIn($root, "liner_dptnnm", head.DPTNNM);
+		    setTextIn($root, "liner_telno", head.TELNO);
+		    setTextIn($root, "liner_rqarrd", head.RQARRD);
+		    setTextIn($root, "liner_addr", head.ADDR);
+		    setTextIn($root, "liner_doctxt", head.DOCTXT);
+		    setTextIn($root, "liner_tdobject", head.TDOBJECT);
+		    setTextIn($root, "liner_svbeln", head.BARSVBELN || head.SVBELN);
+		    setTextIn($root, "liner_voyage_no", "");
+
+		    var html = "";
+
+		    itemList = itemList || [];
+
+		    for (var i = 0; i < itemList.length; i++) {
+		        var row = itemList[i];
+
+		        html += "<tr>";
+		        html += "<td>" + (i + 1) + "</td>";
+		        html += "<td class='left'>" + nvl(row.SKUKEY) + "</td>";
+		        html += "<td class='left'>" + nvl(row.DESC01) + "</td>";
+		        html += "<td>" + nvl(row.ASKL03 || row.LOTA09) + "</td>";
+		        html += "<td>" + nvl(row.ASKL04) + "</td>";
+		        html += "<td class='right'>" + nvl(row.KG_QTY || row.QTSIWH) + "</td>";
+		        html += "<td>" + nvl(row.UOMKEY) + "</td>";
+		        html += "<td>" + nvl(row.LOTA14) + "</td>";
+		        html += "<td class='right'>" + nvl(row.ROLL_LENGTH) + "</td>";
+		        html += "<td class='left'>" + nvl(row.DOCTXT) + "</td>";
+		        html += "</tr>";
+		    }
+
+		    $root.find("[id='linerItemBody']").html(html);
+		
+		}
+		function bindTransfer($root, list) {
+		    if (!list || list.length === 0) return;
+
+		    var head = list[0];
+
+		    for (var copy = 1; copy <= 3; copy++) {
+		    	setTextIn($root, "trn_delivery_date_" + copy, String(head.RQSHPD || "").replace("납품일자 :", "").trim());
+		    	setTextIn($root, "trn_print_date_" + copy, String(head.PRTDAT || "").replace("출력일자 :", "").trim());
+		    	setTextIn($root, "trn_stknum_" + copy, head.STKNUMNM || head.STKNUM);
+		        setTransferBarcodeIn($root, "trn_barcode_" + copy, head.STKNUM);
+		        setTextIn($root, "trn_barcode_text_" + copy, head.STKNUM);
+		        setTextIn($root, "trn_from_nm_" + copy, head.VDDPTNNM);
+		        setTextIn($root, "trn_from_addr_" + copy, head.VDADDR);
+		        setTextIn($root, "trn_from_tel_" + copy, head.VDTELN);
+		        setTextIn($root, "trn_from_fax_" + copy, head.VDFAXT);
+
+		        setTextIn($root, "trn_to_nm_" + copy, head.CTDPTNNM);
+		        setTextIn($root, "trn_to_addr_" + copy, head.CTADDR);
+		        setTextIn($root, "trn_to_tel_" + copy, head.CTTELN);
+		        setTextIn($root, "trn_to_fax_" + copy, head.CTFAXT);
+
+		        setTextIn($root, "trn_doctxt_" + copy, head.DOCTXT);
+		        setTextIn($root, "trn_carno_" + copy, head.CARNO);
+		        setTextIn($root, "trn_carton_" + copy, head.CARTON);
+		        setTextIn($root, "trn_drivercel_" + copy, head.DRIVERCEL);
+		    }
+
+		    var html = "";
+		    var totalQty = 0;
+
+		    for (var i = 0; i < list.length; i++) {
+		        var row = list[i];
+		        var qty = Number(String(row.QTTAOR || "0").replace(/,/g, ""));
+		        totalQty += qty;
+
+		        html += "<tr>";
+		        html += "<td>" + (i + 1) + "</td>";
+		        html += "<td class='left'>" + nvl(row.SKUKEY) + "</td>";
+		        html += "<td class='left'>" + nvl(row.DESC01) + "</td>";
+		        html += "<td>" + nvl(row.ASKL04) + "</td>";
+		        var qty = Number(String(row.QTTAOR || "0").replace(/,/g,""));
+
+		        html += "<td class='right'>"
+		              + qty.toLocaleString(undefined,{
+		                    minimumFractionDigits:3,
+		                    maximumFractionDigits:3
+		                })
+		              + "</td>";
+		        html += "<td>" + nvl(row.UOMKEY) + "</td>";
+		        html += "<td>" + nvl(row.EANCOD) + "</td>";
+		        html += "</tr>";
+		    }
+
+		    for (var copy = 1; copy <= 3; copy++) {
+		        $root.find("[id='transferItemBody_" + copy + "']").html(html);
+		        setTextIn(
+		        	    $root,
+		        	    "trn_total_qty_" + copy,
+		        	    totalQty.toLocaleString(undefined,{
+		        	        minimumFractionDigits:3,
+		        	        maximumFractionDigits:3
+		        	    })
+		        	);
+		    }
+		}
+		
+		/* function groupInvoiceByDptnky(list) {
+		    var groupMap = {};
+		    var groupedList = [];
+		    var i, row, key;
+
+		    for (i = 0; i < list.length; i++) {
+		        row = list[i];
+		        key = nvl(row.DPTNKY);
+
+		        if (key === "") {
+		            key = "NO_DPTNKY";
+		        }
+
+		        if (!groupMap[key]) {
+		            groupMap[key] = [];
+		            groupedList.push(groupMap[key]);
+		        }
+
+		        groupMap[key].push(row);
+		    }
+
+		    return groupedList;
+		} */
+		function groupInvoiceByDptnky(list) {
+		    var groupMap = {};
+		    var groupedList = [];
+		    var i, row, key;
+
+		    for (i = 0; i < list.length; i++) {
+		        row = list[i];
+
+		        key = nvl(row.DPTNKY) + "|" + nvl(row.PTRCVR);
+
+		        if (key === "|") {
+		            key = "NO_DPTNKY";
+		        }
+
+		        if (!groupMap[key]) {
+		            groupMap[key] = [];
+		            groupedList.push(groupMap[key]);
+		        }
+
+		        groupMap[key].push(row);
+		    }
+
+		    return groupedList;
+		}
+		function fillSlip($slip, row) {
+			$slip.find(".logo img").attr("src", getLogoSrc(row));
+
+			setBarcode($slip.find(".barcode_header"), nvl(row.STKNUM
+					|| row.CHIT_NUM || row.IF_KEY), 35);
+			setBarcode($slip.find(".barcode_footer"), nvl(row.CAR_NUM
+					|| row.STKNUM || row.CHIT_NUM), 30);
+
+			$slip.find(".sendDate").text(nvl(formatDate(row.MOVE_DATE))); // 발송일 (출하요청일) 동일하게 적용 (기존: row.SEND_DAT)
+			$slip.find(".reciveDate").text(nvl(formatDate(row.MOVE_DATE))); // 도착일 (출하요청일) 동일하게 적용
+
+			$slip.find(".companyFrom").text(nvl(row.CST_SND_CST_NAM));
+			$slip.find(".nameFrom").text(nvl(row.REG_USR));
+			$slip.find(".phoneFrom").text(nvl(row.CST_SND_CST_TEL));
+
+			$slip.find(".companyTo").text(nvl(row.CST_ORD_CST_NAM));
+			$slip.find(".nameTo").text(nvl(row.DRIVER_NAM));
+			$slip.find(".phoneTo").text(nvl(row.DRIVER_TEL));
+
+			$slip.find(".company").text('롯데글로벌로지스');
+			$slip.find(".carNo").text(nvl(row.CAR_NUM));
+			$slip.find(".name").text(nvl(row.DRIVER_NAM));
+			$slip.find(".phone").text(nvl(row.DRIVER_TEL));
+
+			fillTypeQty($slip, row);
+
+			var itemNames = [];
+
+			if (row.ITEM_LIST && row.ITEM_LIST.length > 0) {
+				for (var i = 0; i < row.ITEM_LIST.length && i < 4; i++) {
+					itemNames.push(nvl(row.ITEM_LIST[i].ITEM));
+				}
+			} else {
+				itemNames.push(nvl(row.PRD_COD));
+			}
+
+			$slip.find(".itemName").text(itemNames.join(" / "));
+			$slip.find(".remark").text(nvl(row.ETC_DESC));
+		}
+		
+		function bindInvoiceBarcode(stknum) {
+		    if (!stknum) return;
+
+		    $("#inv_stknum_1").text(stknum);
+		    $("#inv_stknum_2").text(stknum);
+		    $("#inv_stknum_3").text(stknum);
+
+		    setOutOrderBarcode($("#inv_barcode_1"), stknum);
+		    setOutOrderBarcode($("#inv_barcode_2"), stknum);
+		    setOutOrderBarcode($("#inv_barcode_3"), stknum);
+		}
+		function getTransferBodyHtml(suffix) {
+		    return ''
+		    + '<table>'
+		    + '<colgroup>'
+		    + '<col width="4%"><col width="7%"><col width="18%"><col width="7%"><col width="14%">'
+		    + '<col width="4%"><col width="7%"><col width="18%"><col width="7%"><col width="14%">'
+		    + '</colgroup>'
+		    + '<tr>'
+		    + '<th rowspan="3" class="vertical">인도처</th>'
+		    + '<th>상호</th><td id="trn_from_nm_' + suffix + '" class="left"></td><th>센터장</th><td></td>'
+		    + '<th rowspan="3" class="vertical">인수처</th>'
+		    + '<th>상호</th><td id="trn_to_nm_' + suffix + '" class="left"></td><th>센터장</th><td></td>'
+		    + '</tr>'
+		    + '<tr>'
+		    + '<th>주소</th><td colspan="3" id="trn_from_addr_' + suffix + '" class="left"></td>'
+		    + '<th>주소</th><td colspan="3" id="trn_to_addr_' + suffix + '" class="left"></td>'
+		    + '</tr>'
+		    + '<tr>'
+		    + '<th>전화번호</th><td id="trn_from_tel_' + suffix + '"></td><th>FAX번호</th><td id="trn_from_fax_' + suffix + '"></td>'
+		    + '<th>전화번호</th><td id="trn_to_tel_' + suffix + '"></td><th>FAX번호</th><td id="trn_to_fax_' + suffix + '"></td>'
+		    + '</tr>'
+		    + '</table>'
+
+		    + '<table style="margin-top:6px;">'
+		    + '<colgroup><col width="4%"><col width="9%"><col width="5%"><col width="10%"><col width="16%"><col width="11%"><col width="13%"><col width="30%"></colgroup>'
+		    + '<tr>'
+		    + '<th rowspan="2" class="vertical trn-delivery-title">납품<br>정보</th>'
+		    + '<th>배송비고</th><td colspan="6" id="trn_doctxt_' + suffix + '" class="left"></td>'
+		    + '</tr>'
+		    + '<tr>'
+		    + '<th>운송정보</th><td class="left">차량ID</td><td id="trn_carno_' + suffix + '"></td>'
+		    + '<td class="left">차량톤수</td><td id="trn_carton_' + suffix + '"></td>'
+		    + '<td class="left">기사연락처</td><td id="trn_drivercel_' + suffix + '"></td>'
+		    + '</tr>'
+		    + '</table>'
+
+		    + '<table class="item-table" style="margin-top:12px;">'
+		    + '<colgroup>'
+		    + '<col width="4%"><col width="19%"><col><col width="11%"><col width="9%"><col width="7%"><col width="12%">'
+		    + '</colgroup>'
+		    + '<thead>'
+		    + '<tr><th>No</th><th>제품코드</th><th>제품명</th><th>규격</th><th>수량</th><th>단위</th><th>비고</th></tr>'
+		    + '</thead>'
+		    + '<tbody id="transferItemBody_' + suffix + '"></tbody>'
+		    + '<tfoot>'
+		    + '<tr><td>합계</td><td></td><td></td><td></td><td id="trn_total_qty_' + suffix + '" class="right"></td><td></td><td></td></tr>'
+		    + '</tfoot>'
+		    + '</table>';
+		}
+		
+		function setInvoiceBarcode($target, text) {
+		    $target.empty();
+
+		    if (!text) return;
+
+		    $target.barcode(String(text), "code128", {
+		        barWidth : 0.8,
+		        barHeight : 35,
+		        showHRI : true
+		    });
+		}
+		
+		function bindTransferBarcode(stknum) {
+		    if (!stknum) return;
+
+		    $("#trn_stknum_1").text(stknum);
+		    $("#trn_stknum_2").text(stknum);
+		    $("#trn_stknum_3").text(stknum);
+
+		    setInvoiceBarcode($("#trn_barcode_1"), stknum);
+		    setInvoiceBarcode($("#trn_barcode_2"), stknum);
+		    setInvoiceBarcode($("#trn_barcode_3"), stknum);
+		}
+		
+		function setTextIn($root, id, value) {
+		    $root.find("[id='" + id + "']").text(nvl(value));
+		}
+		
+		/* 원지 바코드 */
+		function setLinerBarcodeIn($root, id, value) {
+		    var $target = $root.find("[id='" + id + "']");
+		    $target.empty();
+
+		    if (!value) {
+		        return;
+		    }
+
+		    $target.barcode(String(value), "code128", {
+		        barWidth : 2.2,
+		        barHeight : 42,
+		        showHRI : false
+		    });
+		}
+		
+		function setTransferBarcodeIn($root, id, value) {
+		    var $target = $root.find("[id='" + id + "']");
+		    $target.empty();
+
+		    if (!value) {
+		        return;
+		    }
+
+		    $target.barcode(String(value), "code128", {
+		        barWidth : 2.2,
+		        barHeight : 42,
+		        showHRI : false
+		    });
+		}
+		
+		function setBarcodeIn($root, id, value) {
+		    setOutOrderBarcode($root.find("[id='" + id + "']"), nvl(value));
+		}
+
+		function bindOutOrderHl($root, list) {
+		    if (!list || list.length === 0) {
+		        return;
+		    }
+
+		    var head = list[0];
+
+		    setTextIn($root, "out_stknum_top", head.STKNUM);
+		    setBarcodeIn($root, "out_barcode", head.STKNUM);
+
+		    setTextIn($root, "out_sdabw", head.SAP1);
+		    setTextIn($root, "out_stknum", head.STKNUM);
+		    setTextIn($root, "out_prtdat", head.PRTDAT);
+		    setTextIn($root, "out_rqarrd", head.RQARRD);
+		    setTextIn($root, "out_rqshpd", head.RQSHPD);
+		    setTextIn($root, "out_svbeln", head.BARSVBELN);
+		    setTextIn($root, "out_ptrcnm", head.PTRCNM);
+		    setTextIn($root, "out_doctxt", head.DOCTXT);
+		    //console.log("DOCTXT =", head.DOCTXT); /* 확인 */
+		    setTextIn($root, "out_tdlnr", head.TDLNR_NM || head.TDLNR);
+		    setTextIn($root, "out_carno", head.CARNO);
+		    setTextIn($root, "out_carton", head.CARTON);
+		   /*  setTextIn($root, "out_loadton", Number(head.LOADTON || 0) === 0 ? "" : head.LOADTON); */
+		    setTextIn($root, "out_carart", head.CARART);
+		    setTextIn($root, "out_loadvolume", head.LOADVOLUME);
+		    setTextIn($root, "out_drivercel", head.DRIVERCEL);
+		    setTextIn($root, "out_disptime", nvl(head.DTDIS) + " " + nvl(head.UZDIS));
+		    setTextIn($root, "out_dptnnm", head.DPTNNM);
+		    setTextIn($root, "out_telno", head.TELNO);
+		    setTextIn($root, "out_addr", head.ADDR);
+
+		    var html = "";
+		    var totalBox = 0;
+		    var totalPlt = 0;
+		    var totalNotBox = 0;
+
+		    function toNumber(value) {
+		        if (value == null || value === "") {
+		            return 0;
+		        }
+
+		        return Number(String(value).replace(/,/g, "")) || 0;
+		    }
+
+		    for (var i = 0; i < list.length; i++) {
+		        var row = list[i];
+
+		        var boxQty = toNumber(row.BOX_QTY);
+		        var pltQty = toNumber(row.PLT_QTY);
+		        var notBox = toNumber(row.NOT_BOX);
+
+		        totalBox += boxQty;
+		        totalPlt += pltQty;
+		        totalNotBox += notBox;
+
+		        html += "<tr>";
+		        html += "<td>" + nvl(row.RN) + "</td>";
+		        html += "<td class='left'><b>" + nvl(row.SKUKEY)
+		              + "</b><br>" + nvl(row.EANCOD) + "</td>";
+		        html += "<td class='item-name'>" + nvl(row.DESC01) + "</td>";
+		        html += "<td class='right'>" + nvl(row.BOX_QTY) + "</td>";
+		        html += "<td>" + nvl(row.EA_BAG) + "</td>";
+		        html += "<td>" + nvl(row.BAG_BOX) + "</td>";
+		        html += "<td>" + nvl(row.BOX_PAL) + "</td>";
+		        html += "<td>" + nvl(row.ASHORTX) + "</td>";
+		        html += "<td>" + nvl(row.LOCAKY) + "</td>";
+		        html += "<td class='right'>" + nvl(row.BOX_QTY) + "</td>";
+		        html += "<td class='right'>" + nvl(row.PLT_QTY) + "</td>";
+		        html += "<td class='right'>" + (notBox === 0 ? "0" : notBox) + "</td>";
+		        html += "<td></td>";
+		        html += "</tr>";
+		    }
+
+		    html += "<tr>";
+		    html += "<td>" + (list.length + 1) + "</td>";
+		    html += "<td class='left'><b>합계</b></td>";
+		    html += "<td></td>";
+		    html += "<td class='right'>" + totalBox.toLocaleString("ko-KR") + "</td>";
+		    html += "<td></td><td></td><td></td>";
+		    html += "<td></td><td></td>";
+		    html += "<td class='right'>" + totalBox.toLocaleString("ko-KR") + "</td>";
+		    html += "<td class='right'>" + ceil2(totalPlt).toFixed(2) + "</td>";
+		    html += "<td class='right'>" + totalNotBox + "</td>";
+		    html += "<td></td>";
+		    html += "</tr>";
+
+		    $root.find("[id='outOrderHlBody']").html(html);
+		}
+		
+		function createSheet(row) {
+			var $sheet = $("#moveSheetTemplate").clone();
+
+			$sheet.removeAttr("id");
+			$sheet.removeClass("template-sheet");
+			$sheet.addClass("moveSheet");
+
+			$sheet.find(".slip").each(function() {
+				fillSlip($(this), row);
+			});
+
+			return $sheet;
+		}
+
+		$(document)
+				.ready(
+						function() {
+							var stknums = getStknumListFromUrl();
+							var allRows = [];
+							var $wrap = $("#kiosk_moveSheet_wrap");
+							var i;
+
+							if (!stknums || stknums.length === 0) {
+								commonUtil.msgBox("출력할 문서가 없습니다.", null, null,
+										function() {
+											self.close();
+										});
+								return;
+							}
+							
+							if (isInvoiceClientOnlyPrint()) {
+
+							    $("#kiosk_moveSheet_wrap").hide();
+
+							    $("#outOrderHlPageBreak").hide();
+							    $("#outOrderHlArea").hide();
+
+							    $("#linerPageBreak").hide();
+							    $("#linerArea").hide();
+
+							    $("#transferPageBreak").hide();
+							    $("#transferArea").hide();
+
+							    $("#invoiceArea").empty();
+
+							    for (i = 0; i < stknums.length; i++) {
+							        var invJson = fetchInvoiceData(stknums[i]);
+
+							        if (invJson && invJson.data && invJson.data.length > 0) {
+							            var invoiceGroups = groupInvoiceByDptnky(invJson.data);
+
+							            for (var g = 0; g < invoiceGroups.length; g++) {
+							                var $invoice = $("#invoiceTemplate").clone();
+
+							                $invoice.removeAttr("id");
+							                $invoice.removeClass("template-sheet");
+							                $invoice.show();
+
+							                bindInvoice($invoice, invoiceGroups[g], "CLIENT_ONLY");
+
+							                $("#invoiceArea").append($invoice);
+							            }
+							        }
+							    } 
+							    if ($("#invoiceArea").children().length > 0) {
+							        $("#invoicePageBreak").hide();
+							        $("#invoiceArea").show();
+							    } else {
+							        commonUtil.msgBox("출력할 거래명세서가 없습니다.", null, null, function() {
+							            self.close();
+							        });
+							    }
+
+							    return;
+							}
+
+							/* bindInvoiceBarcode(stknums[0]); */
+							/* $("#transferBody_1").html(getTransferBodyHtml("1"));
+							$("#transferBody_2").html(getTransferBodyHtml("2"));
+							$("#transferBody_3").html(getTransferBodyHtml("3")); */
+
+							/* bindTransferBarcode(stknums[0]); */
+							allRows = getAllRows(stknums);
+
+
+							var outList = [];
+
+							if (isHlUnloadedPrint()) {
+
+								$("#outOrderHlArea").empty();
+
+								for (i = 0; i < stknums.length; i++) {
+								    var outJson = fetchOutOrderHlData(stknums[i]);
+
+								    if (outJson && outJson.data && outJson.data.length > 0) {
+								        outList = outList.concat(outJson.data);
+
+								        var $page = $("#outOrderHlTemplate").clone();
+
+								        $page.removeAttr("id");
+								        $page.removeClass("template-sheet");
+								        $page.show();
+
+								        bindOutOrderHl($page, outJson.data);
+
+								        $("#outOrderHlArea").append($page);
+								    }
+								}
+
+								if (outList.length > 0) {
+								    $("#kiosk_moveSheet_wrap").hide();
+
+								    $("#invoicePageBreak").hide();
+								    $("#invoiceArea").hide();
+
+								    $("#linerPageBreak").hide();
+								    $("#linerArea").hide();
+
+								    $("#transferPageBreak").hide();
+								    $("#transferArea").hide();
+
+								    $("#outOrderHlPageBreak").hide();
+								    $("#outOrderHlArea").show();
+
+								    return;
+								}else {
+								    commonUtil.msgBox("출력할 출고지시서가 없습니다.", null, null,
+								            function() {
+								                self.close();
+								            });
+								    return;
+								}
+
+								} else {
+								    $("#outOrderHlPageBreak").hide();
+								    $("#outOrderHlArea").hide();
+								}
+							
+						
+							
+							if (!allRows || allRows.length === 0) {
+							    if (getUrlParam("MOVE_YN") === "Y"
+							        && getUrlParam("INVOICE_YN") !== "Y"
+							        && getUrlParam("LINER_YN") !== "Y"
+							        && getUrlParam("TRANSFER_YN") !== "Y") {
+
+							        commonUtil.msgBox("출력할 문서가 없습니다.", null, null, function() {
+							            self.close();
+							        });
+							        return;
+							    }
+							}
+							$("#invoiceArea").empty();
+
+							for (i = 0; i < stknums.length; i++) {
+							    var invJson = fetchInvoiceData(stknums[i]);
+
+							    if (invJson && invJson.data && invJson.data.length > 0) {
+							        var invoiceGroups = groupInvoiceByDptnky(invJson.data);
+
+							        for (var g = 0; g < invoiceGroups.length; g++) {
+							            var $invoice = $("#invoiceTemplate").clone();
+
+							            $invoice.removeAttr("id");
+							            $invoice.removeClass("template-sheet");
+							            $invoice.show();
+
+							            bindInvoice($invoice, invoiceGroups[g]);
+							            $invoice.append($invoice.find(".invoice-copy[data-copy-type='RECEIPT']"));
+							            $invoice.append($invoice.find(".invoice-copy[data-copy-type='CLIENT']"));
+							            $invoice.append($invoice.find(".invoice-copy[data-copy-type='SUPPLIER']"));
+							            $("#invoiceArea").append($invoice);
+							        }
+							    }
+							} 
+							if ($("#invoiceArea").children().length > 0) {
+							    $("#invoicePageBreak").show();
+							    $("#invoiceArea").show();
+							} else {
+							    $("#invoicePageBreak").hide();
+							    $("#invoiceArea").hide();
+							}
+							
+							$("#linerArea").empty();
+
+							if (getUrlParam("LINER_YN") === "Y") {
+							    for (i = 0; i < stknums.length; i++) {
+							        var linerHeadJson = fetchLinerHeadData(stknums[i]);
+
+							        if (linerHeadJson && linerHeadJson.data && linerHeadJson.data.length > 0) {
+							        	for (var h = 0; h < linerHeadJson.data.length && h < 1; h++) {
+							                var head = linerHeadJson.data[h];
+
+							                var linerItemJson = fetchLinerItemData(stknums[i], head.DPTNKY);
+							                var itemList = [];
+
+							                if (linerItemJson && linerItemJson.data && linerItemJson.data.length > 0) {
+							                    itemList = linerItemJson.data;
+							                }
+
+							                var $liner = $("#linerTemplate").clone();
+
+							                $liner.removeAttr("id");
+							                $liner.removeClass("template-sheet");
+							                $liner.show();
+
+							                bindLiner($liner, head, itemList);
+
+							                $("#linerArea").append($liner);
+							            }
+							        }
+							    }
+							}
+
+							if ($("#linerArea").children().length > 0) {
+								$("#linerPageBreak").hide();
+
+								if ($("#kiosk_moveSheet_wrap").is(":visible") || $("#invoiceArea").is(":visible")) {
+								    $("#linerArea").addClass("force-page-break");
+								}
+
+								$("#linerArea").show();
+							} else {
+							    $("#linerPageBreak").hide();
+							    $("#linerArea").hide();
+							}
+							
+							
+							/* 이송명세서 */
+							$("#transferArea").empty();
+							$("#transferArea").hide();
+							
+							if (getUrlParam("TRANSFER_YN") === "Y") {
+							    for (i = 0; i < stknums.length; i++) {
+							        var trnJson = fetchTransferData(stknums[i]);
+							
+							        if (trnJson && trnJson.data && trnJson.data.length > 0) {
+							            var $transfer = $("#transferTemplate").clone();
+							
+							            $transfer.removeAttr("id");
+							            $transfer.removeClass("template-sheet");
+							            $transfer.show();
+							
+							            $transfer.find("#transferBody_1").html(getTransferBodyHtml("1"));
+							            $transfer.find("#transferBody_2").html(getTransferBodyHtml("2"));
+							            $transfer.find("#transferBody_3").html(getTransferBodyHtml("3"));
+							
+							            bindTransfer($transfer, trnJson.data);
+							
+							            $transfer.append($transfer.find(".transfer-copy[data-copy-type='RECEIPT']"));
+							            $transfer.append($transfer.find(".transfer-copy[data-copy-type='CLIENT']"));
+							            $transfer.append($transfer.find(".transfer-copy[data-copy-type='SUPPLIER']"));
+							
+							            $("#transferArea").append($transfer);
+
+							         	// 출고처리 대상 (강내, 중부, 태성리, 연정리)
+							         	// console.dir(trnJson.data[0])
+							         	/*
+							            if ( $.inArray(trnJson.data[0].PTNRKY, ["P1200", "P6100", "P6200", "P6300"]) > -1 && trnJson.data[0].TLOTA02 == "P200" && $.inArray(trnJson.data[0].TLOTA01, ["3500", "6001", "6002", "6003"]) > -1) {
+							            	sendEcmsList.push(stknums[i])
+							    		}
+							         	*/
+							         	
+							         	// 출고처리 대상 (강내, 중부, 태성리, 연정리)
+							         	// CMCDV.CMCDKY = 'PDA_AUTO_GI' 
+							         	if (trnJson.data[0].AUTO_GI == "Y") {
+							            	sendEcmsList.push(stknums[i])
+							         	}
+							        }
+							    }
+							}
+							
+							if ($("#transferArea").children().length > 0) {
+							    $("#transferPageBreak").hide();
+							
+							    if ($("#kiosk_moveSheet_wrap").is(":visible") || $("#invoiceArea").is(":visible") || $("#linerArea").is(":visible")) {
+							        $("#transferArea").addClass("force-page-break");
+							    }
+							
+							    $("#transferArea").show();
+							} else {
+							    $("#transferPageBreak").hide();
+							    $("#transferArea").hide();
+							}
+
+							
+							if (allRows && allRows.length > 0) {
+
+							    $wrap.empty();
+							    $wrap.show();
+
+							    var groupMap = {};
+							    var groupedRows = [];
+
+							for (i = 0; i < allRows.length; i++) {
+								var row = allRows[i];
+
+								var key = [ nvl(row.CST_ORD_CST_NAM), // 납품처명
+								nvl(row.CAR_NUM), // 차량번호
+								nvl(row.MOVE_DATE), // 출하요청일
+								nvl(row.IF_VNDR_CD) // AJ/KPP 구분
+								].join("|");
+
+								if (!groupMap[key]) {
+									groupMap[key] = $.extend({}, row);
+									groupMap[key].ITEM_LIST = [];
+									groupedRows.push(groupMap[key]);
+								}
+								var vndrCd = nvl(row.IF_VNDR_CD).trim().toUpperCase();
+								var itemCd = nvl(row.ITEM).trim();
+								
+								groupMap[key].ITEM_LIST.push({
+								    ITEM : (vndrCd == "AJ" && itemCd == "B0111001") ? "11A" : itemCd,
+								    DLV_QTY : row.DLV_QTY
+								});
+							}
+							for (i = 0; i < groupedRows.length; i++) {
+								$wrap.append(createSheet(groupedRows[i]));
+							}
+						  }
+						});
+	   
+					
+
+	})();
+</script>
+
+<div class="print-action-bar">
+	<button type="button" id="btnPrint" class="btn-print"
+		onclick="printMoveSlip()">출력</button>
+</div>
+
+<div id="kiosk_moveSheet_wrap" class="print-landscape" style="display:none;"></div>
+
+<!-- 템플릿 -->
+<div class="sheet template-sheet" id="moveSheetTemplate">
+
+	<!-- =========================
+         발송처용
+    ========================== -->
+	<div class="slip">
+		<table class="slip-table">
+			<tr>
+				<td colspan="6" class="header">
+					<div class="logo">
+						<img src="">
+					</div>
+					<div class="barcode_header">BARCODE</div>
+					<div class="title">
+						파렛트 이동전표<br>(발송처용)
+					</div>
+				</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">발송일</th>
+				<td colspan="4" class="sendDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">발송지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyFrom x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameFrom"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneFrom"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">도착일</th>
+				<td colspan="4" class="reciveDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">도착지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyTo x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameTo"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneTo"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="5">운송회사</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="company"></td>
+			</tr>
+			<tr>
+				<th>차량번호</th>
+				<td colspan="4" class="carNo"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="4" class="name"></td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="3" class="phone"></td>
+				<td>(인)</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">품목</th>
+				<td colspan="4" class="itemName"></td>
+			</tr>
+			<tr>
+				<th colspan="2">비고</th>
+				<td colspan="4" class="remark x2H"></td>
+			</tr>
+
+			<tr>
+				<td colspan="6" class="footer">
+					<div>http://edi.ajups.com | 1600-5599(대표)</div>
+					<div>(02)6363-9883, (02)6363-9887</div>
+					<div class="barcode_footer">BARCODE</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- =========================
+         파렛트회사용
+    ========================== -->
+	<div class="slip">
+		<table class="slip-table">
+			<tr>
+				<td colspan="6" class="header">
+					<div class="logo">
+						<img src="">
+					</div>
+					<div class="barcode_header">BARCODE</div>
+					<div class="title">
+						파렛트 이동전표<br>(파렛트회사용)
+					</div>
+				</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">발송일</th>
+				<td colspan="4" class="sendDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">발송지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyFrom x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameFrom"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneFrom"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">도착일</th>
+				<td colspan="4" class="reciveDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">도착지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyTo x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameTo"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneTo"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="5">운송회사</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="company"></td>
+			</tr>
+			<tr>
+				<th>차량번호</th>
+				<td colspan="4" class="carNo"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="4" class="name"></td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="3" class="phone"></td>
+				<td>(인)</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">품목</th>
+				<td colspan="4" class="itemName"></td>
+			</tr>
+			<tr>
+				<th colspan="2">비고</th>
+				<td colspan="4" class="remark x2H"></td>
+			</tr>
+
+			<tr>
+				<td colspan="6" class="footer">
+					<div>http://edi.ajups.com | 1600-5599(대표)</div>
+					<div>(02)6363-9883, (02)6363-9887</div>
+					<div class="barcode_footer">BARCODE</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- =========================
+         운송회사용
+    ========================== -->
+	<div class="slip">
+		<table class="slip-table">
+			<tr>
+				<td colspan="6" class="header">
+					<div class="logo">
+						<img src="">
+					</div>
+					<div class="barcode_header">BARCODE</div>
+					<div class="title">
+						파렛트 이동전표<br>(운송회사용)
+					</div>
+				</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">발송일</th>
+				<td colspan="4" class="sendDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">발송지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyFrom x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameFrom"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneFrom"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">도착일</th>
+				<td colspan="4" class="reciveDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">도착지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyTo x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameTo"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneTo"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="5">운송회사</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="company"></td>
+			</tr>
+			<tr>
+				<th>차량번호</th>
+				<td colspan="4" class="carNo"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="4" class="name"></td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="3" class="phone"></td>
+				<td>(인)</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">품목</th>
+				<td colspan="4" class="itemName"></td>
+			</tr>
+			<tr>
+				<th colspan="2">비고</th>
+				<td colspan="4" class="remark x2H"></td>
+			</tr>
+
+			<tr>
+				<td colspan="6" class="footer">
+					<div>http://edi.ajups.com | 1600-5599(대표)</div>
+					<div>(02)6363-9883, (02)6363-9887</div>
+					<div class="barcode_footer">BARCODE</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<!-- =========================
+         도착지용
+    ========================== -->
+	<div class="slip">
+		<table class="slip-table">
+			<tr>
+				<td colspan="6" class="header">
+					<div class="logo">
+						<img src="">
+					</div>
+					<div class="barcode_header">BARCODE</div>
+					<div class="title">
+						파렛트 이동전표<br>(도착지용)
+					</div>
+				</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">발송일</th>
+				<td colspan="4" class="sendDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">발송지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyFrom x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameFrom"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneFrom"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">도착일</th>
+				<td colspan="4" class="reciveDate"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="4">도착지</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="companyTo x2H"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="3" class="nameTo"></td>
+				<td>(인)</td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="4" class="phoneTo"></td>
+			</tr>
+
+			<tr class="section-title">
+				<td rowspan="5">운송회사</td>
+			</tr>
+			<tr>
+				<th>회사명</th>
+				<td colspan="4" class="company"></td>
+			</tr>
+			<tr>
+				<th>차량번호</th>
+				<td colspan="4" class="carNo"></td>
+			</tr>
+			<tr>
+				<th>담당자</th>
+				<td colspan="4" class="name"></td>
+			</tr>
+			<tr>
+				<th>연락처</th>
+				<td colspan="3" class="phone"></td>
+				<td>(인)</td>
+			</tr>
+
+			<tr>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+				<th colspan="2">유형</th>
+				<th>수량</th>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+			<tr>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+				<td colspan="2" class="pltType"></td>
+				<td class="pltQty"></td>
+			</tr>
+
+			<tr>
+				<th colspan="2">품목</th>
+				<td colspan="4" class="itemName"></td>
+			</tr>
+			<tr>
+				<th colspan="2">비고</th>
+				<td colspan="4" class="remark x2H"></td>
+			</tr>
+
+			<tr>
+				<td colspan="6" class="footer">
+					<div>http://edi.ajups.com | 1600-5599(대표)</div>
+					<div>(02)6363-9883, (02)6363-9887</div>
+					<div class="barcode_footer">BARCODE</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+</div>
+<!-- 
+<div style="page-break-before: always; break-before: page;"></div> -->
+<div id="outOrderHlPageBreak" style="page-break-before: always; break-before: page;"></div>
+<style>
+.out-order-paper {
+    width: 100%;
+    font-family: "Malgun Gothic", Arial, sans-serif;
+    font-size: 12px;
+    color: #000;
+    box-sizing: border-box;
+
+    page-break-after: always;
+    break-after: page;
+}
+
+.out-order-paper:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+
+.out-order-paper table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.out-order-paper th,
+.out-order-paper td {
+    border: 1px solid #000;
+    padding: 3px;
+    height: 28px;
+    text-align: center;
+    vertical-align: middle;
+    word-break: break-all;
+}
+
+.out-order-paper th {
+    font-weight: bold;
+    background: #f5f5f5;
+}
+
+.out-order-paper .top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.out-order-paper .safety-box {
+    width: 30%;
+    font-size: 9px;
+}
+
+.out-order-paper .safety-box {
+    width: 22%;
+}
+
+.out-order-paper .vehicle-notice-img {
+    width: 120%;
+    height: auto;
+    display: block;
+}
+
+
+
+.out-order-paper .title-box {
+    width: 38%;
+    text-align: center;
+    padding-top: 28px;
+}
+
+.out-order-paper .title {
+    font-size: 28px;
+    letter-spacing: 12px;
+    padding-left: 12px;
+}
+
+.out-order-paper .confirm-wrap table th,
+.out-order-paper .confirm-wrap table td {
+    font-size: 10px;
+    height: 24px;
+    padding: 1px;
+    word-break: keep-all;
+}
+
+.out-order-paper .confirm-wrap table th {
+    line-height: 1.1;
+}
+
+.out-order-paper .confirm-wrap table td:first-child {
+    font-size: 9px;
+    letter-spacing: -0.8px;
+}
+
+.out-order-paper .confirm-wrap table th:nth-child(6) {
+    font-size: 8px;
+    letter-spacing: -0.8px;
+}
+.out-order-paper .barcode-box {
+    width: 32%;
+    text-align: center;
+}
+
+.out-order-paper .fake-barcode {
+    width: 280px;
+    height: 95px;
+    margin: 0 auto;
+    background: none;
+    overflow: hidden;
+}
+
+#out_stknum_top {
+    margin-top: -5px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 12px;
+    width: 280px;
+    margin-left: auto;
+    margin-right: -40;
+}
+.out-order-paper .meta-line {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+}
+
+.out-order-paper .vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 1px;
+    font-size: 10px;
+    line-height: 1.1;
+    font-weight: bold;
+    background: #fff;
+      white-space: nowrap !important;
+    word-break: keep-all !important;
+}
+
+.out-order-paper .left {
+    text-align: left !important;
+}
+
+.out-order-paper .right {
+    text-align: right !important;
+}
+
+.out-order-paper .item-table th,
+.out-order-paper .item-table td {
+    height: 31px;
+    padding: 2px;
+    font-size: 13px;
+}
+
+.out-order-paper .item-name {
+    font-weight: bold;
+    text-align: left !important;
+    letter-spacing: -0.5px;
+}
+
+.out-order-paper .sign-area {
+    margin-top: 10px;
+}
+
+.out-order-paper .confirm-wrap {
+    width: 56%;
+    margin-left: auto;
+    margin-top: 14px;
+}
+
+.out-order-paper .notice {
+    margin-top: 8px;
+    font-size: 12px;
+      text-align: center;
+    letter-spacing: 2px;
+}
+
+.out-order-paper .driver-sign {
+    text-align: right;
+    margin-top: 6px;
+}
+
+.out-order-paper .small {
+    font-size: 10px;
+}
+.out-order-paper .vehicle-inner {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.out-order-paper .vehicle-inner td {
+    border: 0 !important;
+    height: 26px;
+    padding: 0 4px;
+    text-align: left !important;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.out-order-paper .vehicle-inner td {
+    border-top: 0 !important;
+    border-bottom: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+
+    height: 26px;
+    padding: 0 4px;
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+.out-order-paper .sign-area-clean td,
+.out-order-paper .sign-area-clean th {
+    height: 24px;
+}
+
+.out-order-paper .sign-area-clean .sign-no-right {
+    border-right: 0 !important;
+}
+
+.out-order-paper .sign-area-clean .sign-no-right + td {
+    border-left: 0 !important;
+}
+
+.out-order-paper .sign-area-clean .sign-text {
+    white-space: nowrap;
+}
+
+.transfer-barcode-text {
+    width: 120px;
+    text-align: center;
+    margin-left: auto;
+    margin-top: -10px;
+    font-size: 9px;
+    line-height: 10px;
+}
+
+.wing-blank {
+    border-left: none !important;
+    border-bottom: none !important;
+}
+
+.wing-title {
+    border-left: none !important;
+}
+
+/* 이송명세서 인수증 도착/하차 시간표만 */
+#transferArea .transfer-copy:last-child .trn-receipt-time-table{
+    width:190px !important;
+    margin-left:auto;
+    margin-top:8px !important;
+}
+
+#transferArea .transfer-copy:last-child .trn-receipt-time-table th{
+    height:20px !important;
+    font-size:9px !important;
+    padding:0 !important;
+}
+
+#transferArea .transfer-copy:last-child .trn-receipt-time-table td{
+    height:32px !important;
+}
+
+/* ==============================
+   원지출고지시서 EZGEN 양식 맞춤
+   ============================== */
+
+.liner-paper {
+    width: 96% !important;
+     margin: 0 auto !important;
+    font-family: Gulim, "굴림", "Malgun Gothic", Arial, sans-serif;
+    font-size: 11px;
+    page-break-after: always;
+    break-after: page;
+}
+
+.liner-paper th,
+.liner-paper td {
+    border: 1px solid #000;
+    padding: 1px 3px !important;
+    height: 22px !important;
+    font-size: 10px !important;
+    font-weight: normal !important;
+    line-height: 1.15 !important;
+    vertical-align: middle !important;
+}
+
+.liner-paper th {
+    background: #fff !important;
+    font-weight: normal !important;
+}
+
+.liner-top {
+    margin-bottom: 12px !important;
+}
+
+.liner-safety {
+    width: 22% !important;
+}
+
+.liner-safety img {
+    width: 90% !important;
+    max-height: 118px !important;
+    object-fit: contain;
+}
+
+.liner-title-box {
+    width: 46% !important;
+    padding-top: 20px !important;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position:relative;
+    left:24px;
+}
+
+.liner-title {
+    font-family: Gulim, "굴림", "Malgun Gothic", sans-serif;
+    font-size: 39px !important;
+     font-weight: 700 !important;     /* 굵게 */
+
+    letter-spacing: 10px !important;
+    border-bottom: 1px solid #000;
+    padding-bottom: 1px !important;
+    white-space: nowrap;
+}
+
+.liner-barcode-box {
+    width: 32% !important;
+    text-align: right !important;
+    padding-right: 0 !important;
+}
+
+.liner-barcode {
+    width: 250px !important;
+    height: 52px !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+
+.liner-barcode > div,
+.liner-barcode canvas,
+.liner-barcode img {
+    max-width: 100% !important;
+}
+
+.liner-barcode-text {
+    width: 250px !important;
+    text-align: center !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    margin-top: -5px !important;
+    font-size: 10px !important;
+    line-height: 11px !important;
+}
+
+.liner-meta {
+    margin: 8px 0 10px !important;
+    font-size: 10px !important;
+}
+.liner-meta > span {
+    position: relative;
+    top: 17px;      
+}
+.liner-car-main th,
+.liner-car-main td,
+.liner-container-main th,
+.liner-container-main td {
+    height: 28px !important;
+    font-size: 10px !important;
+    padding: 3px 4px !important;
+}
+
+.liner-car-main th,
+.liner-container-main th {
+    background: #fff !important;
+    font-weight: normal !important;
+}
+
+.liner-car-summary {
+    text-align: left !important;
+    white-space: nowrap !important;
+    word-spacing: 0 !important;
+    font-size: 10px !important;
+}
+
+.liner-car-summary span {
+    margin-right: 34px !important;
+}
+
+.liner-paper .vertical-label {
+    font-size: 10px !important;
+    font-weight: normal !important;
+    line-height: 1.15 !important;
+    letter-spacing: 0 !important;
+}
+
+.liner-item-table {
+    margin-top: 0 !important;
+}
+
+.liner-item-table th,
+.liner-item-table td {
+    height: 24px !important;
+    font-size: 10px !important;
+    padding: 1px 3px !important;
+    font-weight: normal !important;
+}
+
+.liner-item-table thead th {
+    height: 34px !important;
+    font-weight: normal !important;
+}
+
+.liner-sign {
+    margin-top: 4px !important;
+}
+
+.liner-sign th,
+.liner-sign td {
+    height: 22px !important;
+    font-size: 10px !important;
+    padding: 1px 4px !important;
+    font-weight: normal !important;
+}
+
+.liner-notice {
+    margin-top: 6px !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    letter-spacing: 1px !important;
+}
+
+.liner-driver-sign {
+    margin-top: 4px !important;
+    text-align: right !important;
+    font-size: 10px !important;
+    margin-bottom:18px !important;
+}
+
+/* 원지 - 테이블 간격 조정 */
+.liner-container-main {
+    margin-top: 5px !important;
+    margin-bottom: 2px !important;
+     border-collapse: collapse;
+}
+
+.liner-container-main + table {
+    margin-top: 2px !important;
+}
+
+.liner-item-table {
+    margin-top: 2px !important;
+}
+
+.liner-sign {
+    margin-top: 3px !important;
+}
+
+/* 원지 - 납품정보 하단 행 여유 */
+.liner-paper table tr td[id='liner_doctxt'],
+.liner-paper table tr td[id='liner_tdobject'] {
+    height: 28px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+.liner-container-main th,
+.liner-container-main td {
+    border-width: 0.8px !important;
+}
+
+
+/* ==============================
+   원지출고지시서 크기 최종 확대 조정
+   ============================== */
+
+/* 전체 글자 살짝 확대 */
+.liner-paper {
+    font-size: 11px !important;
+}
+
+/* 헤더 영역: 이지젠처럼 차량정보 시작 위치까지 더 내려오게 */
+.liner-top {
+    margin-bottom: 18px !important;
+}
+
+.liner-meta {
+    margin: 10px 0 14px !important;
+    min-height: 22px !important;
+    font-size: 11px !important;
+}
+
+/* 차량정보 / 컨테이너 / 납품정보 기본 셀 확대 */
+.liner-paper th,
+.liner-paper td {
+    font-size: 11px !important;
+    height: 28px !important;
+    padding: 3px 5px !important;
+}
+
+/* 차량정보 */
+.liner-car-main th,
+.liner-car-main td {
+    height: 32px !important;
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+    text-align: left !important;
+    padding-left: 8px !important;
+}
+
+/* 컨테이너 번호 */
+.liner-container-main th,
+.liner-container-main td {
+    height: 32px !important;
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+}
+
+/* 납품정보 */
+.liner-container-main + table th,
+.liner-container-main + table td {
+    height: 32px !important;
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+}
+
+/* 특이사항 / Shipping Mark 행은 더 크게 */
+.liner-paper table tr td[id='liner_doctxt'],
+.liner-paper table tr td[id='liner_tdobject'] {
+    height: 42px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+
+/* 품목 헤더 확대 */
+.liner-item-table thead th {
+    height: 38px !important;
+    font-size: 11px !important;
+    padding: 4px 5px !important;
+}
+
+/* 품목 데이터 row 확대 */
+.liner-item-table tbody td {
+    height: 36px !important;
+    font-size: 11px !important;
+    padding: 4px 5px !important;
+}
+
+/* 합계 row도 동일하게 */
+.liner-item-table tbody tr:last-child td {
+    height: 36px !important;
+}
+
+/* 기타 영역 확대 */
+.liner-sign th,
+.liner-sign td {
+    height: 32px !important;
+    font-size: 11px !important;
+    padding: 4px 6px !important;
+}
+
+/* 각서/서명 영역 */
+.liner-notice {
+    margin-top: 10px !important;
+    font-size: 11px !important;
+    line-height: 18px !important;
+}
+
+.liner-driver-sign {
+    margin-top: 8px !important;
+    margin-bottom: 20px !important;
+    font-size: 11px !important;
+}
+
+/* 출고지시서만 이지젠 기준 보정 */
+.out-order-paper {
+    width: 96% !important;
+    margin: 0 auto !important;
+    font-family: Gulim, "굴림", "Malgun Gothic", Arial, sans-serif !important;
+}
+
+.out-order-paper th,
+.out-order-paper td {
+    font-size: 14px !important;
+    font-weight: normal !important;
+    height: 32px !important;
+    padding: 3px 5px !important;
+}
+
+.out-order-paper th {
+    background: #fff !important;
+}
+
+.out-order-paper .top {
+    margin-bottom: 14px !important;
+}
+
+.out-order-paper .title {
+    font-size: 36px !important;
+    font-weight: 700 !important;
+    letter-spacing: 10px !important;
+    border-bottom: 1px solid #000;
+    display: inline-block;
+    padding-bottom: 2px;
+}
+
+.out-order-paper .meta-line {
+    margin: 8px 0 10px !important;
+    font-size: 11px !important;
+}
+
+.out-order-paper .meta-line > div {
+    position: relative;
+    top: 4px;
+}
+
+.out-order-paper .vehicle-notice-img {
+    width: 115% !important;
+}
+
+.out-order-paper .barcode-box {
+    width: 32%;
+    text-align: right !important;
+    padding-right: 0 !important;
+}
+
+.out-order-paper .fake-barcode {
+    width: 280px;
+    height: 85px;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+}
+.out-order-paper .item-table th,
+.out-order-paper .item-table td {
+    font-size: 13px !important;
+    height: 32px !important;
+}
+
+.out-order-paper .notice {
+    margin-top: 10px !important;
+    font-size: 12px !important;
+    line-height: 18px !important;
+}
+
+.out-order-paper .driver-sign {
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+    font-size: 11px !important;
+}
+
+.out-order-paper .wing-sign-table {
+    margin-top: 0px !important;
+}
+
+.out-order-paper .sign-area {
+    margin-top: 6px !important;
+}
+
+.out-order-paper .confirm-wrap {
+    width: 56% !important;
+    margin-left: auto !important;
+    margin-top: 10px !important;
+}
+
+#transferArea > .kiosk-paper-doc {
+    page-break-after: always;
+    break-after: page;
+}
+
+#transferArea > .kiosk-paper-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+/* 이동명세서 공급자 + 공급받는자 */
+#transferArea .transfer-copy[data-copy-type='SUPPLIER'] .ship-no,
+#transferArea .transfer-copy[data-copy-type='CLIENT'] .ship-no {
+    margin-top: 100px !important;
+    margin-right: -8px !important;
+    text-align: right;
+}
+/* 이동명세서 인수증 */
+#transferArea .transfer-copy[data-copy-type='RECEIPT'] .ship-no {
+    margin-top: 50px !important;
+    margin-right: -8px !important;
+    text-align: right;
+}
+</style>
+<!-- 출고지시서 -->
+<div id="outOrderHlArea" class="print-portrait"></div>
+
+<div class="out-order-paper template-sheet" id="outOrderHlTemplate">
+
+    <div class="top">
+       
+<div class="safety-box">
+    <img src="/mobile/img/vehicle_notice.png"
+         class="vehicle-notice-img">
+</div>
+        <div class="title-box">
+            <div class="title">출고지시서</div>
+        </div>
+
+        <div class="barcode-box">
+            <div id="out_barcode" class="fake-barcode"></div>
+            <div id="out_stknum_top"></div>
+        </div>
+    </div>
+
+    <div class="meta-line">
+        <div id="out_prtdat"></div>
+        <div>[선적번호 : <span id="out_stknum"></span>]</div>
+    </div>
+
+    <table>
+    <colgroup>
+        <col width="3%">
+        <col width="11%">
+        <col width="30%">
+        <col width="10%">
+        <col width="10%">
+        <col width="12%">
+        <col width="24%">
+    </colgroup>
+
+    <tr>
+        <td rowspan="2" class="vertical">수주정보</td>
+        <th>대표수주일시</th>
+        <td id="out_rqarrd" class="left"></td>
+        <th>대표납품일자</th>
+        <td id="out_rqshpd" class="left"></td>
+        <th>대표판매오더</th>
+        <td id="out_svbeln" class="left"></td>
+    </tr>
+    <tr>
+        <th>요청사항</th>
+        <td colspan="2" id="out_doctxt" class="left"></td>
+        <th>대표판매처</th>
+        <td colspan="2" id="out_ptrcnm" class="left"></td>
+    </tr>
+
+    <tr>
+        <td rowspan="2" class="vertical">차량정보</td>
+        <td colspan="6" style="padding:0;">
+    <table class="vehicle-inner">
+       <colgroup>
+		    <col width="26%">
+		    <col width="22%">
+		    <col width="16%">
+		    <col width="16%">
+		    <col width="20%">
+		</colgroup>
+		
+		<tr>
+		    <td>운송사: <span id="out_tdlnr"></span></td>
+		    <td>차량번호: <span id="out_carno"></span></td>
+		    <td>차량톤수: <span id="out_carton"></span></td>
+		    <td>차종: <span id="out_carart"></span></td>
+		    <td>용적(CBM): <span id="out_loadvolume"></span></td>
+		</tr>
+    </table>
+</td>
+    </tr>
+    <tr>
+        <th>연락처</th>
+       <td colspan="3" id="out_drivercel" class="left"></td>
+        <th>배차시간</th>
+        <td colspan="2" id="out_disptime"></td>
+    </tr>
+
+    <tr>
+        <td rowspan="2" class="vertical">납품정보</td>
+        <th>납품처</th>
+        <td colspan="2" id="out_dptnnm" class="left"></td>
+        <th>전화번호</th>
+        <td colspan="2" id="out_telno" class="left"></td>
+    </tr>
+    <tr>
+        <th>주소</th>
+        <td colspan="2" id="out_addr" class="left"></td>
+        <th>하차정보</th>
+        <td colspan="2" id="out_sdabw"></td>
+    </tr>
+</table>
+
+    <table class="item-table" style="margin-top:4px;">
+        <colgroup>
+		    <col width="4%">   <!-- No -->
+		    <col width="15%">  <!-- 품목코드 -->
+		    <col width="20%">  <!-- 품목명 -->
+		    <col width="8%">   <!-- 주문수량 BOX -->
+		    <col width="5%">   <!-- EA/BAG -->
+		    <col width="6%">   <!-- BAG/BOX -->
+		    <col width="6%">   <!-- BOX/Pallet -->
+		    <col width="6%">   <!-- 영역 -->
+		    <col width="6%">   <!-- 지번 -->
+		    <col width="5%">   <!-- 납품BOX -->
+		    <col width="6%">   <!-- Pallet -->
+		    <col width="5%">   <!-- 날개BOX -->
+		    <col width="5%">   <!-- 비고 -->
+		</colgroup>
+        <thead>
+            <tr>
+                <th rowspan="2">No</th>
+                <th rowspan="2">품목코드</th>
+                <th rowspan="2">품목명</th>
+                <th>주문수량</th>
+                <th rowspan="2">EA/<br>BAG</th>
+                <th rowspan="2">BAG/<br>BOX</th>
+                <th rowspan="2">BOX/<br>Pallet</th>
+                <th colspan="5">Picking정보</th>
+                <th rowspan="2">비고</th>
+            </tr>
+            <tr>
+                <th>BOX</th>
+                <th>영역</th>
+                <th>지번</th>
+                <th>납품BOX</th>
+                <th>Pallet</th>
+                <th>날개BOX</th>
+            </tr>
+        </thead>
+        <tbody id="outOrderHlBody"></tbody>
+    </table>
+
+   <table class="sign-area sign-area-clean">
+    <colgroup>
+        <col width="5%">
+        <col width="17%">
+        <col width="17%">
+        <col width="17%">
+        <col width="17%">
+        <col width="15%">
+        <col width="12%">
+    </colgroup>
+    <tr>
+        <th>기타</th>
+        <td class="left sign-text sign-no-right">입문시간:</td>
+        <td class="left sign-text sign-no-right">출문시간:</td>
+        <td class="left sign-text sign-no-right">팔레트종류:</td>
+        <td class="left sign-text">팔레트수량:</td>
+        <td class="left sign-text sign-no-right">출고담당자:</td>
+        <td>(인)</td>
+    </tr>
+</table>
+
+<table class="wing-sign-table">
+    <colgroup>
+        <col width="60%">
+        <col width="20%">
+        <col width="30%">
+    </colgroup>
+    <tr>
+        <td rowspan="2" class="blank-cell no-left no-bottom wing-blank"></td>
+        <th rowspan="2">윙바디 개폐확인</th>
+        <td class="left">운송 기사 :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</td>
+    </tr>
+    <tr>
+        <td class="left">지게차 기사:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(인)</td>
+    </tr>
+</table>
+
+<div class="notice">
+    위의 출고 지시 수량과 상차 수량이 틀림없음을 확인하여 만약 후일 사고가 있을 시는 전책임을 위임하겠기에 각서합니다
+</div>
+
+<div class="driver-sign">
+    차량번호 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    성명 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    (인)
+</div>
+
+    <div class="confirm-wrap">
+        <table>
+            <colgroup>
+                <col width="18%">
+                <col width="18%">
+                <col width="16%">
+                <col width="16%">
+                <col width="16%">
+                <col width="16%">
+            </colgroup>
+            <tr>
+                <th colspan="6">검수확인</th>
+            </tr>
+            <tr>
+                <th>창고명</th>
+                <th>담당자</th>
+                <th colspan="4">Pallet</th>
+            </tr>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>K-11</th>
+                <th>K-14</th>
+                <th>A-11</th>
+                <th>MAX A-11</th>
+            </tr>
+            <tr><td>천막창고1</td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td>천막창고2</td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td>화장지창고</td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td>패드창고</td><td></td><td></td><td></td><td></td><td></td></tr>
+            <tr><td>중문창고</td><td></td><td></td><td></td><td></td><td></td></tr>
+        </table>
+    </div>
+
+</div>
+
+<style>
+#outOrderHlPageBreak,
+#invoicePageBreak,
+#linerPageBreak,
+#transferPageBreak,
+#outOrderHlArea,
+#invoiceArea,
+#linerArea,
+#transferArea {
+    display: none;
+}
+
+.kiosk-paper-doc {
+    width: 96%;
+    margin: 0 auto;
+    font-family: "Malgun Gothic", Arial, sans-serif;
+    font-size: 10px;
+    color: #000;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.kiosk-paper-page {
+    width: 100%;
+    box-sizing: border-box;
+    page-break-after: always;
+    break-after: page;
+}
+
+.kiosk-paper-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+}
+
+.kiosk-paper-doc table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* 거래명세서 마스터 정보  */
+.kiosk-paper-doc th,
+.kiosk-paper-doc td {
+    border: 0.8px solid #000;
+    padding: 2px 3px;
+    height: 23px;
+    text-align: center;
+    vertical-align: middle;
+    word-break: break-all;
+    font-size: 10px;
+    font-weight: normal;
+}
+.kiosk-paper-doc th {
+    background: #f1f1f1;
+    font-weight: bold;
+}
+
+.kiosk-paper-doc .left {
+    text-align: left !important;
+}
+
+.kiosk-paper-doc .right {
+    text-align: right !important;
+}
+
+.kiosk-paper-doc .center {
+    text-align: center !important;
+}
+
+.kiosk-paper-header {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+    height: 156px;
+}
+
+.kiosk-paper-header > div {
+    width: 30%;
+}
+
+.kiosk-paper-title {
+    width: 40% !important;
+    text-align: center;
+    padding-top: 34px;
+    position: relative;
+}
+
+/* 거래명세서 타이틀 */
+.kiosk-paper-title p {
+    margin: 0;
+    font-family: Gulim, "굴림", "Malgun Gothic", sans-serif;
+    font-size: 26pt;
+    font-weight: bold;
+    letter-spacing: 6px;
+    white-space: nowrap;
+    display: inline-block;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2px;
+}
+
+/* 거래명세서 부제목 */
+.kiosk-paper-title span {
+    display: block;
+    margin-top: 4px;
+    font-family: Gulim, "굴림", "Malgun Gothic", sans-serif;
+    font-size: 16px;
+    font-weight: normal;
+}
+
+
+.kiosk-paper-header ul {
+    list-style: none;
+    padding: 0;
+    margin: 84px 0 0 0;
+}
+
+.kiosk-paper-header li {
+    height: 18px;
+    line-height: 94px;
+}
+
+.kiosk-paper-barcode {
+    width: 170px;
+    height: 42px;
+    margin-left: auto;
+    margin-top: 0;
+    overflow: hidden;
+}
+
+.kiosk-paper-barcode > div,
+.kiosk-paper-barcode canvas,
+.kiosk-paper-barcode img {
+    max-width: 100% !important;
+}
+
+.kiosk-paper-header .ship-no {
+    margin-top: 50px;
+    text-align: right;
+}
+
+
+/* 도장 위치는 right: 340px; */
+.kiosk-paper-stamp {
+    display: block;
+    position: absolute;
+    top: 155px;
+    right: 350px;
+    width: 55px;
+    height: 55px;
+    z-index: 5;
+}
+/* 인수증 top */
+.kiosk-paper-stamp.receipt {
+    top: 155px;
+}
+.kiosk-paper-doc .vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    letter-spacing: 2px;
+    font-weight: normal;
+    line-height: 1.35;
+}
+
+.kiosk-paper-doc .memo {
+    height: 46px !important;
+}
+
+/* 거래명세서 제품정보 */
+.kiosk-paper-doc .item-table th,
+.kiosk-paper-doc .item-table td {
+    height: 27px;
+    font-size: 10.5px;
+    padding: 1px 2px;
+}
+/* 거래명세서 품목/빈칸/합계 높이 고정 */
+.kiosk-paper-doc .item-table tbody tr,
+.kiosk-paper-doc .item-table tfoot tr {
+    height: 27px !important;
+}
+
+.kiosk-paper-doc .item-table tbody td,
+.kiosk-paper-doc .item-table tfoot td {
+    height: 27px !important;
+    max-height: 27px !important;
+    padding: 1px 2px !important;
+    overflow: hidden !important;
+    vertical-align: middle !important;
+    line-height: 1.1 !important;
+}
+
+/* 거래명세서 품목 테이블 헤더 일반 굵기 */
+.kiosk-paper-doc .item-table thead th {
+    font-weight: normal !important;
+}
+
+.kiosk-paper-doc .takeout-title {
+    margin: 0 0 4px 0;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.kiosk-paper-doc .time-table {
+    margin-top: 2px;
+}
+
+.kiosk-paper-doc .sign-row td {
+    height: 36px;
+}
+
+.kiosk-paper-doc td[id^='inv_supplier_'],
+.kiosk-paper-doc td[id^='inv_client_'],
+.kiosk-paper-doc td[id^='inv_delivery_'],
+.kiosk-paper-doc td[id^='inv_driver_'],
+.kiosk-paper-doc td[id^='inv_return_'],
+.kiosk-paper-doc td[id^='inv_employee_'] {
+    text-align: left !important;
+}
+
+.no-bottom {
+    border-bottom: none !important;
+}
+/* 이송바코드 */
+/* 이송명세서 바코드 - 거래명세서 크기 기준 */
+#transferArea #trn_barcode_1,
+#transferArea #trn_barcode_2,
+#transferArea #trn_barcode_3 {
+    width: 230px;
+    height: 55px;
+    margin-left: auto;
+    overflow: hidden;
+}
+
+/* 이송명세서 바코드 하단 선적번호 텍스트 */
+#transferArea .transfer-barcode-text {
+    width: 230px;
+    text-align: center;
+    margin-left: auto;
+    margin-right: -15px;
+    margin-top: -14px;
+    font-size: 11px;
+    line-height: 12px;
+}
+
+.kiosk-paper-doc table:not(.item-table) th,
+.kiosk-paper-doc table:not(.item-table) td {
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.kiosk-paper-doc table:not(.item-table) th {
+    font-weight: normal;
+}
+
+/* 이송명세서 헤더와 표 사이 간격 */
+#transferArea .kiosk-paper-header {
+    margin-bottom: 14px;
+}
+
+#transferArea #trn_barcode_1 > div,
+#transferArea #trn_barcode_2 > div,
+#transferArea #trn_barcode_3 > div,
+#transferArea #trn_barcode_1 canvas,
+#transferArea #trn_barcode_2 canvas,
+#transferArea #trn_barcode_3 canvas,
+#transferArea #trn_barcode_1 img,
+#transferArea #trn_barcode_2 img,
+#transferArea #trn_barcode_3 img {
+    max-width: 100% !important;
+}
+
+/* ==============================
+   거래명세서 HL 전용
+   PS 영향 없음
+   ============================== */
+
+#invoiceArea .invoice-hl-doc {
+    font-family: Gulim, "굴림", "Malgun Gothic", Arial, sans-serif !important;
+}
+
+#invoiceArea .invoice-hl-doc th,
+#invoiceArea .invoice-hl-doc td {
+    font-size: 10px !important;
+    height: 23px !important;
+    padding: 2px 3px !important;
+    font-weight: normal !important;
+    line-height: 1.15 !important;
+}
+
+/* HL 품목 테이블 */
+#invoiceArea .invoice-hl-doc .hl-item-table {
+    margin-top: 6px !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-item-table th,
+#invoiceArea .invoice-hl-doc .hl-item-table td {
+    height: 30px !important;
+    font-size: 10px !important;
+    padding: 2px 3px !important;
+    line-height: 1.15 !important;
+    font-weight: normal !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-item-table thead th {
+    height: 28px !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-item-table tbody td {
+    height: 31px !important;
+    max-height: 31px !important;
+    overflow: hidden !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-item-table .hl-item-name {
+    text-align: left !important;
+    white-space: normal !important;
+    word-break: keep-all !important;
+    line-height: 1.18 !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-item-table .hl-remark {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-total-table {
+    margin-top: 2px !important;
+}
+
+#invoiceArea .invoice-hl-doc .hl-total-table th,
+#invoiceArea .invoice-hl-doc .hl-total-table td {
+    height: 24px !important;
+    font-size: 10px !important;
+    padding: 2px 3px !important;
+    font-weight: normal !important;
+}
+#invoiceArea .invoice-hl-doc .receipt-sign {
+    text-align: center !important;
+    vertical-align: middle !important;
+    font-weight: normal !important;
+    white-space: nowrap !important;
+}
+
+/* HL 거래명세서 색상 제거 */
+#invoiceArea .invoice-hl-doc th,
+#invoiceArea .invoice-hl-doc td,
+#invoiceArea .invoice-hl-doc .hl-item-table th,
+#invoiceArea .invoice-hl-doc .hl-item-table td,
+#invoiceArea .invoice-hl-doc .hl-total-table th,
+#invoiceArea .invoice-hl-doc .hl-total-table td {
+    background: #fff !important;
+    background-color: #fff !important;
+    color: #000 !important;
+}
+</style>
+<!-- =========================
+     거래명세서
+========================== -->
+<div id="invoicePageBreak" style="page-break-before: always; break-before: page;"></div>
+
+<div id="invoiceArea" class="print-portrait"></div>
+
+<div class="kiosk-paper-doc template-sheet" id="invoiceTemplate">
+
+    <!-- 공급자 보관용 -->
+    <div class="kiosk-paper-page invoice-copy" data-copy-type="SUPPLIER">
+        <div class="kiosk-paper-header">
+            <div>
+                <ul>
+                    <li>납 품 일 자 : <span id="inv_delivery_date_1"></span></li>
+                    <li>출 력 일 자 : <span id="inv_print_date_1"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>거 래 명 세 서</p>
+                <span>(공급자 보관용)</span>
+            </div>
+
+            <div>
+                <div id="inv_barcode_1" class="kiosk-paper-barcode"></div>
+				<div id="inv_barcode_text_1" class="kiosk-paper-barcode-text"></div>
+				<p class="ship-no">[선적번호 : <span id="inv_stknum_1"></span></p>
+            </div>
+
+            <img src="/mobile/img/transaction_statement_seal.png" class="kiosk-paper-stamp">
+        </div>
+
+        <table>
+            <colgroup>
+                <col width="40px">
+                <col width="45px">
+                <col>
+                <col width="45px">
+                <col>
+                <col width="40px">
+                <col width="45px">
+                <col>
+                <col width="45px">
+                <col>
+            </colgroup>
+            <tr>
+                <th rowspan="4" class="vertical">공급자</th>
+                <th>등록<br>번호</th>
+                <td id="inv_supplier_bizno_1"></td>
+                <th>전화<br>번호</th>
+                <td id="inv_supplier_tel_1"></td>
+
+                <th rowspan="4" class="vertical">공급받는자</th>
+                <th>등록<br>번호</th>
+                <td id="inv_client_bizno_1"></td>
+                <th>전화<br>번호</th>
+                <td id="inv_client_tel_1"></td>
+            </tr>
+            <tr>
+                <th>상호</th>
+                <td id="inv_supplier_nm_1"></td>
+                <th>대표</th>
+                <td id="inv_supplier_ceo_1"></td>
+
+                <th>상호</th>
+                <td id="inv_client_nm_1"></td>
+                <th>대표</th>
+                <td id="inv_client_ceo_1"></td>
+            </tr>
+            <tr>
+                <th>주소</th>
+                <td colspan="3" id="inv_supplier_addr_1" class="left"></td>
+
+                <th>주소</th>
+                <td colspan="3" id="inv_client_addr_1" class="left"></td>
+            </tr>
+            <tr>
+                <th>업태</th>
+                <td id="inv_supplier_sector_dtl_1"></td>
+                <th>업종</th>
+                <td id="inv_supplier_sector_1"></td>
+
+                <th>업태</th>
+                <td id="inv_client_sector_dtl_1"></td>
+                <th>업종</th>
+                <td id="inv_client_sector_1"></td>
+            </tr>
+        </table>
+
+        <table style="margin-top:2px;">
+            <colgroup>
+                <col width="40px">
+                <col width="90px">
+                <col>
+                <col width="40px">
+                <col width="90px">
+                <col>
+            </colgroup>
+            <tr>
+				    <th rowspan="5" class="vertical">납품정보</th>
+				    <th>납품처명</th>
+				    <td id="inv_delivery_nm_1" class="left"></td>
+				
+				    <th rowspan="4" class="vertical">기타정보</th>
+				    <th>차량정보</th>
+				    <td id="inv_delivery_info_1" class="left"></td>
+				</tr>
+				<tr>
+				    <th>전화번호</th>
+				    <td id="inv_delivery_tel_1"></td>
+				
+				    <th>기사 연락처</th>
+				    <td id="inv_driver_tel_1"></td>
+				</tr>
+				<tr>
+				    <th rowspan="2">납품주소</th>
+				    <td rowspan="2" id="inv_delivery_addr_1" class="left"></td>
+				
+				    <th>팔레트 회수</th>
+				    <td id="inv_return_pallet_1"></td>
+				</tr>
+				<tr>
+				    <th>영업정보</th>
+				    <td id="inv_employee_info_1" class="left"></td>
+				</tr>
+				<tr>
+				    <th>배송메모</th>
+				    <td colspan="4" id="inv_delivery_memo_1" class="left memo bg"></td>
+				</tr>
+        </table>
+
+        <table class="item-table" style="margin-top:6px;">
+            <colgroup>
+                <col width="3%">
+                <col width="25%">
+                <col width="8%">
+                <col width="15%">
+                <col width="7%">
+                <col width="7%">
+                <col width="8%">
+                <col width="8%">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">제 품 명</th>
+                    <th rowspan="2">평량</th>
+                    <th rowspan="2">규격</th>
+                    <th colspan="2">수량</th>
+                    <th rowspan="2">입고단가</th>
+                    <th rowspan="2">공급가액</th>
+                    <th rowspan="2">비고</th>
+                </tr>
+                <tr>
+                    <th>REAM</th>
+                    <th>KG</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceItemBody_1"></tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td>합 계</td>
+                    <td></td>
+                    <td></td>
+                    <td id="inv_total_qty_1" class="right"></td>
+                    <td id="inv_total_weight_1" class="right"></td>
+                    <td id="inv_total_price_1" class="right"></td>
+                    <td id="inv_total_vat_price_1" class="right"></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- 공급받는자 보관용 -->
+    <div class="kiosk-paper-page invoice-copy" data-copy-type="CLIENT">
+        <div class="kiosk-paper-header">
+            <div>
+                <ul>
+                    <li>납 품 일 자 : <span id="inv_delivery_date_2"></span></li>
+                    <li>출 력 일 자 : <span id="inv_print_date_2"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>거 래 명 세 서</p>
+                <span>(공급받는자 보관용)</span>
+            </div>
+
+            <div>
+                <div id="inv_barcode_2" class="kiosk-paper-barcode"></div>
+				<div id="inv_barcode_text_2" class="kiosk-paper-barcode-text"></div>
+				<p class="ship-no">[선적번호 : <span id="inv_stknum_2"></span></p>
+            </div>
+
+            <img src="/mobile/img/transaction_statement_seal.png" class="kiosk-paper-stamp">
+        </div>
+
+        <table>
+            <colgroup>
+                <col width="40px">
+                <col width="45px">
+                <col>
+                <col width="45px">
+                <col>
+                <col width="40px">
+                <col width="45px">
+                <col>
+                <col width="45px">
+                <col>
+            </colgroup>
+            <tr>
+                <th rowspan="4" class="vertical">공급자</th>
+                <th>등록<br>번호</th>
+                <td id="inv_supplier_bizno_2"></td>
+                <th>전화<br>번호</th>
+                <td id="inv_supplier_tel_2"></td>
+
+                <th rowspan="4" class="vertical">공급받는자</th>
+                <th>등록<br>번호</th>
+                <td id="inv_client_bizno_2"></td>
+                <th>전화<br>번호</th>
+                <td id="inv_client_tel_2"></td>
+            </tr>
+            <tr>
+                <th>상호</th>
+                <td id="inv_supplier_nm_2"></td>
+                <th>대표</th>
+                <td id="inv_supplier_ceo_2"></td>
+
+                <th>상호</th>
+                <td id="inv_client_nm_2"></td>
+                <th>대표</th>
+                <td id="inv_client_ceo_2"></td>
+            </tr>
+            <tr>
+                <th>주소</th>
+                <td colspan="3" id="inv_supplier_addr_2" class="left"></td>
+
+                <th>주소</th>
+                <td colspan="3" id="inv_client_addr_2" class="left"></td>
+            </tr>
+            <tr>
+                <th>업태</th>
+                <td id="inv_supplier_sector_dtl_2"></td>
+                <th>업종</th>
+                <td id="inv_supplier_sector_2"></td>
+
+                <th>업태</th>
+                <td id="inv_client_sector_dtl_2"></td>
+                <th>업종</th>
+                <td id="inv_client_sector_2"></td>
+            </tr>
+        </table>
+
+        <table style="margin-top:2px;">
+            <colgroup>
+                <col width="40px">
+                <col width="90px">
+                <col>
+                <col width="40px">
+                <col width="90px">
+                <col>
+            </colgroup>
+				<tr>
+				    <th rowspan="5" class="vertical">납품정보</th>
+				    <th>납품처명</th>
+				    <td id="inv_delivery_nm_2" class="left"></td>
+				
+				    <th rowspan="4" class="vertical">기타정보</th>
+				    <th>차량정보</th>
+				    <td id="inv_delivery_info_2" class="left"></td>
+				</tr>
+				<tr>
+				    <th>전화번호</th>
+				    <td id="inv_delivery_tel_2"></td>
+				
+				    <th>기사 연락처</th>
+				    <td id="inv_driver_tel_2"></td>
+				</tr>
+				<tr>
+				    <th rowspan="2">납품주소</th>
+				    <td rowspan="2" id="inv_delivery_addr_2" class="left"></td>
+				
+				    <th>팔레트 회수</th>
+				    <td id="inv_return_pallet_2"></td>
+				</tr>
+				<tr>
+				    <th>영업정보</th>
+				    <td id="inv_employee_info_2" class="left"></td>
+				</tr>
+				<tr>
+				    <th>배송메모</th>
+				    <td colspan="4" id="inv_delivery_memo_2" class="left memo bg"></td>
+				</tr>
+        </table>
+
+        <table class="item-table" style="margin-top:6px;">
+            <colgroup>
+                <col width="3%">
+                <col width="25%">
+                <col width="8%">
+                <col width="15%">
+                <col width="7%">
+                <col width="7%">
+                <col width="8%">
+                <col width="8%">
+                <col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">제 품 명</th>
+                    <th rowspan="2">평량</th>
+                    <th rowspan="2">규격</th>
+                    <th colspan="2">수량</th>
+                    <th rowspan="2">입고단가</th>
+                    <th rowspan="2">공급가액</th>
+                    <th rowspan="2">비고</th>
+                </tr>
+                <tr>
+                    <th>REAM</th>
+                    <th>KG</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceItemBody_2"></tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td>합 계</td>
+                    <td></td>
+                    <td></td>
+                    <td id="inv_total_qty_2" class="right"></td>
+                    <td id="inv_total_weight_2" class="right"></td>
+                    <td id="inv_total_price_2" class="right"></td>
+                    <td id="inv_total_vat_price_2" class="right"></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- 인수증 -->
+    <div class="kiosk-paper-page invoice-copy" data-copy-type="RECEIPT">
+        <h1 class="takeout-title">시동 끄고 고임목 받치고 반출도장 받으시오</h1>
+
+        <div class="kiosk-paper-header">
+            <div>
+                <table class="time-table inv-takeout-confirm-table">
+                    <colgroup>
+                        <col width="45px">
+                        <col>
+                    </colgroup>
+                    <tr>
+                        <th>반출<br>확인</th>
+                        <td id="inv_delivery_confirm_3"></td>
+                    </tr>
+                </table>
+                <ul style="margin-top:-1px;">
+                    <li>납 품 일 자 : <span id="inv_delivery_date_3"></span></li>
+                    <li>출 력 일 자 : <span id="inv_print_date_3"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>거 래 명 세 서</p>
+                <span>(인수증)</span>
+            </div>
+
+            <div>
+                <div id="inv_barcode_3" class="kiosk-paper-barcode"></div>
+				<div id="inv_barcode_text_3" class="kiosk-paper-barcode-text"></div>
+				<table class="time-table trn-receipt-time-table">
+				    <tr>
+				        <th>도착시간</th>
+				        <th>하차시간</th>
+				    </tr>
+				    <tr>
+				        <td></td>
+				        <td></td>
+				    </tr>
+				</table>
+                <p class="ship-no">[선적번호 : <span id="inv_stknum_3"></span></p>
+            </div>
+
+            <img src="/mobile/img/transaction_statement_seal.png"  class="kiosk-paper-stamp receipt">
+        </div>
+
+        <!-- 인수증 본문은 공급받는자 보관용과 동일 구조 -->
+        <table>
+            <colgroup>
+                <col width="40px"><col width="45px"><col><col width="45px"><col>
+                <col width="40px"><col width="45px"><col><col width="45px"><col>
+            </colgroup>
+            <tr>
+                <th rowspan="4" class="vertical">공급자</th>
+                <th>등록<br>번호</th><td id="inv_supplier_bizno_3"></td>
+                <th>전화<br>번호</th><td id="inv_supplier_tel_3"></td>
+                <th rowspan="4" class="vertical">공급받는자</th>
+                <th>등록<br>번호</th><td id="inv_client_bizno_3"></td>
+                <th>전화<br>번호</th><td id="inv_client_tel_3"></td>
+            </tr>
+            <tr>
+                <th>상호</th><td id="inv_supplier_nm_3"></td>
+                <th>대표</th><td id="inv_supplier_ceo_3"></td>
+                <th>상호</th><td id="inv_client_nm_3"></td>
+                <th>대표</th><td id="inv_client_ceo_3"></td>
+            </tr>
+            <tr>
+                <th>주소</th><td colspan="3" id="inv_supplier_addr_3" class="left"></td>
+                <th>주소</th><td colspan="3" id="inv_client_addr_3" class="left"></td>
+            </tr>
+            <tr>
+                <th>업태</th><td id="inv_supplier_sector_dtl_3"></td>
+                <th>업종</th><td id="inv_supplier_sector_3"></td>
+                <th>업태</th><td id="inv_client_sector_dtl_3"></td>
+                <th>업종</th><td id="inv_client_sector_3"></td>
+            </tr>
+        </table>
+
+        <table style="margin-top:2px;">
+            <colgroup>
+                <col width="40px"><col width="90px"><col>
+                <col width="40px"><col width="90px"><col>
+            </colgroup>
+            <tr>
+				    <th rowspan="5" class="vertical">납품정보</th>
+				    <th>납품처명</th>
+				    <td id="inv_delivery_nm_3" class="left"></td>
+				
+				    <th rowspan="4" class="vertical">기타정보</th>
+				    <th>차량정보</th>
+				    <td id="inv_delivery_info_3" class="left"></td>
+				</tr>
+				<tr>
+				    <th>전화번호</th>
+				    <td id="inv_delivery_tel_3"></td>
+				
+				    <th>기사 연락처</th>
+				    <td id="inv_driver_tel_3"></td>
+				</tr>
+				<tr>
+				    <th rowspan="2">납품주소</th>
+				    <td rowspan="2" id="inv_delivery_addr_3" class="left"></td>
+				
+				    <th>팔레트 회수</th>
+				    <td id="inv_return_pallet_3"></td>
+				</tr>
+				<tr>
+				    <th>영업정보</th>
+				    <td id="inv_employee_info_3" class="left"></td>
+				</tr>
+				<tr>
+				    <th>배송메모</th>
+				    <td colspan="4" id="inv_delivery_memo_3" class="left memo bg"></td>
+				</tr>
+		
+        </table>
+
+        <table class="item-table" style="margin-top:6px;">
+            <colgroup>
+                <col width="3%"><col width="25%"><col width="8%"><col width="15%">
+                <col width="7%"><col width="7%"><col width="8%"><col width="8%"><col>
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">제 품 명</th>
+                    <th rowspan="2">평량</th>
+                    <th rowspan="2">규격</th>
+                    <th colspan="2">수량</th>
+                    <th rowspan="2">입고단가</th>
+                    <th rowspan="2">공급가액</th>
+                    <th rowspan="2">비고</th>
+                </tr>
+                <tr>
+                    <th>REAM</th>
+                    <th>KG</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceItemBody_3"></tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td>합 계</td>
+                    <td></td>
+                    <td></td>
+                    <td id="inv_total_qty_3" class="right"></td>
+                    <td id="inv_total_weight_3" class="right"></td>
+                    <td id="inv_total_price_3" class="right"></td>
+                    <td id="inv_total_vat_price_3" class="right"></td>
+                    <td></td>
+                </tr>
+                <tr class="sign-row">
+				    <td colspan="9" class="bg">
+				        <div class="invoice-receipt-confirm">
+				            <div class="invoice-receipt-message">
+				                상기 품목을 수령하였으며,<br>
+				                외형 품질 및 수량에 이상 없음을 확인합니다.
+          					  </div>
+
+          				   <div class="invoice-receipt-sign">
+                인수인 :
+                <span></span>
+                (날인 또는 서명)
+            </div>
+        </div>
+    </td>
+</tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+<!-- 원지출력물 -->
+<div id="linerPageBreak" style="page-break-before: always; break-before: page;"></div>
+
+<!-- <div id="linerArea"></div> -->
+<div id="linerArea" class="print-portrait"></div>
+
+<div class="liner-paper template-sheet" id="linerTemplate">
+    <div class="liner-top">
+        <div class="liner-safety">
+            <img src="/mobile/img/vehicle_notice.png">
+        </div>
+
+        <div class="liner-title-box">
+            <div class="liner-title">원지 출고지시서</div>
+        </div>
+
+        <div class="liner-barcode-box">
+		    <div id="liner_barcode" class="liner-barcode"></div>
+		    <div id="liner_barcode_text" class="liner-barcode-text"></div>
+		</div>
+    </div>
+
+    <div class="liner-meta">
+        <span id="liner_prtdat"></span>
+        <span>[선적번호 : <span id="liner_stknum"></span></span>
+    </div>
+	<table class="liner-car-main">
+    <colgroup>
+        <col width="4%">
+        <col width="10%">
+        <col width="25%">
+        <col width="10%">
+        <col width="15%">
+        <col width="10%">
+        <col width="12%">
+        <col width="7%">
+        <col width="7%">
+    </colgroup>
+    <tr>
+        <td rowspan="2" class="vertical-label">차<br>량<br>정<br>보</td>
+        <td colspan="8" class="liner-car-summary">
+            운송사: <span id="liner_tdlnr"></span>
+            &nbsp;&nbsp;&nbsp;
+            차량번호: <span id="liner_carno"></span>
+            &nbsp;&nbsp;&nbsp;
+            차량톤수: <span id="liner_carton"></span>
+            &nbsp;&nbsp;&nbsp;
+            적재가능톤수: <span id="liner_loadton"></span>
+            &nbsp;&nbsp;&nbsp;
+            차종: <span id="liner_carart"></span>
+            &nbsp;&nbsp;&nbsp;
+            용적(CBM): <span id="liner_loadvolume"></span>
+        </td>
+    </tr>
+    <tr>
+    <th>연락처</th>
+    <td colspan="3" id="liner_drivercel"></td>
+
+	 <th>배차시간</th>
+	<td colspan="3" id="liner_disptime"></td>
+</tr>
+</table>
+
+<table class="liner-container-main">
+    <colgroup>
+        <col width="4%">
+        <col width="10%">
+        <col width="19%">
+        <col width="12%">
+        <col width="15%">
+        <col width="10%">
+        <col width="12%">
+        <col width="10%">
+        <col width="10%">
+    </colgroup>
+    <tr>
+        <th colspan="2">컨테이너 번호</th>
+        <td colspan="2" id="liner_container_no"></td>
+
+        <th>SEAL No</th>
+        <td colspan="2" id="liner_seal_no"></td>
+
+        <th>Con.Type</th>
+        <td id="liner_con_type"></td>
+    </tr>
+</table>
+
+<table>
+    <colgroup>
+        <col width="4%">
+        <col width="10%">
+        <col width="19%">
+        <col width="12%">
+        <col width="15%">
+        <col width="10%">
+        <col width="12%">
+        <col width="10%">
+        <col width="10%">
+    </colgroup>
+    <tr>
+        <td rowspan="5" class="vertical-label">납<br>품<br>정<br>보</td>
+        <th>납품처</th>
+        <td id="liner_dptnnm" class="left"></td>
+        <th>연락처</th>
+        <td id="liner_telno"></td>
+        <th>수주일</th>
+        <td id="liner_rqarrd"></td>
+        <th>납품번호</th>
+		<td id="liner_svbeln" class="nowrap"></td>
+    </tr>
+    <tr>
+        <th>주소</th>
+        <td colspan="5" id="liner_addr" class="left"></td>
+        <th>항차번호</th>
+        <td id="liner_voyage_no"></td>
+    </tr>
+    <tr>
+        <th>특이사항</th>
+        <td colspan="2" id="liner_doctxt" class="left"></td>
+        <th>Shipping<br>Mark</th>
+        <td colspan="4" id="liner_tdobject" class="left"></td>
+    </tr>
+</table>
+
+    <table class="liner-item-table">
+        <colgroup>
+		    <col width="4%">
+		    <col width="14%">
+		    <col width="28%">
+		    <col width="6%">
+		    <col width="6%">
+		    <col width="6%">
+		    <col width="6%">
+		    <col width="13%">
+		    <col width="6%">
+		    <col width="11%">
+		</colgroup>
+        <thead>
+		    <tr>
+		        <th rowspan="2">No</th>
+		        <th rowspan="2">품목코드</th>
+		        <th rowspan="2">품목명</th>
+		        <th rowspan="2">평량</th>
+		        <th rowspan="2">규격</th>
+		        <th colspan="2">지시수량</th>
+		        <th rowspan="2">개별바코드</th>
+		        <th rowspan="2">Roll<br>길이</th>
+		        <th rowspan="2">비고</th>
+		    </tr>
+		    <tr>
+		        <th>수량</th>
+		        <th>단위</th>
+		    </tr>
+		</thead>
+        <tbody id="linerItemBody"></tbody>
+    </table>
+
+    <table class="liner-sign">
+	    <colgroup>
+	        <col width="4%">
+	        <col width="18%">
+	        <col width="18%">
+	        <col width="18%">
+	        <col width="14%">
+	        <col width="10%">
+	        <col width="8%">
+	    </colgroup>
+        <tr>
+		    <th>기타</th>
+		    <td class="left no-right">입문시간:</td>
+		    <td class="left no-left no-right">출문시간:</td>
+		    <td class="left no-left no-right">팔레트종류:</td>
+		    <td class="left no-left no-right">팔레트수량:</td>
+		    <td class="left no-right">출고담당자:</td>
+		    <td class="no-left">(인)</td>
+		</tr>
+    </table>
+
+    <div class="liner-notice">
+        위의 출고 지시 수량과 상차 수량이 틀림없음을 확인하여 만약 후일 사고가 있을 시는 전책임을 위임하겠기에 각서합니다
+    </div>
+
+    <div class="liner-driver-sign">
+        차량번호 : 　　　　　　　　　　 성명 : 　　　　　　　　　 (인)
+    </div>
+</div>
+<!-- =========================
+     이송명세서
+========================== -->
+<div id="transferPageBreak" style="page-break-before: always; break-before: page;"></div>
+
+<!-- <div class="kiosk-paper-doc" id="transferArea"> -->
+<div id="transferArea" class="print-portrait"></div>
+
+<div class="kiosk-paper-doc template-sheet" id="transferTemplate">
+
+    <!-- 공급자 보관용 -->
+    <div class="kiosk-paper-page transfer-copy" data-copy-type="SUPPLIER">
+        <div class="kiosk-paper-header">
+            <div>
+                <ul>
+                    <li>납 품 일 자 : <span id="trn_delivery_date_1"></span></li>
+                    <li>출 력 일 자 : <span id="trn_print_date_1"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>이 송 명 세 서</p>
+                <span>(공급자 보관용)</span>
+            </div>
+
+            <div>
+               <div id="trn_barcode_1" class="kiosk-paper-barcode"></div>
+				<div id="trn_barcode_text_1" class="transfer-barcode-text"></div>
+				<p class="ship-no">[선적번호 : <span id="trn_stknum_1"></span>]</p>
+            </div>
+        </div>
+
+        <!-- 기존 이송명세서 본문 table 그대로 복사 -->
+        <div id="transferBody_1"></div>
+    </div>
+
+    <!-- 공급받는자 보관용 -->
+    <div class="kiosk-paper-page transfer-copy" data-copy-type="CLIENT">
+        <div class="kiosk-paper-header">
+            <div>
+                <ul>
+                    <li>납 품 일 자 : <span id="trn_delivery_date_2"></span></li>
+                    <li>출 력 일 자 : <span id="trn_print_date_2"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>이 송 명 세 서</p>
+                <span>(공급받는자 보관용)</span>
+            </div>
+
+            <div>
+                <div id="trn_barcode_2" class="kiosk-paper-barcode"></div>
+                <div id="trn_barcode_text_2" class="transfer-barcode-text"></div>
+                <p class="ship-no">[선적번호 : <span id="trn_stknum_2"></span>]</p>
+            </div>
+        </div>
+
+        <div id="transferBody_2"></div>
+    </div>
+
+    <!-- 인수증 -->
+    <div class="kiosk-paper-page transfer-copy" data-copy-type="RECEIPT">
+        <h1 class="takeout-title">시동 끄고 고임목 받치고 반출도장 받으시오</h1>
+
+        <div class="kiosk-paper-header">
+            <div>
+                <table class="time-table takeout-confirm-table">
+				    <colgroup>
+				        <col width="30%">
+				        <col width="70%">
+				    </colgroup>
+				    <tr>
+				        <th>반출<br>확인</th>
+				        <td></td>
+				    </tr>
+				</table>
+                <ul class="trn-receipt-date">
+                    <li>납 품 일 자 : <span id="trn_delivery_date_3"></span></li>
+                    <li>출 력 일 자 : <span id="trn_print_date_3"></span></li>
+                </ul>
+            </div>
+
+            <div class="kiosk-paper-title">
+                <p>이 송 명 세 서</p>
+                <span>(인수증)</span>
+            </div>
+
+            <div>
+                <div id="trn_barcode_3" class="kiosk-paper-barcode"></div>
+				<div id="trn_barcode_text_3" class="transfer-barcode-text"></div>
+                <table class="time-table trn-receipt-time-table">
+                    <tr>
+                        <th>도착시간</th>
+                        <th>하차시간</th>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+                <p class="ship-no">[선적번호 : <span id="trn_stknum_3"></span>]</p>
+            </div>
+        </div>
+
+        <div id="transferBody_3"></div>
+
+        <table class="no-border-table" style="margin-top:8px;">
+            <tr>
+                <td style="height:45px;" class="right">
+                    인수인 :　　　　　　　　　　　　　(날인 또는 서명)
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

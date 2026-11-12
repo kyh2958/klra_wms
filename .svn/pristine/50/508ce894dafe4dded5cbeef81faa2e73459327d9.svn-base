@@ -1,0 +1,208 @@
+<%@ page language="java"
+    contentType="text/plain; charset=UTF-8"
+    pageEncoding="UTF-8"
+    import="
+        org.apache.logging.log4j.LogManager,
+        org.apache.logging.log4j.Logger,
+        java.util.UUID,
+        java.util.Enumeration,
+        java.util.Set,
+        java.util.HashSet,
+        java.util.Arrays,
+        javax.servlet.RequestDispatcher"
+%>
+
+<%!
+private static final Logger log = LogManager.getLogger("DataExceptionJSP");
+
+/**
+ * Root Cause 조회
+ */
+private Throwable getRootCause(Throwable t){
+
+    if(t == null){
+        return null;
+    }
+
+    Throwable cur = t;
+    int guard = 0;
+
+    while(cur.getCause() != null &&
+          cur.getCause() != cur &&
+          guard++ < 50){
+
+        cur = cur.getCause();
+    }
+
+    return cur;
+}
+%>
+
+<%
+
+/*************************************************
+ * Error Page 재진입 방지
+ *************************************************/
+if(Boolean.TRUE.equals(request.getAttribute("__DATA_EXCEPTION_PAGE_VISITED__"))){
+
+    response.setStatus(500);
+    out.print("ERROR_PAGE_REENTRY");
+    return;
+}
+
+request.setAttribute("__DATA_EXCEPTION_PAGE_VISITED__", Boolean.TRUE);
+
+/*************************************************
+ * Request 정보
+ *************************************************/
+Object statusCodeObj = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
+Object originalUriObj = request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
+Object servletName = request.getAttribute(RequestDispatcher.ERROR_SERVLET_NAME);
+
+String originalUri = originalUriObj == null ? "" : originalUriObj.toString();
+
+/*************************************************
+ * Skip URI
+ *************************************************/
+Set<String> skipUriSet = new HashSet<String>(Arrays.asList(
+    "/wms/inventory/json/MV01CreatTaskOrder.data"
+));
+
+if(skipUriSet.contains(originalUri)){
+    response.setStatus(500);
+    out.print("ERROR");
+    return;
+}
+
+/*************************************************
+ * Error ID
+ *************************************************/
+String errorId = UUID.randomUUID().toString();
+String errMsg = errorId;
+
+/*************************************************
+ * Exception
+ *************************************************/
+Throwable ex = (Throwable)request.getAttribute("exceptionMsg");
+
+if(ex == null){
+    ex = (Throwable)request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
+}
+
+Throwable root = getRootCause(ex);
+
+/*************************************************
+ * 로그 출력
+ *************************************************/
+log.error("");
+log.error("==============================================================");
+log.error("                  DATA EXCEPTION OCCURRED");
+log.error("==============================================================");
+
+log.error("ERROR ID        : {}", errorId);
+log.error("THREAD          : {}", Thread.currentThread().getName());
+
+log.error("DISPATCH TYPE   : {}", request.getDispatcherType());
+log.error("METHOD          : {}", request.getMethod());
+
+log.error("CURRENT URI     : {}", request.getRequestURI());
+log.error("ORIGINAL URI    : {}", originalUri);
+
+log.error("QUERY STRING    : {}", request.getQueryString());
+log.error("REMOTE ADDR     : {}", request.getRemoteAddr());
+
+log.error("STATUS CODE     : {}", statusCodeObj);
+log.error("SERVLET NAME    : {}", servletName);
+
+/*************************************************
+ * Parameter 출력
+ *************************************************/
+Enumeration<String> names = request.getParameterNames();
+
+while(names.hasMoreElements()){
+
+    String name = names.nextElement();
+
+    try{
+        log.error("PARAM [{}] = {}", name, request.getParameter(name));
+    }catch(Exception ignore){
+    }
+
+}
+
+/*************************************************
+ * Exception 정보
+ *************************************************/
+if(ex != null){
+
+    log.error("----------------------------------------------");
+    log.error("TOP ERROR TYPE : {}", ex.getClass().getName());
+    log.error("TOP ERROR MSG  : {}", ex.getMessage());
+    errMsg = ex.getMessage();
+
+}else{
+
+    log.error("TOP ERROR : NULL");
+
+}
+
+if(root != null){
+
+    log.error("----------------------------------------------");
+    log.error("ROOT ERROR TYPE : {}", root.getClass().getName());
+    log.error("ROOT ERROR MSG  : {}", root.getMessage());
+
+}
+
+/*************************************************
+ * StackOverflowError
+ *************************************************/
+if(root instanceof StackOverflowError){
+
+    StackTraceElement[] arr = root.getStackTrace();
+
+    log.error("----------------------------------------------");
+    log.error("FIRST STACK TRACE (30)");
+
+    for(int i=0;i<Math.min(arr.length,30);i++){
+
+        log.error("[{}] {}", i, arr[i]);
+
+    }
+
+}
+
+/*************************************************
+ * 전체 StackTrace
+ *************************************************/
+if(ex != null){
+
+    log.error("----------------------------------------------");
+    log.error("FULL STACK TRACE", ex);
+
+}
+
+log.error("==============================================================");
+
+/*************************************************
+ * Status 유지
+ *************************************************/
+int sc = 500;
+
+try{
+
+    if(statusCodeObj != null){
+        sc = Integer.parseInt(statusCodeObj.toString());
+    }
+
+}catch(Exception ignore){
+}
+
+response.setStatus(sc);
+
+/*************************************************
+ * Client Response
+ *************************************************/
+out.print(errMsg);
+
+%>

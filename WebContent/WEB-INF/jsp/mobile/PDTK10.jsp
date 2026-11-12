@@ -1,0 +1,621 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+
+<!doctype html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<style type="text/css">
+button{ vertical-align: bottom; height: 37px; }
+input:read-only{ background-color: #e2e2e2; }
+select:disabled{ background-color: #e2e2e2; }
+.tem5_content .tableWrap_search  { overflow: hidden; }
+.tem4_content .select_box table  { width  : 98% !important; margin: auto; }
+.tem4_content .select_box .text  { padding: unset !important; margin: unset !important; }
+.tem4_content table th           { padding: 3px !important; white-space: normal; }
+.tem4_content table td           { padding: 3px !important; }
+.number { text-align: right }
+
+</style>
+<script>
+	$(document).ready(function(){
+		
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,		
+			gridMobileType : true,
+			emptyMsgType:false			
+		});
+		
+		$('#BARCOD').focus();		
+		gridList.resetGrid("gridList");
+		
+		$('.number').change(function (e) {
+	         var value = e.currentTarget.value;
+	         e.currentTarget.value = setDecimalValue(value, 3);
+	      })
+		
+	      gridList.setReadOnly("gridList", true, ['rowNum']);
+		});
+	
+	function setDecimalValue(str, decimal) {
+		str = new String(str);
+		var regex = /[^0-9.]/g;
+		var number = Number(str.replace(regex, ""));
+		number = number ? number : 0;
+		return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+	}
+	
+	function reset(refreshYn) {
+		if(refreshYn != "Y"){
+			
+			commonUtil.msgConfirm("VALID_M0011",null, //데이터 초기화됩니다. 계속 하시겠습니까?
+					function () {
+				
+				$("#BARCOD").val("");
+				$("#LOCASR").val("");
+				$("#SKUKEY").val("");
+				$("#DESC01").val("");
+				$("#UOMKEY").val("");
+				$("#PLNTKY").val("");
+				$("#QTSIWH").val("0.000");
+				$("#QTSPUT").val("0.000");
+						        
+		        $comboObj = $("#LOTA01");
+				 inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+				 
+				gridList.resetGrid("gridList");
+				$('#BARCOD').focus();			
+					}, function () {
+						
+						$('#BARCOD').focus();
+						return;
+					}
+				);
+		}else{
+			
+			$("#BARCOD").val("");
+			$("#LOCASR").val("");
+			$("#SKUKEY").val("");
+			$("#DESC01").val("");
+			$("#UOMKEY").val("");
+			$("#PLNTKY").val("");
+			$("#QTSIWH").val("0.000");
+			$("#QTSPUT").val("0.000");
+					        
+	        $comboObj = $("#LOTA01");
+			 inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+			 
+			gridList.resetGrid("gridList");
+			
+			$('#BARCOD').focus();
+		}
+		
+		
+		
+		
+		
+	}
+	
+	
+	//생산직불출 출고완료
+	function start(){
+		var list = gridList.getGridData("gridList");
+		var param = new DataMap();
+		
+		
+		
+		
+		
+		for(var i=0; i < list.length; i++){
+			
+			var ListLota01 = gridList.getColData("gridList", i, "LOTA01");						
+			var ListLota02 = gridList.getColData("gridList", i, "LOTA02"); 
+			var FirstSkukey = gridList.getColData("gridList", i, "SKUKEY").substr(0, 2);
+			var HeadLota01 = gridList.getColData("gridList", i, "TOWAREKY");
+			
+			var j = i+1;
+			
+			if(i+1 >= list.length){
+				j = list.length-1;							
+			}
+			
+			var NextListLota01 = gridList.getColData("gridList", j, "LOTA01");
+			var NextListLota02 = gridList.getColData("gridList", j, "LOTA02");
+			var NextFirstSkukey = gridList.getColData("gridList", j, "SKUKEY").substr(0, 2);
+			
+			
+			if(((ListLota01 == "2400" && ListLota02 == "P100" && (FirstSkukey == "S0" || FirstSkukey == "S9")) || (NextListLota01 == "2400" && NextListLota02 == "P100" && (NextFirstSkukey == "S0" || NextFirstSkukey == "S9"))) && ListLota01 != NextListLota01) {
+				PlaySound("e");					
+				commonUtil.msgBox("VALID_M2101", null, null, function () { //밀롤외 품목이존재합니다. 
+					$('#BARCOD').focus();
+					return;
+				}); 
+				
+			}
+										
+		}
+		
+		
+		param.put("WAREKY", '<%=wareky%>');
+        param.put("OWNRKY", "<%=ownrky%>");
+        param.put("LANGKY", "<%=langky%>");
+        
+        param.put("list", list);
+        
+        param.put("PROGID", "<%=menuId%>");
+                   
+        
+        commonUtil.msgConfirm("OUT_M0191",null,
+   			function () {
+	        	var json = netUtil.sendData({			
+	    			url: "/mobile/Mobile/json/savePDTK10.data",
+	    			param: param
+	    		});
+	            
+	            if(json && json.data){
+	            
+	            	var sendMsg = json.data["MSG"];
+		            var sendMsg_Type = json.data["MSG_TYPE"];
+		            var sendMsg_Doc_No = json.data["MSG_DOC_NO"];
+	            	
+	            	if(json.data["GROWNUM_LIST"].length > 0){		// 출고 실패
+	            		commonUtil.msgBox(sendMsg);		// 출고완료에 실패하였습니다.
+	            		return;
+	            	} else {		// return 되는 json 없으면 성공
+	            		PlaySound("s");					
+ 						commonUtil.msgBox("OUT_M0192", null, null, function () { //출고완료 되었습니다.
+ 							reset("Y");
+		            	});
+ 					}
+   				}
+    	});
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		
+		if(gridId == "gridList" && rowNum >= 0){
+			
+			var list = gridList.getGridData("gridList");
+			
+			var barcod = gridList.getColData("gridList", rowNum, "LOTA14");
+			var locasr = gridList.getColData("gridList", rowNum, "LOCASR");
+			var skukey = gridList.getColData("gridList", rowNum, "SKUKEY");
+			var desc01 = gridList.getColData("gridList", rowNum, "DESC01");
+			var uomkey = gridList.getColData("gridList", rowNum, "UOMKEY");
+			var lota02 = gridList.getColData("gridList", rowNum, "LOTA02");
+			
+			var qtsiwh = gridList.getColData("gridList", rowNum, "QTSIWH");
+			var shpqty = gridList.getColData("gridList", rowNum, "SHPQTY");						
+			
+			shpqty = setDecimalValue(new Number(shpqty), 3); 
+			qtsiwh = setDecimalValue(new Number(qtsiwh), 3);
+			
+			if( new Number(shpqty) > new Number(qtsiwh)){
+				shpqty = qtsiwh;
+			}
+            			
+			
+			
+    		
+    		$("#STLKY").val(gridList.getColData("gridList", rowNum, "LOTA01"));
+    		$("#FIRSTSKUKEY").val(gridList.getColData("gridList", rowNum, "SKUKEY").substr(0, 1));    		
+    		$("#BARCOD").val(barcod);
+			$("#LOCASR").val(locasr);
+			$("#SKUKEY").val(skukey);
+			$("#DESC01").val(desc01);
+			$("#UOMKEY").val(uomkey);
+			$("#PLNTKY").val(lota02);			
+			$("#QTSIWH").val(qtsiwh);
+			$("#QTSPUT").val(shpqty);
+			
+			$comboObj = $("#LOTA01");
+    		inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+    					
+    		$("#LOTA01").val(gridList.getColData("gridList", rowNum, "TOWAREKY"));
+    		
+    		gridList.setColFocus(gridId, rowNum, "LOTA14");
+			
+    		$("#BARCOD").focus();
+		}
+		
+	}
+	
+	//재고조회
+	function eventKeydown(event,objId){
+
+		if(event.keyCode == "13"){
+				var list = gridList.getGridData("gridList");
+				var barcod = $.trim($("#BARCOD").val());	
+				
+				var param = new DataMap();
+				
+				 param.put("WAREKY", '<%=wareky%>');
+	             param.put("OWNRKY", "<%=ownrky%>");
+	             param.put("LANGKY", "<%=langky%>");
+<%-- 	             param.put('PLNTKY', '<%=plntky%>'); --%>
+	             
+	             param.put("BARCOD", barcod);
+		         param.put("TASOTY", "356");   
+		         
+	             var json = netUtil.sendData({
+						module: "WmsMobileOutboundPicking",
+						command: "PDTK10StockValidation",						
+						param: param
+					});
+	             
+	            
+	             if(json && json.data){			    						 
+					
+	            	  $(json.data).each(function (i, item) {
+	                     item.LOCAKY = item.LOCASR;
+	                  })
+	                  
+	            	 if(json.data.length > 1){
+	            		 var param = new DataMap();
+	    	             param.put("json", json);
+	    	             mobile.linkPopOpen('/mobile/PDLOC_POP.page', param);
+	    	             
+	            	 }else if(json.data.length == 1){
+	            		 
+	            		 for(var i=0; i < list.length; i++){
+	            			 
+		            		 if(json.data[0].LOCASR == gridList.getColData("gridList", i, "LOCASR") &&
+		            			json.data[0].AREAKY == gridList.getColData("gridList", i, "AREAKY") &&
+		            			json.data[0].ZONEKY == gridList.getColData("gridList", i, "ZONEKY") &&
+		            			json.data[0].LOTA14 == gridList.getColData("gridList", i, "LOTA14") && gridList.getColData("gridList", i, "GRowState") != "D"){
+		            			 gridListEventRowClick("gridList", i, "LOCASR");		            			 
+		            			 return;
+		            		 } 
+	            		 }
+	            		 
+	            		 var bindData = new DataMap();
+		                 bindData.putObject(json.data[0]);
+		                 dataBind.dataNameBind(bindData, "searchArea");
+		                 
+		                 var jsonArray = [];
+		                 jsonArray.push(JSON.parse(bindData));
+		                 
+		                 var jsonObj = {data: jsonArray}; // parse jsonObject
+		                 
+		                 gridList.appendJson('gridList', jsonObj); // append grid
+		                 
+		                 $("#PLNTKY").val(json.data[0].LOTA02);
+		                 $("#STLKY").val(json.data[0].STLKY);                 
+		                 $("#FIRSTSKUKEY").val(json.data[0].FIRSTSKUKEY);
+		                 $("#QTSPUT").val(setDecimalValue(json.data[0].SHPQTY),3);
+		                 
+		                 $comboObj = $("#LOTA01");
+		         		 inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+		         		
+		         		 gridList.setColFocus('gridList', list.length, 'LOTA14'); 
+		         		PlaySound('s');
+	            	 }else{	            		 
+		            	 
+		            	 PlaySound("e");					
+							/* 240103 메시지 변경으로 주석처리
+		            	 	commonUtil.msgBox("VALID_M0005", null, null, function () { 
+								$('#BARCOD').focus();
+								return;
+							});
+							*/
+							
+							// 240103 메시지 변경(재고상태가 품질이거나 가용수량이 0인 건은 처리할 수 없습니다.)
+		            	 	commonUtil.msgBox("VALID_M2156", null, null, function () { 
+								$('#BARCOD').focus();
+								return;
+							});
+							
+		             }
+	            	 	            	 	            	 	            	 
+	         		
+	            	  $("#BARCOD").focus();    
+	           }    
+				
+		}		
+		
+	}
+	
+	function LocPopCallback(data) {
+		
+		var list = gridList.getGridData("gridList");
+		
+		for(var i=0; i < list.length; i++){
+			 
+			if(data.get("LOCASR") == gridList.getColData("gridList", i, "LOCASR") &&
+			   data.get("AREAKY") == gridList.getColData("gridList", i, "AREAKY") &&
+			   data.get("ZONEKY") == gridList.getColData("gridList", i, "ZONEKY") &&
+			   data.get("SKUKEY") == gridList.getColData("gridList", i, "SKUKEY") &&
+			   data.get("LOTA01") == gridList.getColData("gridList", i, "LOTA01") &&
+			   data.get("LOTA02") == gridList.getColData("gridList", i, "LOTA02") &&
+			   data.get("QTSIWH") == gridList.getColData("gridList", i, "QTSIWH")){
+				       			     			
+    			var barcod = gridList.getColData("gridList", i, "LOTA14");
+    			var locasr = gridList.getColData("gridList", i, "LOCASR");
+    			var skukey = gridList.getColData("gridList", i, "SKUKEY");
+    			var desc01 = gridList.getColData("gridList", i, "DESC01");
+    			var uomkey = gridList.getColData("gridList", i, "UOMKEY");
+    			var lota02 = gridList.getColData("gridList", i, "LOTA02");
+    			
+    			var qtsiwh = gridList.getColData("gridList", i, "QTSIWH");
+    			var shpqty = gridList.getColData("gridList", i, "SHPQTY");						
+    			
+    			shpqty = setDecimalValue(new Number(shpqty) + new Number(data.get('SHPQTY')), 3); 
+    			qtsiwh = setDecimalValue(new Number(qtsiwh), 3);
+    			
+    			if( new Number(shpqty) > new Number(qtsiwh)){
+    				shpqty = qtsiwh;
+    			}
+    			
+    			
+    			$comboObj = $("#LOTA01");
+        		inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+        					
+    			gridList.setColFocus("gridList", i, "LOTA14");
+    			
+        		$("#LOTA01").val(gridList.getColData("gridList", i, "TOWAREKY"));
+        		gridList.setColValue("gridList", i, "SHPQTY", shpqty);
+        		
+        		
+        		$("#BARCOD").val(barcod);
+    			$("#LOCASR").val(locasr);
+    			$("#SKUKEY").val(skukey);
+    			$("#DESC01").val(desc01);
+    			$("#UOMKEY").val(uomkey);
+    			$("#PLNTKY").val(lota02);
+    			$("#QTSIWH").val(qtsiwh);
+    			$("#QTSPUT").val(shpqty);
+    			
+       			 return;
+        	} 
+		 }
+		
+        dataBind.dataNameBind(data, "bindArea");
+        
+        var $input = $('#bindArea').find('.number');
+        
+        for(var i = 0; i< $input.length; i++) {
+        	$input[i].value = setDecimalValue($input[i].value, 3);
+        }
+        
+        
+        var jsonArray = [];
+        jsonArray.push(JSON.parse(data));
+        
+        var jsonObj = {data: jsonArray}; // parse jsonObject
+        
+        gridList.appendJson('gridList', jsonObj); // append grid
+        
+        $("#PLNTKY").val(data.get('LOTA02'));
+        $("#QTSPUT").val(setDecimalValue(data.get('SHPQTY'),3));
+        
+        $comboObj = $("#LOTA01");
+		 inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileOutboundPicking,LOTA01COMBO");
+		 
+		 gridList.setColFocus('gridList',list.length, 'LOTA14');
+			
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "WmsMobileOutboundPicking,LOTA01COMBO"){
+            var param = new DataMap();
+            var plntky = $.trim($("#PLNTKY").val());
+            var stlky = $.trim($("#STLKY").val());
+            var firstskukey = $.trim($("#FIRSTSKUKEY").val());
+            
+            param.put("WAREKY", '<%=wareky%>');
+            param.put("OWNRKY", "<%=ownrky%>");
+            param.put("LANGKY", "<%=langky%>");            
+            param.put("PLNTKY", plntky);
+            param.put("STLKY", stlky);
+            param.put("FIRSTSKUKEY", firstskukey);
+            param.put("WMSMAK", "X");
+            
+            return param;
+        }
+	}
+	
+	function valueChangeEvent(obj) {
+		
+		var objId  = $(obj).attr("id");
+		var objVal = $(obj).val();
+		var rowNum = gridList.getFocusRowNum("gridList");
+		
+		
+		if(objId == "QTSPUT"){
+			
+			var qtsiwh = new Number($("#QTSIWH").val());
+			
+			if(new Number(objVal) > qtsiwh){
+				
+				PlaySound("e");					
+				commonUtil.msgBox("VALID_M2072", null, null, function () { 
+					$("#QTSPUT").val(0);
+					return;          			
+				}); 
+				
+			}
+			
+			gridList.setColValue("gridList", rowNum, "SHPQTY", objVal);
+			
+			$(obj).val(setDecimalValue(objVal, 3));
+			
+		}else if(objId =="LOTA01"){
+						
+			gridList.setColValue("gridList", rowNum, "TOWAREKY", objVal);			
+			
+		}
+		
+		
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div id="searchArea">	
+					<table>
+						<colgroup>
+							<col width="80px" />
+							<col width="*" />																										
+						</colgroup>
+						<tbody id="paramArea">								
+							<tr>
+								<th CL='STD_BARCOD'>바코드</th>
+								<td colspan="5">
+									<input type="text" class="text textbox" name="BARCOD" id="BARCOD" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/>
+								</td>
+							</tr>								
+							<tr>
+								<th CL='STD_LOCAKY3'>로케이션</th>
+								<td colspan="5">
+									<input type="text" class="text" name="LOCASR" id="LOCASR" readonly/>
+								</td>
+							</tr>
+							<tr>
+								<th CL='STD_SKUKEY'>품목코드</th>
+								<td colspan="5">
+									<input type="text" class="text" name="SKUKEY" id="SKUKEY" readonly/>
+								</td>
+							</tr>	
+							<tr>
+								<th CL='STD_DESC01'>품목명</th>
+								<td colspan="5">
+									<input type="text" class="text" name="DESC01" id="DESC01" readonly/>									
+								</td>
+							</tr>													
+					</tbody>
+				</table>	
+				<table>
+					<colgroup>
+						<col width="80px" />
+						<col width="90px" />
+						<col width="44px" />
+						<col width="75px" />
+						<col width="100px" />
+					</colgroup>
+					<tbody>									
+							<tr>
+								<th  CL='STD_QTSIWH'>재고수량</th>
+								<td>
+									<input type="text" class="text number" name="QTSIWH" id="QTSIWH" readonly="readonly"/>
+								</td>									
+								<td>
+									<input type="text" class="text" name="UOMKEY" id="UOMKEY" readonly="readonly"/>
+								</td>
+								<th  CL='STD_SHPQTY'>출고수량</th>
+								<td>
+									<input type="text" name="QTSPUT" id="QTSPUT" onfocus="this.select();" class="text number"  value="0.000" onchange="valueChangeEvent(this)"/>
+								</td>
+							</tr>								
+							<tr>
+								<th  CL='STD_LOTA01_TO'>TO저장위치</th>
+								<td colspan="5">
+									<select class="input" Combo="WmsMobileOutboundPicking,LOTA01COMBO" name="LOTA01" id="LOTA01" validate="required(STD_LOTA01)" onchange="valueChangeEvent(this)">							  
+									</select>
+								</td>
+							</tr>	
+							<tr><th></th>	
+								<td>				
+								<input type="hidden" class="input" name="PLNTKY" id="PLNTKY" validate="required(STD_LOTA02)"/>
+								</td>
+								<td>				
+								<input type="hidden" class="input" name="STLKY" id="STLKY"/>
+								</td>
+								<td>				
+								<input type="hidden" class="input" name="FIRSTSKUKEY" id="FIRSTSKUKEY"/>
+								</td>
+							</tr>		
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="tableWrap_search section" >
+				<div class="tableHeader">						 
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="60px" />
+							<col width="110px" />
+							<col width="100px" />
+							<col width="70px" />
+							<col width="70px" />
+							<col width="70px" />
+							<col width="130px" />
+							<col width="150px" />
+						</colgroup> 
+						<thead>
+							<tr>
+								<th CL="STD_NO">NO</th>								
+								<th CL="STD_LOTA14">제조LOT</th>
+								<th CL="STD_LOCAKY">로케이션</th>
+								<th CL="STD_SHPQTY">출고수량</th>									
+								<th CL="STD_UOM">단위</th>									
+								<th CL="STD_LOTA01">저장위치</th>
+								<th CL="STD_SKUKEY">품목코드</th>
+								<th CL="STD_DESC01">품목명</th>							
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="60px" />
+							<col width="110px" />
+							<col width="100px" />
+							<col width="70px" />
+							<col width="70px" />
+							<col width="70px" />
+							<col width="130px" />
+							<col width="150px" />
+							<col width="0px" />							
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+							<col width="0px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="false">
+								<td GCol="rownum">순번</td>
+								<td GCol="text,LOTA14">제조LOT</td>
+								<td GCol="text,LOCASR">실로케이션</td>
+								<td GCol="text,SHPQTY" GF="N 20,3">출고수량</td>										
+								<td GCol="text,UOMKEY">단위</td>										
+								<td GCol="text,LOTA01">저장위치</td>
+								<td GCol="text,SKUKEY">품목코드</td>
+								<td GCol="text,DESC01">품목명</td>																																			
+								<td GCol="text,QTSIWH" hidden="hidden">재고수량</td>
+								<td GCol="text,LOTA02" hidden="hidden">플랜트</td>
+								<td GCol="text,TOWAREKY" hidden="hidden">저장위치</td>
+								<td GCol="text,AREAKY" hidden="hidden">영역</td>
+								<td GCol="text,ZONEKY" hidden="hidden">구역</td>								
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>						
+		
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;" >
+				<table>
+					<tr>
+						<td class=f_1 width="30%" onclick="window.top.closePage()">
+							<label CL='BTN_EXIT'></label>
+						</td>					
+						<td class=f_1 width="30%" onclick ="reset()" >
+							<label CL='BTN_RESET'></label>
+						</td>
+						<td class=f_1 width="30%" onclick="start()">
+							<label CL='BTN_ERPSEND'></label>
+						</td>						
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->
+		</div>
+	</div>
+</body>

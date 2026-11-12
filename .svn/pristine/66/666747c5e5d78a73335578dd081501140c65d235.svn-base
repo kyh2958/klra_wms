@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="WcsIF">
+
+	<resultMap id="UPDATE_TB_PLT_STOCK" type="project.common.bean.DataMap">
+	    <result property="p_RESULT" column="p_RESULT"/>
+	    <result property="p_RESULT_MSG" column="p_RESULT_MSG"/>
+	    <result property="p_SCNT" column="p_SCNT"/>
+	    <result property="p_FCNT" column="p_FCNT"/>
+	</resultMap>
+	<select id="CALL_UPDATE_TB_PLT_STOCK_MAP" parameterType="Map" statementType="CALLABLE" resultMap="UPDATE_TB_PLT_STOCK">
+    	CALL SP_UPDATE_TB_PLT_STOCK(
+	        	IFNULL(TRIM(#{ORD_TYPE}),'NONE'),
+	        	IFNULL(TRIM(#{IND_BCD}),'0'),
+	            #{p_RESULT, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_RESULT_MSG, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_SCNT, mode=OUT, jdbcType=INTEGER, javaType=Integer},
+		        #{p_FCNT, mode=OUT, jdbcType=INTEGER, javaType=Integer}
+	        )
+	</select>
+	
+	<resultMap id="INSERT_TB_PLT_STOCK" type="project.common.bean.DataMap">
+	    <result property="p_RESULT" column="p_RESULT"/>
+	    <result property="p_RESULT_MSG" column="p_RESULT_MSG"/>
+	</resultMap>
+	<select id="CALL_INSERT_TB_PLT_STOCK_MAP" parameterType="Map" statementType="CALLABLE" resultMap="INSERT_TB_PLT_STOCK">
+    	CALL SP_INSERT_TB_PLT_STOCK(
+	        	IFNULL(TRIM(#{ORD_NO}),'0'),
+	        	IFNULL(TRIM(#{ORD_TYPE}),'IN'),
+	        	IFNULL(TRIM(#{PLANT_CD}),'0'),
+	        	IFNULL(TRIM(#{MATNR}),'0'),
+	        	IFNULL(TRIM(#{MATNR_NM}),'0'),
+	        	IFNULL(TRIM(#{LOT_NO}),'0'),
+	        	IFNULL(TRIM(#{IND_BCD}),'0'),
+	        	IFNULL(TRIM(#{UNIT}),'0'),
+	        	IFNULL(TRIM(#{QTY}),'0'),
+	        	IFNULL(TRIM(#{MACH_CD}),'0'),
+	            #{p_RESULT, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_RESULT_MSG, mode=OUT, jdbcType=VARCHAR, javaType=String}
+	        )
+	</select>
+</mapper>

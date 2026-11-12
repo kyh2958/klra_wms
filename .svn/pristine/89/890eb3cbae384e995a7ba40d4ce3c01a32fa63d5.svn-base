@@ -1,0 +1,295 @@
+package project.wms.controller;
+
+import java.security.PrivateKey;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import project.common.airfw.DateUtil;
+import project.common.airfw.User;
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.bean.SystemConfig;
+import project.common.bean.UriInfo;
+import project.common.controller.BaseController;
+import project.common.service.CommonService;
+import project.common.task.SseEventManager;
+import project.common.util.RSA;
+import project.common.util.ShaUtil;
+import project.wms.service.SsoGwService;
+
+
+@Controller
+public class WmsLoginController extends BaseController {
+
+	static final Logger log = LogManager.getLogger(WmsLoginController.class.getName());
+
+	@Autowired
+	private CommonService commonService;
+	
+	@Autowired
+	private SystemConfig systemConfig;
+	
+	@Autowired
+	private SsoGwService ssoGwService;
+
+	@RequestMapping("/*/json/login.*")
+	public String login(HttpSession session, HttpServletRequest request, Map model) throws SQLException {
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		logout(session, request, model);
+
+		map.setModuleCommand(systemConfig.getCmmonType(), "USERCHECK");
+		
+		String encPw = map.getString("PASSWD");
+		//String plntky = map.getString("PLNTKY");// 플랜트 값을 받는다
+		String decPw = null;
+		
+		try {
+			decPw = RSA.decryptRsa((PrivateKey) request.getSession().getAttribute("__rsaPrivateKey__"), encPw);
+		} catch (Exception e1) {
+			log.error(e1.getMessage());
+			
+			e1.printStackTrace();
+			
+			model.put("data", "P");
+			return JSON_VIEW;
+		}
+		
+		String userId = map.getString("USERID");
+		boolean isEpUser = ssoGwService.isSsoEpUser(userId,decPw);
+		
+		String password = "";
+		try {
+			password = ShaUtil.toSha256String(decPw);
+		} catch (Exception e) {
+			password = "";
+		}
+		map.put("PASSWD", password);
+
+		User user = (User)commonService.getObj(map);
+
+		if (user != null) {
+			
+			if(isEpUser != true) {
+				// 패스워드가 틀린 경우
+				if (!user.getPasswd().equals(map.getString("PASSWD"))) {
+					model.put("data", "N");
+					
+					return JSON_VIEW;
+				}
+				
+				// 활성화된 경우에만 가능
+				if(user.getDelmak().equals("V")) {
+					model.put("data", "F_LOGIN_DEL");
+					return JSON_VIEW;
+//				throw new SQLException("†F_LOGIN_DEL†");
+				}
+				
+				// 패스워드 변경일이 90일을 초과한 경우
+				String today = DateUtil.getShortDateString();
+//				if(today.compareTo(user.getPw90dat()) > 0) {
+//					model.put("data", "F_LOGIN_PW_90_OVER");
+//					return JSON_VIEW;
+//				throw new SQLException("†F_LOGIN_PW_90_OVER†");
+//				}
+				
+				// 마지막 로그인 일자가 90일을 초과한 경우
+//				if(today.compareTo(user.getLlogid90()) > 0) {
+//					model.put("data", "F_LOGIN_90_OVER");
+//					return JSON_VIEW;
+//				throw new SQLException("†F_LOGIN_90_OVER†");
+//				}
+				
+				// 물류센터에 접속 권한이 없음
+				map.setModuleCommand(systemConfig.getCmmonType(), "ROLCT");
+				map.put(CommonConfig.SES_USER_ID_KEY, user.getUserid());
+				List<DataMap> rolctList = commonService.getList(map);
+				if(rolctList.size() < 1){
+					model.put("data", "F_LOGIN_ROLE");
+					return JSON_VIEW;
+//				throw new SQLException("†F_LOGIN_ROLE†");
+				}
+				
+				//SseEventManager.sendEvent("DL081", "WmsLoginController.login", rolctList);
+			}
+
+			UriInfo uriInfo = (UriInfo)request.getAttribute(CommonConfig.REQUEST_URI_INFO_KEY);
+			
+			String pdaModule = uriInfo.getUri()!=null&&!"".equals(uriInfo.getUri().trim())&&uriInfo.getUri().indexOf("/") > -1?uriInfo.getUri().split("/")[1]:"";
+			boolean isPda = "mobile".equals(pdaModule)?true:false;
+			
+			//setLoginUser(session, model, map, user, plntky, commonService, systemConfig.getCmmonType(), "WMS");
+			setLoginUser(session, model, map, user, isPda, commonService, systemConfig.getCmmonType(), "WMS");
+			
+		} else {
+			model.put("data", "N");
+		}
+
+		return JSON_VIEW;
+	}
+	
+	/**
+	 * 로그인한 사용자 정보 셋팅
+	 * @param session
+	 * @param map
+	 * @param user
+	 * @param plntky
+	 */
+	public void setLoginUser(HttpSession session, Map model, DataMap map, User user, boolean isPda, CommonService commonService, String commonType, String loginType) {
+		String dataFlag = "N";
+		try {
+			commonService.update(commonType+".LOGIN", map);
+			
+			map.setModuleCommand("Common", "SYSGRIDCOL");
+			map.put(CommonConfig.SES_USER_ID_KEY, user.getUserid());
+			List<DataMap> list = commonService.getList(map);
+			DataMap usrlo = new DataMap();
+			DataMap row;
+			List data;
+			String progid;
+			for (int i = 0; i < list.size(); i++) {
+				row = list.get(i);
+				progid = row.getString("PROGID");
+				if (usrlo.containsKey(progid)) {
+					data = usrlo.getList(progid);
+					data.add(row);
+				} else {
+					List newData = new ArrayList();
+					newData.add(row);
+					usrlo.put(progid, newData);
+				}
+			}
+
+			user.setUsrlo(usrlo);
+			
+			String wareky = map.getString("WAREKY");
+			String langky = map.getString("LANGKY");
+			String mtype = user.getUserg4();// 품목군 값을 받는다
+			/*
+			if(!"".equals(user.getUserg4().trim())) {
+				plntky = user.getUserg4();// 플랜트 값을 받는다
+			}
+			*/
+			if(null == langky || "".contentEquals(langky.trim())) {
+				langky = "KR";
+			}
+			if(loginType.equals("SSO") || null == wareky || "".contentEquals(wareky.trim())) {
+				wareky = user.getUserg3();
+			}
+			
+			// 플랜트 지정을위해 설정된 거점이 없으면 청주공장으로 지정
+			if(null == wareky || "".contentEquals(wareky.trim())) {
+				wareky = "1100";
+			}
+			
+			map.put("WAREKY", wareky);
+			map.put("MTYPE", mtype);
+			map.setModuleCommand("Common", "MTYPE_PLANT");
+			map.put(CommonConfig.SES_USER_ID_KEY, user.getUserid());
+			DataMap plantMap = commonService.getMap(map);
+			if (plantMap == null || plantMap.containsKey("PLNTKY") == false) {
+				dataFlag = "N_NOT_EXIST_PLANT";
+				throw new SQLException("not exist MTYPE_PLANT: userId" + user.getUserid() + ", wareky: " + wareky + ", mtype: " + mtype);
+			}
+			session.setAttribute(CommonConfig.SES_MENU_GROUP_KEY, user.getMenugid());
+			
+			session.setAttribute(CommonConfig.SES_USER_OBJECT_KEY, user);
+			session.setAttribute(CommonConfig.SES_USER_ID_KEY, user.getUserid());
+			session.setAttribute(CommonConfig.SES_USER_NAME_KEY, user.getNmlast());
+			session.setAttribute(CommonConfig.SES_USER_WHAREHOUSE_KEY, wareky);
+			session.setAttribute(CommonConfig.SES_USER_OWNER_KEY, user.getOwner());
+			session.setAttribute(CommonConfig.SES_USER_COMPANY_KEY, user.getCompky());
+			session.setAttribute(CommonConfig.SES_USER_LANGUAGE_KEY, langky);
+			session.setAttribute(CommonConfig.SES_USER_EMPL_ID_KEY, user.getEmplid());
+			session.setAttribute(CommonConfig.SES_USER_THEME_KEY, CommonConfig.SYSTEM_THEME_PATH);
+			session.setAttribute(CommonConfig.SES_USER_REGN01_KEY, user.getRegn01());
+
+			session.setAttribute(CommonConfig.SES_DEVICE_TYPE, isPda == true ? "M" : "W");
+			session.setAttribute(CommonConfig.SES_MTYPE, mtype);
+			
+			session.setAttribute(CommonConfig.SES_USER_PLANT_KEY, plantMap.getString("PLNTKY"));
+			
+			String schema = "public";
+			if(!"WDSCM".equals(user.getCompid())){
+				schema = user.getCompid().toLowerCase();
+			}
+			session.setAttribute(CommonConfig.SES_SCHEMA, schema);
+			
+			// menu list
+			map.put("LANGKY", map.getString("LANGKY"));
+			map.put("USERID", user.getUserid());
+			map.put("MENUGID", user.getMenugid());
+			map.put("COMPID", user.getCompid());
+
+			list = commonService.getList("Common.MENUTREE", map);
+
+			session.setAttribute(CommonConfig.SES_USER_MENU_KEY, list);
+
+			DataMap urlMap = new DataMap();
+			String tmpUrl;
+			for (int i = 0; i < list.size(); i++) {
+				row = list.get(i);
+				tmpUrl = row.getString("PGPATH");
+				if (tmpUrl.trim().length() != 0) {
+					if (tmpUrl.substring(0, 2).equals("./")) {
+						tmpUrl = tmpUrl.substring(1);
+					}
+					if (tmpUrl.substring(tmpUrl.length() - 3).equals("jsp")) {
+						tmpUrl = tmpUrl.substring(0, tmpUrl.length() - 3) + "page";
+					}
+					urlMap.put(tmpUrl, true);
+				}
+			}
+			urlMap.put("/common/main.page", true);
+			urlMap.put("/common/left.page", true);
+			urlMap.put("/common/top.page", true);
+			urlMap.put("/common/wintab.page", true);
+			urlMap.put("/common/info.page", true);
+			session.setAttribute(CommonConfig.SES_USER_URL_KEY, urlMap);
+
+			dataFlag = "S";
+			
+			map.setModuleCommand("System", "LOGIN_LOG");
+			commonService.insert(map);
+
+		} catch (SQLException e) {
+			log.error("SQLException : " + e.getMessage());
+		}
+		
+		model.put("data", dataFlag);
+	}
+
+	@RequestMapping("/wms/json/logout.*")
+	public String logout(HttpSession session, HttpServletRequest request, Map model) throws SQLException {
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		if(session.getAttribute(CommonConfig.SES_USER_ID_KEY) != null){
+			String userid = session.getAttribute(CommonConfig.SES_USER_ID_KEY).toString();
+			
+			session.removeAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+			session.removeAttribute(CommonConfig.SES_USER_ID_KEY);
+			session.removeAttribute(CommonConfig.SES_USER_NAME_KEY);
+			session.removeAttribute(CommonConfig.SES_USER_COMPANY_KEY);
+			session.removeAttribute(CommonConfig.SES_DEPT_ID_KEY);
+			session.removeAttribute(CommonConfig.SES_USER_INFO_KEY);
+			session.removeAttribute(CommonConfig.SES_USER_MENU_KEY);
+			
+			map.setModuleCommand(systemConfig.getCmmonType(), "LOGOUT");
+			commonService.update(map);
+			
+			map.setModuleCommand("System", "LOGOUT_LOG");
+			commonService.insert(map);
+		}
+		return "/index";
+	}
+}

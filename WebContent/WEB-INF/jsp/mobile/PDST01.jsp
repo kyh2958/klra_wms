@@ -1,0 +1,349 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {
+	vertical-align: bottom;
+	height: 37px;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Smile Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	//var chkFlag = true;
+	var chkObjId = "";
+	var isGhostBarcod = false;
+	
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			module : "WmsInventory",
+			command : "PDST01",
+			gridMobileType : true
+		});
+		
+		gridList.setGrid({
+			id : "gridListSkuSum",
+			module : "WmsInventory",
+			command : "PDST01SKUSUM",
+			gridMobileType : true
+		});
+
+		$("#BARCOD").focus();
+		
+		$(".tableWrap_search").scroll(function() {
+		    // 현재 스크롤된 요소의 인덱스
+		    var index = $(this).index();
+
+		    // 다른 요소에 스크롤 위치 설정
+		    $(".tableWrap_search").not(this).scrollLeft($(this).scrollLeft());
+		});
+	})
+	
+	function onReadBarcode() {
+		var param = inputList.setRangeParam("searchArea");
+		var LOCAKY = param.get('LOCAKY');
+		var BARCOD = param.get('BARCOD');
+		var SKUKEY = param.get('SKUKEY');
+		if (!BARCOD) {
+			if (!SKUKEY && !LOCAKY) {
+				commonUtil.msgBox("COMMON_M0009", '바코드', null, function() {
+					$('#BARCOD').focus();
+				}); // {0}을(를) 입력해주세요.
+				return false;
+			}
+		}
+		
+		var BARCOD = $('#BARCOD').val();
+		
+		var gridDataList = gridList.getGridData('gridList');
+		var finded = gridDataList.find(x => { return x.get("LOTA14") == BARCOD })
+		if (finded) {
+			gridList.setColFocus('gridList', finded.get('GRowNum'), 'LOTA14');
+			$(".tableWrap_search:eq(1)").animate(({scrollTop: $("#gridList tr:eq(0)").outerHeight() * finded.get('GRowNum')}), 100);
+		} else {
+			searchList();
+		}
+		
+		$("#BARCOD").focus();
+	}
+	
+	function onReadLocaky(type){
+		var param = inputList.setRangeParam("searchArea");
+		var targetLOCAKY = param.get("LOCAKY");
+
+		if (targetLOCAKY != undefined && targetLOCAKY != "") {
+			targetLOCAKY = targetLOCAKY.toUpperCase();
+		}
+		
+		param.remove('BARCOD');
+		param.remove('LOCAKY');
+		param.put('WAREKY', '<%=wareky%>');
+		param.put("OWNRKY", "<%=ownrky%>");
+
+		if (type == 'find') {
+			var json = netUtil.sendData({
+				module : "WmsInventory",
+				command : "PDMV01LOCMA",
+				sendType: "listMobile",
+				param : param
+			});
+			
+			param.put("json", json);
+
+			var finded = json.data.find(
+				x => { return x.LOCAKY == targetLOCAKY }
+			);
+			
+			if (finded) {
+				param.put("AREAKY", finded.AREAKY);
+				param.put("ZONEKY", finded.ZONEKY);
+			}
+
+			mobile.linkPopOpen('/mobile/PDLOC_POP.page', param);
+		} else {
+			param.put("LOCAKY", targetLOCAKY);
+			LocPopCallback(param)
+		}
+	}
+	
+	function LocPopCallback(data) {
+		$('#LOCAKY').val(data.get("LOCAKY"));
+		searchList();
+	}
+
+	function searchList(){
+		
+		var searchtype = "<%=mtype%>";
+		
+		if("<%=mtype%>" == "P" || "<%=mtype%>" == "M" ){
+			searchtype = "P";
+		}
+		
+		$("#SEARCHTYPE").val(searchtype);
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+		
+		gridList.gridList({
+			id : "gridListSkuSum",
+			param : param
+		});
+		
+		$("#BARCOD").focus();
+		
+		
+		// gridList.prependJson('gridList', jsonObj);
+	}
+	
+	function searchEndEventFunction(){
+		$("#BARCOD").focus();
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		
+		if (gridId == "gridList") {
+			if (dataLength == 0) {
+				PlaySound('e');
+			} else {
+				PlaySound('s');
+				
+				var gridDataList = gridList.getGridData('gridList');
+				var finded = gridDataList.find(x => { return x.get("LOTA14") == $('#BARCOD').val() })
+				if (finded) {
+					gridList.setColFocus('gridList', finded.get('GRowNum'), 'LOTA14');
+				} else {
+					isGhostBarcod = true;
+				}
+				
+				var tdDesc01Index = $("#tableHeader th").filter(function(i){
+					if($(this).attr('CL') == 'STD_DESC01'){
+						return i;
+					}
+				}).index();
+	
+				for(var i = 0; i< dataLength;i++){
+					$("#gridList tr:eq("+i+") td:eq("+tdDesc01Index+")").text(gridList.getColData(gridId,i,"DESC01").replace(/깨끗한나라|보솜이|프레미뇽|디어스킨|메디프렌즈/g, ""));
+				}
+				
+				if ($('#BARCOD').val() && !isGhostBarcod) {
+					// 바코드 포커싱을 위한 호출
+					onReadBarcode()
+				}
+			}
+			
+			$('#BARCOD').focus();
+		}else if (gridId == "gridListSkuSum") {
+			if (dataLength > 1) {
+
+				//var totalSum = gridList.getRowData(gridId, 0);
+				var totalSum = new DataMap();
+
+				totalSum.put("SKUKEY", dataLength + " SKU");
+				totalSum.put("DESC01", "총합계");
+				totalSum.put("BAGQT", 0);
+				totalSum.put("BOXQT", 0);
+				totalSum.put("EAQTY", 0);
+				totalSum.put("PLTQT", 0);
+				totalSum.put("QTSALO", 0);
+				totalSum.put("QTSBLK", 0);
+				totalSum.put("QTSCNU", 0);
+				totalSum.put("QTSHQT", 0);
+				totalSum.put("QTSIQT", 0);
+				totalSum.put("QTSIWH", 0);
+				totalSum.put("QTSPMI", 0);
+				totalSum.put("QTSPMO", 0);
+				totalSum.put("QTSWQT", 0);
+				totalSum.put("SOKQT", 0);
+				totalSum.put("TOTWG", 0);
+				totalSum.put("USEQTY", 0);
+				totalSum.put("LOTA14", 0);
+
+				for(var i = 0; i< dataLength;i++){
+					totalSum.map["BAGQT"] += Number(gridList.getColData(gridId,i,"BAGQT"));
+					totalSum.map["BOXQT"] += Number(gridList.getColData(gridId,i,"BOXQT"));
+					totalSum.map["EAQTY"] += Number(gridList.getColData(gridId,i,"EAQTY"));
+					totalSum.map["PLTQT"] += Number(gridList.getColData(gridId,i,"PLTQT"));
+					totalSum.map["QTSALO"] += Number(gridList.getColData(gridId,i,"QTSALO"));
+					totalSum.map["QTSBLK"] += Number(gridList.getColData(gridId,i,"QTSBLK"));
+					totalSum.map["QTSCNU"] += Number(gridList.getColData(gridId,i,"QTSCNU"));
+					totalSum.map["QTSHQT"] += Number(gridList.getColData(gridId,i,"QTSHQT"));
+					totalSum.map["QTSIQT"] += Number(gridList.getColData(gridId,i,"QTSIQT"));
+					totalSum.map["QTSIWH"] += Number(gridList.getColData(gridId,i,"QTSIWH"));
+					totalSum.map["QTSPMI"] += Number(gridList.getColData(gridId,i,"QTSPMI"));
+					totalSum.map["QTSPMO"] += Number(gridList.getColData(gridId,i,"QTSPMO"));
+					totalSum.map["QTSWQT"] += Number(gridList.getColData(gridId,i,"QTSWQT"));
+					totalSum.map["SOKQT"] += Number(gridList.getColData(gridId,i,"SOKQT"));
+					totalSum.map["TOTWG"] += Number(gridList.getColData(gridId,i,"TOTWG"));
+					totalSum.map["USEQTY"] += Number(gridList.getColData(gridId,i,"USEQTY"));
+					totalSum.map["LOTA14"] += Number(gridList.getColData(gridId,i,"LOTA14"));
+				}
+
+				for (var key in totalSum.map) {
+					if (totalSum.map[key] > 0) {
+						totalSum.map[key] = totalSum.map[key].toFixed(1);
+					}
+				} 
+				
+				gridList.addNewRow(gridId, totalSum);
+				
+				$("#gridListSkuSum tr:not(:last-child)").hide()
+			}
+		}
+		
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum, colName, colValue) {
+		
+		if (gridId == 'gridList') {
+			var fRow = gridList.getFocusRowNum("gridList");
+			var row  = gridList.getRowData("gridList", fRow);
+			var skukey = gridList.getColData('gridList', fRow, "SKUKEY")
+			mobile.linkPopOpen('/mobile/PDST01_POP.page',row);
+			
+			$("#SKUKEY").val(skukey)
+		}
+		
+		if (gridId == 'gridListSkuSum') {
+			
+			if ($("#gridListSkuSum tr:not(:last-child)").filter(":hidden").length == 0) {
+				$("#gridListSkuSum tr:not(:last-child)").hide()	
+			}else {
+				$("#gridListSkuSum tr:not(:last-child)").show()
+			}
+		}
+	}
+	// H20240324R60082, FRT-BLO0002A
+	function gridListEventRowClick(gridId, rowNum, colName, colValue) {
+		if (gridId == 'gridList') {
+			var fRow = gridList.getFocusRowNum("gridList");
+			var skukey = gridList.getColData('gridList', fRow, "SKUKEY")
+			$("#SKUKEY").val(skukey);
+			$("#BARCOD").val('').focus();
+		}
+	}
+	
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box">
+				<table>
+					<colgroup>
+					<col width="20%" />
+					<col width="20%" />
+					<col width="20%" />
+					<col width="20%" />
+					<col width="20%" />
+					</colgroup>
+					<tbody id="searchArea">
+						<tr>
+							<th CL="STD_LOCAKY">지번</th>
+							<td colspan="3">
+								<input type="text" class="text" name="LOCAKY" id="LOCAKY" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadLocaky()')" oninput="this.value = this.value.replace(/\s+/g, '');"/>
+								
+							</td>
+							<td onclick ="onReadLocaky('find')">
+								<button class="bt" style="height: 32px;"><p CL='BTN_FINDDATA'></p></button>
+							</td>
+						</tr>
+						<tr>
+							<th CL="STD_BARCOD">바코드</th>
+							<td>
+								<input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="fn_onfocus(this.id)" inputmode="none" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')" oninput="this.value = this.value.replace(/\s+/g, '');"  />
+								<input type="hidden" class="text" name="SEARCHTYPE" id="SEARCHTYPE" value=""  />
+							</td>
+							<th CL="STD_SKUKEY">품목코드</th>
+							<td>
+								<input type="text" class="text" name="SKUKEY" id="SKUKEY" onfocus="fn_onfocus(this.id)" inputmode="none" oninput="this.value = this.value.replace(/\s+/g, '');"/>
+							</td>
+							<td onclick ="onReadBarcode()">
+								<button class="bt" style="height: 32px;"><p CL='BTN_FINDDATA'></p></button>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section">
+				<div class="tableHeader" id='tableHeader'>
+					
+					
+				<%
+				if(mtype.equals("P")){
+			%>
+		            <jsp:include page="./PDST01_PS.jsp" flush="false"/>
+			<%
+				}else {
+			%>
+		        	<jsp:include page="./PDST01_ELSE.jsp" flush="false"/>
+			<% 
+				}
+			%>  
+				</div>
+			</div>
+				
+		</div>
+		<div class="footer_5" style="position:fixed;">
+			<table>
+				<tr>
+					<td class=f_1 width="50%" onclick="window.top.closePage()">
+						<label CL='BTN_CLOSE'></label>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</div>
+</body>

@@ -1,0 +1,386 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ page import="project.common.airfw.*"%>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<style type="text/css">
+ .content_wrap{background: none;}
+</style>
+<%
+	User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<script type="text/javascript">
+		
+	$(document).ready(function(){
+		
+		$("#WAREKY").val("<%=wareky%>");
+		
+		gridList.setGrid({
+			id : "gridList",
+			editable : true,
+			module : "WmsInbound",
+			command : "GR98"
+		});
+		
+		gridList.setReadOnly("gridList", true, ['LOTA02']);
+		
+		initSearchArea();
+		
+		createList();
+	});
+	
+	function initSearchArea() {
+		  
+		// 플랜트
+      <%if(null!=plant && plant.trim().equals("")){%>
+        $('select[id="PLNTKY"]').multipleSelect('checkAll');
+      <%}else{%>
+        $('select[id="PLNTKY"]').multipleSelect('setSelects', ['<%=plant%>']);
+      <%}%>
+   	  // 입고유형
+	  var $selRCPTTY = $('select[id="RCPTTY"]');
+	  $selRCPTTY.multipleSelect('checkAll');
+      //$('select[id="SKUL01"]').val("");
+    }
+	
+	function commonBtnClick(btnName){
+		
+		if(btnName == "Search"){
+			createList();
+		} else if(btnName == "Save"){
+			saveData();
+		} else if(btnName == "Delete"){
+			deleteData();
+		} else if(btnName == "UploadStkky") {
+			// 재고셋업 엑셀업로드
+			page.linkPopOpen("/wms/inbound/GR98STKPOP.page");
+		}
+		
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		
+		if(gridId == "gridList"){
+			
+			if(colName=="DETAIL"){
+				var rowData = gridList.getRowData("gridList", rowNum);
+				page.linkPopOpen("/wms/inbound/GR98DTPOP.page", rowData);
+			}
+			
+		}
+	}
+	
+	function gridExcelDownloadEventBefore(gridId){
+		var param = new DataMap();
+		if(gridId == "gridList"){
+			param.put("dataGridExcel", "기초재고셋업_임시_리스트");
+		}
+		
+		return param;
+	}
+	
+	function createList(){
+		
+		gridList.resetGrid("gridList");
+	
+		var param = inputList.setRangeParam("searchArea");
+		param.put("LANGKY", "<%=langky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	}
+	
+	function saveData(){
+		// 처리할 데이터 체크
+		var head = gridList.getSelectData("gridList");
+		
+		if( head.length == 0 ){
+			commonUtil.msgBox("VALID_M0006");// 선택된 데이터가 없습니다.
+			return;
+		}
+		
+		if(gridList.validationCheck("gridList", "data")){
+			var rowData;
+			for(var i=0;i<head.length;i++){
+				rowData = head[i];
+				var PRCFLG = rowData.get("PRCFLG"); //입고완료여부
+				if(PRCFLG == "Y"){
+					commonUtil.msgBox("MASTER_M1106"); // 이미 입고완료된 데이터가 존재합니다.
+					var rowNum = rowData.get("GRowNum");
+					gridList.setColFocus("gridList", rowNum, "PRCFLG");
+					return;
+				}
+			}
+			
+			// 저장 여부 체크
+			if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+				return;
+			}
+			
+			var param = new DataMap();
+			param.clear();
+			param.put("head", head);
+			
+			var json = netUtil.sendData({
+				url : "/wms/inbound/json/saveGR98Proc.data",
+				//url : "/wms/inbound/json/saveGR98.data",
+				param : param
+			});
+			//console.log(JSON.stringify(json));
+			if(json && json.data) {
+				var rsList = json.data;
+				var msg = "";
+				for(var i=0; i<rsList.length;i++){
+					
+					var rowMap = rsList[i];					
+					var WAREKY = rowMap.WAREKY;
+					var LOTA02 = rowMap.LOTA02;
+					var ERRORCODE = rowMap.ERRORCODE;
+					var ERRORMESG = rowMap.ERRORMESG;
+					
+					if(""!=msg)msg += "\n";
+					
+					msg += "WAREKY : " + WAREKY + " - LOTA02 : " + LOTA02;
+					msg += "\nERRORCODE : " + ERRORCODE + " - ERRORMESG : " + ERRORMESG;
+					
+				}
+				alert(msg);
+				//commonUtil.msgBox("VALID_M0001"); // 저장이 성공하였습니다.
+				// 재조회
+				createList();
+			}
+		}
+	}
+	
+	function deleteData(){
+		// 처리할 데이터 체크
+		var head = gridList.getSelectData("gridList");
+		
+		if( head.length == 0 ){
+			commonUtil.msgBox("VALID_M0006");// 선택된 데이터가 없습니다.
+			return;
+		}
+		
+		if(gridList.validationCheck("gridList", "data")){
+			var rowData;
+			for(var i=0;i<head.length;i++){
+				rowData = head[i];
+				var PRCFLG = rowData.get("PRCFLG"); //입고완료여부
+				if(PRCFLG == "Y"){
+					commonUtil.msgBox("MASTER_M1106"); // 이미 입고완료된 데이터가 존재합니다.
+					var rowNum = rowData.get("GRowNum");
+					gridList.setColFocus("gridList", rowNum, "PRCFLG");
+					return;
+				}
+			}
+			//MASTER_M0020
+			// 삭제 여부 체크
+			if(!commonUtil.msgConfirm("MASTER_M0020")){
+				return;
+			}
+			
+			var param = new DataMap();
+			param.clear();
+			param.put("head", head);
+			
+			var json = netUtil.sendData({
+				url : "/wms/inbound/json/deleteGR98.data",
+				param : param
+			});
+			
+			if(json && json.data) {
+				commonUtil.msgBox("VALID_M0001"); // 저장이 성공하였습니다.
+				// 재조회
+				createList();
+			}
+		}
+	}
+	
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+	
+		var param = new DataMap();
+		
+		if(gridId == "gridList"){
+			
+		}
+		
+	}
+	
+	function gridListEventRowAddBefore(gridId, rowNum) {
+	
+	}
+	
+	function gridListEventRowAddAfter(gridId, rowNum){
+	
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength) {
+		// 입고완료건 readonly
+		if(gridId == "gridList") {
+			
+			gridList.setReadOnly("gridList", true, ['LOTA02']);
+			
+			for(var rowNum=0; rowNum<gridList.getGridDataCount(gridId);rowNum++) {
+				var PRCFLG = gridList.getColData(gridId, rowNum, "PRCFLG");
+				//console.log("rowNum : " + rowNum + " - PRCFLG : " + PRCFLG);
+				if("Y" == PRCFLG){
+					//gridList.setRowReadOnly(gridId, rowNum, true);
+					gridList.setRowReadOnly(gridId, rowNum, true, ['rowCheck','DOCDAT','DOCTXT']);
+				}
+			}
+		}
+	}
+	
+	function gridModifyStateCheckEvent() {
+		return false;
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType){
+	
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			return param;
+		}
+		
+	}
+	
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+					<input type="button" CB="Save SAVE STD_INBOUND" />
+					<input type="button" CB="Delete DELETE STD_DELETE" />
+					<input type="button" CB="UploadStkky UP BTN_EXCELUP" />
+				</div>
+			</div>
+			
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_WAREKY">거점</dt>
+						<dd>
+<%-- 							<input type="text" class="input" name="WAREKY" name="WAREKY"  value="<%=wareky%>" readonly="readonly" validate="required" /> --%>
+							<select combo="Common,WAHMACOMBO" name="WAREKY" id="WAREKY" class="input" style="width: 150px;">
+							</select>
+						</dd>
+					</dl>
+					<dl style="display:none;">
+						<dt CL="STD_OWNRKY">화주</dt>
+						<dd>
+							<!-- <select type="text" class="input" Combo="WmsOrder,OWNRKYCOMBO" name="OWNRKY" id="OWNRKY" style="width: 150px;">
+							</select> -->
+							<input type="text" class="input" name="OWNRKY" value="<%=ownrky %>" />
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_LOTA02">플랜트</dt>
+						<dd>
+							<select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="TMP.LOTA02" id="PLNTKY" ComboType="MS" validate="required">
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_EXRECPYN">입고완료여부</dt>
+						<dd>
+							<select  name="PRCFLG" id="PRCFLG" class="input" style="width: 150px;">
+							  <option value="" CL="STD_ALL"></option>
+							  <option value="Y">Y</option>
+							  <option value="N">N</option>
+							</select>
+						</dd>
+					</dl>
+					
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+			
+		</div>
+		<div class="search_next_wrap ">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_LIST">탭메뉴1</span></a></li>  
+				</ul>
+				
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40 STD_NUMBER" GCol="rownum">번호</td>
+										<td GH="40" GCol="rowCheck"></td>
+										
+<!-- 										<td GH="80 STD_DETAIL"  GCol="btn,DETAIL" GB="detail SEARCH STD_DETAIL" /></td> -->
+										
+										<td GH="60 STD_WAREKY" GCol="text,WAREKY">물류센터</td>
+										<td GH="120 STD_WARENM" GCol="text,WARENM">물류센터명</td>
+										
+										<td GH="150 STD_LOTA02" GCol="select,LOTA02">
+                                            <select CommonCombo="LOTA02"><!-- 플랜트 -->
+                                                <option value=""></option>
+                                            </select>
+                                        </td>
+                                        
+										<td GH="90 STD_TOTCOUNT" GCol="text,CNT" GF="N 20">총건수</td>
+										<td GH="130 STD_QTYRCV" GCol="text,QTYRCV" GF="N 20">입고수량</td>
+										<td GH="100 STD_DOCDAT" GCol="input,DOCDAT" GF="C N">전기일자</td>
+										
+										<td GH="100 STD_EXRECPYN" GCol="text,PRCFLG">처리여부</td>
+										<td GH="250 STD_DOCTXT" GCol="input,DOCTXT" GF="S 1000">비고</td>
+										
+										<td GH="80 STD_DOCCAT" GCol="text,DOCCAT">문서카테고리</td>
+										<td GH="90 STD_DOCCATNM" GCol="text,DOCCATNM">문서카테고리명</td>
+										<td GH="70 STD_DOCUTY" GCol="text,DOCUTY">문서유형</td>
+										<td GH="90 STD_DOCUTYNM" GCol="text,DOCUTYNM">문서유형명</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<button type='button' GBtn="subTotal"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+				
+				
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

@@ -1,0 +1,771 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<%@ page import="project.common.airfw.*"%>
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+
+<style>
+	input[type="checkbox"]{height:unset;}
+</style>
+
+<script type="text/javascript">
+
+	var dblIdx = -1;
+	var subIdx = 0;
+	var selTab = 1;
+
+	$(document).ready(function(){
+		
+		gridList.setGrid({
+			id : "gridList",
+			module : "WmsSystem",
+			command : "IS03",
+			itemGrid : "gridListSub",
+			itemSearch : true
+		});
+		
+		gridList.setGrid({
+			id : "gridListSub",
+			module : "WmsSystem",
+			command : "IS03Sub",
+			colHoldType: false,
+			emptyMsgType : false
+		});
+		
+		gridList.setGrid({
+	        id : "gridConfirmList",
+	        module : "WmsSystem",
+	        command : "IS03Pal",
+			colHoldType: false,
+			emptyMsgType : false
+	    });
+		
+	    $('#tab2-2').hide();
+		
+	    inputList.setInput("tab2_area");
+	    
+	    //initSearchArea();
+		
+	});
+	
+	function initSearchArea() {
+	  
+	  // 플랜트
+      $('select[id="PLNTKY"]').multipleSelect('checkAll');
+      // 거점
+      $('select[id="WAREKY"]').multipleSelect('checkAll');
+	      
+	}
+	
+	function searchList(){
+		
+		if(validate.check("searchArea")){
+			
+			var param = inputList.setRangeParam("searchArea");
+			param.put("PROGID", configData.MENU_ID);
+			
+			gridList.resetGrid("gridList");
+			gridList.resetGrid("gridListSub");
+			gridList.resetGrid("gridConfirmList");
+			
+			$('#tabSub1').click();
+			
+			gridList.gridList({
+		    	id : "gridList",
+		    	param : param
+		    });
+		}
+	}
+	
+	function searchSubList(){
+		
+		var headGridId = "gridList";
+		var headRowNum = gridList.getFocusRowNum(headGridId);
+		var param = getItemSearchParam(headRowNum);
+	        
+        gridList.gridList({
+           id : "gridListSub",
+           param : param,
+        });
+	}
+	
+	function searchConfirmList(){
+		
+		var headGridId = "gridList";
+		var headRowNum = gridList.getFocusRowNum(headGridId);
+		var param = getItemSearchParam(headRowNum);
+	        
+        gridList.gridList({
+           id : "gridConfirmList",
+           param : param,
+        });
+	}
+ 	
+ 	function getItemSearchParam(rowNum){
+ 		var rowData = gridList.getRowData("gridList", rowNum);
+        var param = inputList.setRangeParam("searchArea");
+        param.put("PROGID", configData.MENU_ID);
+        param.put("LANGKY", "<%=langky%>");
+        param.put("OWNRKY", "<%=ownrky%>");
+        param.put("WAREKY", "<%=wareky%>");
+        param.putAll(rowData);
+        
+        return param;
+ 	}
+ 	
+	function gridListEventItemGridSearch(gridId, rowNum, itemGridList){
+		
+		if(gridId == "gridList"){
+	        var param = getItemSearchParam(rowNum);
+	        
+	        gridList.gridList({
+	           id : "gridListSub",
+	           param : param,
+	        });
+	        
+	        gridList.gridList({
+	           id : "gridConfirmList",
+	           param : param,
+	        });
+			
+	        dblIdx = rowNum;
+			subIdx = rowNum;
+		}
+	}
+ 	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		
+		if(gridId == "gridList"){
+			
+		}else if(gridId == "gridListSub"){
+			
+		}
+		
+	}
+	
+	function commonBtnClick(btnName){
+		
+		if(btnName == "Search"){
+			searchList();
+		}else if(btnName == "Save"){
+			saveData();
+		}else if(btnName == "Pallet"){
+            // 자동 Palletizing
+			fnAutoPalletzing();
+        }else if(btnName == "Inspection"){
+        	// 검수
+        	fnInspectionIntstki();
+		}else if(btnName == "Delete"){
+        	// 삭제
+        	deleteData();
+		} else if(btnName == "UploadStkky") {
+			// 재고셋업 엑셀업로드
+			page.linkPopOpen("/wms/system/IS03_STKPOP.page");
+		}else if(btnName == "Print"){
+			printList();
+		}
+		
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType, obj, rowNum){
+		var param = new DataMap();
+		
+		if(searchCode == "SHBZPTN"){
+            param.put("LANGKY", "<%=langky%>");
+            param.put("OWNRKY", "<%=ownrky%>");
+            param.put("WAREKY", "<%=wareky%>");
+            param.put("PTNRTY", "VD");
+            return param;
+        }else if(searchCode == "SHSTLMAP"){
+        	var PLNTKY = $('select[id="PLNTKY"]').val();
+        	param.put("LANGKY", "<%=langky%>");
+            param.put("OWNRKY", "<%=ownrky%>");
+            param.put("WAREKY", "<%=wareky%>");
+            param.put("PLNTKY", PLNTKY);
+            if(PLNTKY==null || $.trim(PLNTKY)==""){
+            	return false;
+            }
+            return param;
+		}else if(searchCode == "SHSTLMAP2"){
+			param.put("LANGKY", "<%=langky%>");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("WAREKY", "<%=wareky%>");
+			var gridid = "gridListSub";
+			if(selTab!=1){
+				gridid = "gridConfirmList";
+			}
+			var lota02 = gridList.getColData(gridid, rowNum, "LOTA02");
+			param.put("PLNTKY", lota02);
+			
+			return param;
+		}
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			return param;
+		}
+		
+	}
+	
+	function tabChange(tabNo){
+        $("[id^=tab2_btn]").hide();
+        $("#"+tabNo).show();
+        
+        if(tabNo=="tab2_btn_01"){
+        	selTab=1;
+        }else if(tabNo=="tab2_btn_02"){
+        	selTab=2;
+        }
+    }
+	
+	function fnInspectionIntstki(){
+		
+		var headGridId = "gridList";
+		var headRowNum = gridList.getFocusRowNum(headGridId);
+        var headRowdata = gridList.getRowData(headGridId, headRowNum);
+		
+        var STD_INSPECTION = commonLabel.getLabel("STD_INSPECTION1", 1);
+        
+		if(!commonUtil.msgConfirm("VALID_M0943", [STD_INSPECTION])){ // {0} 하시겠습니까?
+			return;
+		}
+		
+		var intseq = headRowdata.get("INTSEQ");
+		
+		var param = new DataMap();
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("INTSEQ", intseq);
+		
+		var json = netUtil.sendData({
+			url : "/wms/system/json/inspectionIntstki.data",
+			param : param
+		});	
+		
+		//console.log( JSON.stringify(json) );
+		if(json.data && json.data.ERRCODE == "S"){
+			// 아이템 라인 조회
+			
+			var SUCCESSCNT = json.data.SUCCESSCNT;
+			var FAILCNT = json.data.FAILCNT;
+			
+			//commonUtil.msgBox("VALID_M0944", [STD_INSPECTION]); // {0} 을(를) 완료하였습니다.
+			commonUtil.msgBox("VALID_M0946", [STD_INSPECTION,SUCCESSCNT,FAILCNT]); // {0} 을(를) 성공{1}건 실패{2}건 완료하였습니다.
+			
+			//searchList();
+			searchSubList();
+			
+		}else{
+			// 실패 - 에러 처리
+			commonUtil.msgBox("VALID_M0945", [STD_INSPECTION]); // {0} 을(를) 실패하였습니다.
+			console.log( JSON.stringify(json.data.ERRMSG) );
+		}
+	}
+	
+	function fnAutoPalletzing(){
+		
+		var headGridId = "gridList";
+		var headRowNum = gridList.getFocusRowNum(headGridId);
+        var headRowdata = gridList.getRowData(headGridId, headRowNum);
+		
+        var STD_AUTOPALLET = commonLabel.getLabel("STD_AUTOPALLET", 1);
+        
+		if(!commonUtil.msgConfirm("VALID_M0943", [STD_AUTOPALLET])){ // {0} 하시겠습니까?
+			return;
+		}
+		
+		var intseq = headRowdata.get("INTSEQ");
+		
+		var param = new DataMap();
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("INTSEQ", intseq);
+		
+		var json = netUtil.sendData({
+			url : "/wms/system/json/palletizingIntstkiIS03.data",
+			param : param
+		});	
+		
+		//console.log( JSON.stringify(json) );
+		if(json.data && json.data.ERRCODE == "S"){
+			// 아이템 라인 조회
+			commonUtil.msgBox("VALID_M0944", [STD_AUTOPALLET]); // {0} 을(를) 완료하였습니다.
+			searchConfirmList();
+			
+			selTab = 2;
+		       
+		    $('#tabSub2').click();
+			
+		}else{
+			// 실패 - 에러 처리
+			
+			if(json.data.ERRMSG && $.trim(json.data.ERRMSG) != ""){
+				alert(json.data.ERRMSG);
+			}else{
+				commonUtil.msgBox("VALID_M0945", [STD_AUTOPALLET]); // {0} 을(를) 실패하였습니다.
+				console.log( JSON.stringify(json.data.ERRMSG) );
+			}
+		}
+		
+	}
+	
+	
+	function deleteData(){
+		
+		var head = gridList.getSelectData("gridList");
+		
+		if(head.length == 0){
+			commonUtil.msgBox("VALID_M2067");// 선택된 아이템이 없습니다.
+			return;
+		}
+						
+		if(!commonUtil.msgConfirm("COMMON_M0026")){ //삭제하시겠습니까?
+			return;
+		}
+		
+		var param = new DataMap();
+		param.put("head", head);
+		
+		var json = netUtil.sendData({
+			url : "/wms/system/json/deleteIS01.data",
+			param : param
+		});  
+		
+		//console.log("json : " + JSON.stringify(json));
+		
+		if(json && json.data.RESULTMSG == "OK"){
+			// 삭제가 성공하였습니다.
+		   commonUtil.msgBox("VALID_M0003");
+		   searchList();
+		}else{
+			
+			var RESULTMSG = json.data.RESULTMSG;
+			if(RESULTMSG.indexOf("VALID") != -1){
+				
+				var msgList = RESULTMSG.split("†");
+				var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+				commonUtil.msg(msgTxt);
+				
+			}else{
+				// 삭제가 실패하였습니다.
+				commonUtil.msgBox("VALID_M0004");	
+			}
+			
+		}
+	}
+	
+	
+	function printList(){
+		var list = gridList.getSelectData("gridConfirmList");
+		
+		if (list.length == 0){
+			commonUtil.msgBox("VALID_M0006");
+			return;
+		}
+		
+		if(!commonUtil.msgConfirm("SYSTEM_PRINTYN")){
+			return;
+		} 
+		
+		var param = new DataMap();
+		param.put("list",list);
+		param.put("columnList", "WAREKY");
+		param.put("PRTTYP","RCP_LB");
+		param.put("OWNRKY", "<%=ownrky%>");
+	
+		var json = netUtil.sendData({
+			url : "/wms/admin/json/commonPrint.data",
+			param : param
+		});
+		
+		var prtseq = null;
+		if(json && json.data){
+			prtseq = json.data;
+		}else{
+			alert("출력불가");
+			return;
+		}
+		
+		var url = "Inventory_Receipt_Label_Print.ezg?ver=0.05";
+		var Keywareky  = "";
+		var where = "AND (";
+		var orderby = "";
+		var language = "<%=langky%>";
+		var map = new DataMap();
+	
+		for(var i=0; i<list.length; i++){
+			var row = list[i];
+			var INTSEQ = row.get("INTSEQ");
+			var STKSEQ = row.get("STKSEQ");
+			var PALSEQ = row.get("PALSEQ");
+			var WAREKY = row.get("WAREKY");			
+			Keywareky = row.get("WAREKY");
+			where += "INTSEQ='"+INTSEQ+"'AND STKSEQ='"+STKSEQ+"'AND PALSEQ='"+PALSEQ+"' AND WAREKY='"+WAREKY+"'";
+			if(i==list.length-1) break;
+			where += " OR ";	
+		}
+		where += ")";
+		
+		var width = '850';
+		var height = '680';
+
+		map.put("WAREKY", Keywareky);
+		WriteEZgenElement(url, where, orderby, language, map, width, height);
+	}
+	
+	
+
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+
+<!-- content -->
+<div class="content_wrap">
+
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+<!-- 					<input type="button" CB="Save SAVE STD_INBOUND" /> -->
+					<input type="button" CB="Delete DELETE STD_DELETE" />
+					<input type="button" CB="UploadStkky UP BTN_EXCELUP" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_WAREKY">거점</dt>
+						<dd>
+<!-- 							<select combo="Common,WAHMACOMBO" name="II.WAREKY" id="WAREKY" class="input" ComboType="MS" validate="required"> -->
+<!-- 							</select> -->
+							<select combo="Common,WAHMACOMBO" name="II.WAREKY" id="WAREKY" class="input" ComboType="MS" >
+							</select>
+						</dd>
+					</dl>
+					<dl style="display:none;">
+						<dt CL="STD_OWNRKY">화주</dt>
+						<dd>
+							<!-- <select type="text" class="input" Combo="WmsOrder,OWNRKYCOMBO" name="OWNRKY" id="OWNRKY" STYLE="width: 150px;">
+							</select> -->
+<%-- 							<input type="text" class="input" name="OWNRKY" value="<%=ownrky %>" /> --%>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_LOTA02">플랜트</dt>
+						<dd>
+<!-- 							<select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="II.LOTA02" id="PLNTKY" ComboType="MS" validate="required"> -->
+<!-- 							</select> -->
+							<select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="II.LOTA02" id="PLNTKY" ComboType="MS" >
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_LOTA01">저장위치</dt>
+						<dd>
+							<input type="text" class="input" name="II.LOTA01" UIInput="R,SHSTLMAP" />
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_INTDAT">오더일자</dt>
+						<dd>
+							<input type="text" class="input" name="IH.INTDAT" UIInput="R" UIFormat="C 0" validate="required" />
+						</dd>
+					</dl>
+					
+					
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+		
+        <div class="search_next_wrap">
+			<div class="content_layout tabs top_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_LIST">리스트</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<!-- <li><button class="btn btn_smaller"><span>축소</span></button></li> -->
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				<div class="table_box section"  id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<form autocomplete="off" onsubmit="return false">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">1</td>
+										<td GH="40" GCol="rowCheck"></td>
+										
+										<td GH="100 STD_INTDAT" GCol="text,INTDAT" GF="C N">작업일자</td>
+										<td GH="100 STD_INTSEQ" GCol="text,INTSEQ" GF="N 20,0">기초재고번호</td>
+										
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자ID</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자ID</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자명</td>
+
+									</tr>
+								</tbody>
+							</table>
+							</form>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+<!-- 						<button type='button' GBtn="total"></button> -->
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+			
+			<div class="content_layout tabs bottom_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tab2-1" onClick="tabChange('tab2_btn_01')" id="tabSub1"><span CL="STD_DETAILLIST">아이템 리스트</span></a></li>
+                    <li><a href="#tab2-2" onClick="tabChange('tab2_btn_02')" id="tabSub2"><span CL="STD_LOTA14">아이템 리스트</span></a></li>
+                    <li id="tab2_btn_01">
+                    	<input type="button" CB="Inspection INSPECTION STD_INSPECTION1" style="margin-top: 6px;"/>
+                    	<input type="button" CB="Pallet AUTOPALLET STD_AUTOPALLET" style="margin-top: 6px;"/>
+                    </li>
+                    <li id="tab2_btn_02" style="display:none;">
+                    	&nbsp;
+                    	<input type="button" CB="Print PRINT BTN_IBLBPRINT" style="margin-top: 6px;"/>
+<!-- 						<font CL="STD_STLKYSELECT" style="display:inline-block;margin-top: 12px;"></font> -->
+<!-- 						<span style="display:inline-block;margin-top: 6px;"> -->
+<!-- 							<input type="text" class="input" id="TOSTLKY" UIInput="S,SHSTLMAP"/> -->
+<!-- 							<input type="hidden" id="TOPLNTKY" /> -->
+<!-- 						</span> -->
+<!-- 						<input type="button" CB="Reflect REFLECT BTN_REFLECT" />반영 -->
+                    </li>
+                    
+					<li class="btn_zoom_wrap">
+						<ul>
+							<!-- <li><button class="btn btn_smaller"><span>축소</span></button></li> -->
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				
+				<div class="table_box section" id="tab2-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<form autocomplete="off" onsubmit="return false">
+							<table class="table_c">
+								<tbody id="gridListSub">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">1</td>
+<!-- 										<td GH="40" GCol="rowCheck"></td> -->
+										
+										<td GH="100 STD_INTSEQ" GCol="text,INTSEQ" GF="N 20,0">기초재고번호</td>
+										<td GH="100 STD_INDSEQ" GCol="text,STKSEQ" GF="N 20,0">기초재고상세번호</td>
+										
+										<td GH="80 STD_CHKFLG" GCol="text,CHKFLG">검수여부</td>
+										<td GH="300 STD_CHKFLG_REMARK" GCol="text,REMARK">검수비고</td>
+										
+										<td GH="60 STD_WAREKY" GCol="text,WAREKY">물류센터</td>
+										<td GH="120 STD_WARENM" GCol="text,WARENM">물류센터명</td>
+										
+										<td GH="150 STD_SKUKEY" GCol="text,SKUKEY">상품코드</td>
+										<td GH="250 STD_DESC01" GCol="text,DESC01">상품명</td>
+										
+										<td GH="100 STD_QTYRCV" GCol="text,QTYRCV" GF="N 20,3">입고수량</td>
+										<td GH="100 STD_UOMKEY" GCol="text,UOMKEY">단위</td>
+										
+										<td GH="100 STD_PALQTY" GCol="text,PALQTY" GF="N 20,3">팔레트입수량</td>
+										
+										<td GH="100 STD_LOTA02" GCol="text,LOTA02">플랜트</td>
+										<td GH="100 STD_PLNTNM" GCol="text,LOTA02NM">플랜트</td>
+										
+										<td GH="80 STD_LOTA01" GCol="text,LOTA01">저장위치</td>
+										<td GH="120 STD_STLNM" GCol="text,LOTA01NM">저장위치</td>
+										
+										<td GH="80 STD_LOTA04" GCol="text,LOTA04">호기</td>
+										<td GH="100 STD_LOTA04NM" GCol="text,LOTA04NM">호기명</td>
+										<td GH="100 STD_LOTA06" GCol="text,LOTA06">재고상태</td>
+										<td GH="100 STD_LOTA06NM" GCol="text,LOTA06NM">재고상태명</td>
+										<td GH="100 STD_LOTA08" GCol="text,LOTA08">국가코드</td>
+										<td GH="150 STD_LOTA08" GCol="text,LOTA08NM">국가명</td>
+										
+										<td GH="120 STD_LOTA07" GCol="text,LOTA07">MTO판매번호</td>
+										<td GH="120 STD_LOTA09" GCol="text,LOTA09">MTO납품처코드</td>
+										<td GH="120 STD_LOTA09NM" GCol="text,LOTA09NM">MTO납품처명</td>
+										
+										<td GH="100 STD_LOTA11" GCol="text,LOTA11" GF="C">제조일자</td>
+										<td GH="100 STD_LOTA12" GCol="text,LOTA12" GF="D">입고일자</td>
+										<td GH="100 STD_LOTA13" GCol="text,LOTA13" GF="D">유통기한</td>
+										
+										<td GH="150 STD_LOTA14" GCol="text,LOTA14">제조LOT</td>
+										<td GH="150 STD_LOTA15" GCol="text,LOTA15">SAP배치번호</td>
+										
+										<td GH="100 STD_LOTA16" GCol="text,LOTA16">평량</td>
+										<td GH="100 STD_LOTA03" GCol="text,LOTA03" >포장타입</td>
+										<td GH="100 STD_LOTA17" GCol="text,LOTA17">컨테이너유형</td>
+										<td GH="120 STD_LOTA21" GCol="text,LOTA21">지관</td>
+										
+										<td GH="120 STD_LOTA23" GCol="text,LOTA23">생산자ID</td>
+										<td GH="120 STD_LOTA24" GCol="text,LOTA24">생산자명</td>
+										
+										<td GH="150 STD_LOTA41" GCol="text,LOTA41">컨테이너NO</td>
+										<td GH="150 STD_LOTA42" GCol="text,LOTA42">공급업체코드(수입밀롤)</td>
+										<td GH="200 STD_LOTA42NM" GCol="text,LOTA42NM">공급업체명(수입밀롤)</td>
+										
+										
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자ID</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자ID</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자명</td>
+										
+									</tr>
+								</tbody>
+							</table>
+							</form>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+				
+				<div class="table_box section" id="tab2-2">
+                    <div class="table_list01">
+                        <div class="scroll">
+                            <table class="table_c">
+                                <tbody id="gridConfirmList">
+                                    <tr CGRow="true">
+                                        <td GH="40" GCol="rownum">1</td>
+                                        <td GH="40" GCol="rowCheck"></td>
+                                        
+<!--                                         <td GH="100 STD_INTSEQ" GCol="text,INTSEQ" GF="N 20,0">기초재고번호</td> -->
+										<td GH="100 STD_INDSEQ" GCol="text,STKSEQ" GF="N 20,0">기초재고상세번호</td>
+										<td GH="100 STD_PALSEQ" GCol="text,PALSEQ" GF="N 20,0">일련번호</td>
+										
+										<td GH="150 STD_TMP_LOTA14" GCol="text,TMP_LOTA14">임시 개별바코드</td>
+										
+										<td GH="90 STD_QTYPHY" GCol="text,QTYPHY" GF="N 20,3">실사수량</td>
+										<td GH="80 STD_PHYCHK" GCol="text,PHYCHK">실사여부</td>
+										<td GH="80 STD_INTCHK" GCol="text,INTCHK">기초생성여부</td>
+										
+										<td GH="60 STD_WAREKY" GCol="text,WAREKY">물류센터</td>
+										<td GH="120 STD_WARENM" GCol="text,WARENM">물류센터명</td>
+										
+										<td GH="150 STD_SKUKEY" GCol="text,SKUKEY">상품코드</td>
+										<td GH="250 STD_DESC01" GCol="text,DESC01">상품명</td>
+										
+										<td GH="100 STD_QTYRCV" GCol="text,QTYRCV" GF="N 20,3">입고수량</td>
+										<td GH="100 STD_UOMKEY" GCol="text,UOMKEY">단위</td>
+										
+										<td GH="100 STD_PALQTY" GCol="text,PALQTY" GF="N 20,3">팔레트입수량</td>
+										
+										<td GH="100 STD_LOTA02" GCol="text,LOTA02">플랜트</td>
+										<td GH="100 STD_PLNTNM" GCol="text,LOTA02NM">플랜트</td>
+										
+										<td GH="80 STD_LOTA01" GCol="text,LOTA01">저장위치</td>
+										<td GH="120 STD_STLNM" GCol="text,LOTA01NM">저장위치</td>
+										
+										<td GH="80 STD_LOTA04" GCol="text,LOTA04">호기</td>
+										<td GH="100 STD_LOTA04NM" GCol="text,LOTA04NM">호기명</td>
+										<td GH="100 STD_LOTA06" GCol="text,LOTA06">재고상태</td>
+										<td GH="100 STD_LOTA06NM" GCol="text,LOTA06NM">재고상태명</td>
+										<td GH="100 STD_LOTA08" GCol="text,LOTA08">국가코드</td>
+										<td GH="150 STD_LOTA08" GCol="text,LOTA08NM">국가명</td>
+										
+										<td GH="120 STD_LOTA07" GCol="text,LOTA07">MTO판매번호</td>
+										<td GH="120 STD_LOTA09" GCol="text,LOTA09">MTO납품처코드</td>
+										<td GH="120 STD_LOTA09NM" GCol="text,LOTA09NM">MTO납품처명</td>
+										
+										<td GH="100 STD_LOTA11" GCol="text,LOTA11" GF="C">제조일자</td>
+										<td GH="100 STD_LOTA12" GCol="text,LOTA12" GF="D">입고일자</td>
+										<td GH="100 STD_LOTA13" GCol="text,LOTA13" GF="D">유통기한</td>
+										
+										<td GH="150 STD_LOTA14" GCol="text,LOTA14">제조LOT</td>
+										<td GH="150 STD_LOTA15" GCol="text,LOTA15">SAP배치번호</td>
+										
+										<td GH="100 STD_LOTA16" GCol="text,LOTA16">평량</td>
+										<td GH="100 STD_LOTA03" GCol="text,LOTA03" >포장타입</td>
+										<td GH="100 STD_LOTA17" GCol="text,LOTA17">컨테이너유형</td>
+										<td GH="120 STD_LOTA21" GCol="text,LOTA21">지관</td>
+										
+										<td GH="120 STD_LOTA23" GCol="text,LOTA23">생산자ID</td>
+										<td GH="120 STD_LOTA24" GCol="text,LOTA24">생산자명</td>
+										
+										<td GH="150 STD_LOTA41" GCol="text,LOTA41">컨테이너NO</td>
+										<td GH="150 STD_LOTA42" GCol="text,LOTA42">공급업체코드(수입밀롤)</td>
+										<td GH="200 STD_LOTA42NM" GCol="text,LOTA42NM">공급업체명(수입밀롤)</td>
+										
+										<td GH="100 STD_LOCAKY" GCol="text,LOCAKY">로케이션</td>
+										
+										<td GH="150 STD_RECVKY" GCol="text,RECVKY">입고문서번호</td>
+										<td GH="100 STD_RECVIT" GCol="text,RECVIT">입고문서아이템</td>
+										
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자ID</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자ID</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자명</td>
+                                        
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="btn_lit tableUtil">
+                        <button type='button' GBtn="find"></button>
+                        <button type='button' GBtn="sortReset"></button>
+                        <button type='button' GBtn="total"></button>
+                        <button type='button' GBtn="layout"></button>
+                        <button type='button' GBtn="excel"></button>
+                        <span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+                    </div>
+                </div>
+				
+				
+			</div>
+		</div>
+	</div>
+
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>
+

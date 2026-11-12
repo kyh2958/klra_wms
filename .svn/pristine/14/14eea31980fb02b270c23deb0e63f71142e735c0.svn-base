@@ -1,0 +1,313 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	String showPlntky = request.getParameter("showPlntky");
+	String showStlky  = request.getParameter("showStlky");
+	showPlntky = showPlntky == null ? "" : showPlntky.trim();
+	showStlky  = showStlky  == null ? "" : showStlky.trim();
+	
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {
+	vertical-align: bottom;
+	height: 37px;
+}
+
+input:read-only {
+	background-color: #e2e2e2;
+}
+
+select:DISABLED {
+	background-color: #e2e2e2;
+}
+
+.tem5_content .tableWrap_search {
+	overflow: hidden;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>WMS</title>
+<%@ include file="/mobile/include/head.jsp"%>
+<script>
+	$(document).ready(function () {
+		
+		gridList.setGrid({
+		    id : "gridList",
+		    editable : false,
+		    module : "WmsMobileOutboundPicking_COPY",
+		    command : "PDPK05_DETAIL02_MTOPOP",
+		    gridMobileType : true,
+		    emptyMsgType:false
+		});
+	
+		var param = searchedParam == null ? mobile.getLinkPopData() : searchedParam;
+		
+		var mtoTitle = $.trim(param.map['LOTA07']) == "" ? "[MTS] " : "[MTO] ";
+		$('#LOTA07').val(mtoTitle + param.map['LOTA07']);
+		
+		searchList(param);
+	})
+	
+	var searchedParam = null;
+	function searchList(param) {
+		var json = mobile.getLinkPopData();
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});		
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+	    if(gridId == "gridList" && dataLength > 0){
+	        var data = gridList.getRowData("gridList", 0);
+	        
+			var useQty = new Number(data.map['USEQTY']);         // 스캔바코드의 동일 mto 가용수량
+			var nextPic = new Number(data.map['NXTPIC']);        // 피킹해야할 잔여 수량
+			if(useQty >= nextPic){
+				callBack();
+			}
+			
+			var qty = 0;
+			var list = gridList.getGridData("gridList");
+		    for(var i=0; i < list.length; i++) {
+		        qty +=  (new Number(list[i].get("QTSIWH")));      // 스캔바코드의 다른 mto/mts 재고 수량 합
+	        }
+			var changeQty = 0;
+			if( qty > nextPic ){
+				changeQty = nextPic;
+			}else{
+				changeQty = qty;
+			}
+			
+			$('#NXTQTY').val(nextPic);
+			$('#USEQTY').val(useQty);
+			$('#TOTQTY').val(qty);
+			$('#QTSTKM').val((nextPic -  useQty) > changeQty ? changeQty : (nextPic -  useQty));
+			$('#QTSTKM_2').val((nextPic -  useQty) > changeQty ? changeQty : (nextPic -  useQty));
+			
+// 			callback(data);
+		}else{
+			callBack(data);
+		}
+	}
+	
+	// 더블클릭 이벤트
+// 	function gridListEventRowDblclick(gridId, rowNum) {
+// 		var data = gridList.getRowData("gridList", rowNum);
+// 		callback(data);
+// 	}
+	
+	// 선택버튼 클릭 이벤트
+// 	function onClickChooseBtn() {
+// 		var data = gridList.getRowData("gridList", selectedRowNum);
+// 		callback(data);
+// 	}
+	
+	// 그리드 클릭 시 rowNum 변수 저장
+	function gridListEventRowClick(gridId, rowNum) {
+		selectedRowNum = rowNum;
+	}
+	
+	function valueChangeEvent(obj) {
+		var objId  = $(obj).attr("id");
+		var objVal = $(obj).val();     
+		
+		if(objId == "QTSTKM"){
+			var nextQty = new Number($('#NXTQTY').val());
+			var qtstkm = new Number($('#QTSTKM').val());
+			var totQty = new Number($('#TOTQTY').val());
+			if(nextQty < qtstkm){
+				commonUtil.msgBox("필요한 수량보다 값이 큽니다.", null, null, function () {
+					$('#QTSTKM').val($('#QTSTKM_2').val());
+                    $('#QTSTKM').select();
+                });
+			}
+			else if(totQty < qtstkm){
+				commonUtil.msgBox("변경 가능 수량보다 값이 큽니다.", null, null, function () {
+					$('#QTSTKM').val($('#QTSTKM_2').val());
+                    $('#QTSTKM').select();
+                });
+			}
+		}
+		
+		
+	    $(obj).val(setDecimalValue(objVal, 3));
+	}
+	
+	function setDecimalValue(str, decimal) {
+        str = new String(str);
+        var regex = /[^0-9.]/g;
+            str.replace(',');
+        var number = Number(str.replace(regex, ""));            
+            
+        number = number ? number : 0;
+        return number.toLocaleString(undefined, { minimumFractionDigits: decimal });
+    }
+	
+	function onClickAPPLY(){
+		var useQty = new Number($('#USEQTY').val());
+		if( useQty <= 0 ){
+			commonUtil.msgBox("적용 가용수량이 부족합니다.", null, null, function () {
+                searchList(param);                                   
+            });
+		}else{
+			commonUtil.msgConfirm("가용수량 [" + $('#USEQTY').val() + "] 로 피킹 하시겠습니까?", null, function(){
+	            
+                callBack();
+	            
+	        }, function(){
+	            $('#QTSTKM').select();
+	        });
+		}
+	}
+	
+	function onClickChangeMTOMTS(){
+		var list = gridList.getGridData("gridList");
+        if(list.length == 0) {
+            commonUtil.msgBox("VALID_M0006"); // 선택된 데이터가 없습니다.
+            return;
+        }
+        
+        var msg = $('#LOTA07').val();
+        commonUtil.msgConfirm(msg + " 로 변경하시겠습니까?", null, function(){
+        	
+        	var param = searchedParam == null ? mobile.getLinkPopData() : searchedParam;
+            param.map['CHGQTY'] = $('#QTSTKM').val();
+            var json = netUtil.sendData({
+                url : "/mobile/Mobile_COPY/json/PDMTO_CHANGE_DATA.data",           
+                param : param
+            });
+            
+            if(json && json.data){
+                var sendMsg = json.data["O_MSG"];
+                if(sendMsg != "SUCCESS"){
+                	commonUtil.msgBox(sendMsg, null, null, function () {
+                		searchList(param);                                   
+                    });
+                    return;
+                }else{
+                	callBack();
+                }
+            }
+            
+        }, function(){
+        	$('#QTSTKM').select();
+        });
+	}
+	
+	function callBack(){
+// 		var data = gridList.getRowData("gridList", 0);
+// 		data.put('param', mobile.getLinkPopData());
+//         // GRowState, GRowNum 미삭제 시 appendJson 호출 시 데이터 바인딩 이상하게 됨.
+//         data.remove("GRowState");
+//         data.remove("GRowNum");
+
+        window.opener.MtoPopCallback($('#QTSTKM').val());
+        self.close();
+	}
+</script>
+</head>
+<body>
+	<div id="menu-container">
+		<div class="menu-item"></div>
+	</div>
+	<div class="main_wrap" id="paramArea">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div id="searchArea">
+					<table>
+						<colgroup>
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+							<col width="20%" />
+						</colgroup>
+						<tbody>
+							<tr>
+								<th CL='STD_LOTA07'>MTO판매번호</th>
+								<td colspan="5">
+									<input type="text" class="text" name="LOTA07" id="LOTA07" readonly />
+								</td>
+							</tr>
+							<tr>
+								<th CL='STD_USEQTY'>가용수량</th>
+								<td colspan="5">
+									<input type="text" class="text" name="USEQTY" id="USEQTY" readonly />
+									<input type="hidden" class="text" name="NXTQTY" id="NXTQTY" readonly />
+									<input type="hidden" class="text" name="TOTQTY" id="TOTQTY" readonly />
+								</td>
+							</tr>
+							<tr>
+								<th CL='STD_QTSTKM'>변경수량</th>
+								<td colspan="5">
+									<input type="text" class="text number" name="QTSTKM" id="QTSTKM" onchange="valueChangeEvent(this)" />
+									<input type="hidden" class="text number" name="QTSTKM_2" id="QTSTKM_2" readonly />
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<div class="tem4_content">
+
+			<div class="tableWrap_search section">
+				<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="10%" />
+							<col width="*" />
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL='STD_NO'>순번</th>
+								<th CL='STD_LOTA07'>영역</th>
+								<th CL='STD_QTSIWH'>구역</th>
+								<th CL='STD_UOMKEY'>지번</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="10%" />
+							<col width="*" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								<td GCol="text,LOTA07"></td>
+								<td GCol="text,QTSIWH"></td>
+								<td GCol="text,UOMKEY"></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="position: fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="33%" onclick="self.close()">
+							<label CL='BTN_CLOSE'></label>
+						</td>
+						<td class=f_1 width="34%" onclick="onClickAPPLY()">
+							<label CL='BTN_APPLY'></label>
+						</td>
+						<td class=f_1 width="33%" onclick="onClickChangeMTOMTS()">
+							<label CL='BTN_EDIT'></label>
+						</td>
+					</tr>
+				</table>
+			</div>
+			<!-- end footer_5 -->
+
+		</div>
+	</div>
+</body>

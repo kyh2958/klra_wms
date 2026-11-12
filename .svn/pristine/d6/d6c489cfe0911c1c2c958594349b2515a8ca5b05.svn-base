@@ -1,0 +1,1568 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Smile Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+
+<style type="text/css">
+
+input:read-only{ background-color: #e2e2e2; }
+select:disabled{ background-color: #e2e2e2; }
+.tem5_content .tableWrap_search  { overflow: hidden; }
+.tem4_content .select_box table  { width  : 98% !important; margin: auto; }
+.tem4_content .select_box .text  { padding: unset !important; margin: unset !important; }
+.tem4_content table th           { padding: 3px !important; }
+.tem4_content table td           { padding: 3px !important; }
+.number { text-align: right }
+
+/* --- 키오스크 리파인 스타일 --- */
+#kioskq {
+	font-family: "Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+	color: #1f1f29;
+	background: linear-gradient(135deg,#f6f8ff,#fdf6f2);
+	min-height: 100vh;
+}
+#kioskq .kiosk-wrapper {
+	max-width: 1280px;
+	margin: 0 auto;
+	padding: 36px 48px 140px;
+	display: flex;
+	flex-direction: column;
+	gap: 32px;
+}
+#kioskq .kiosk-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 28px;
+	background: #fff;
+	border-radius: 24px;
+	padding: 22px 28px;
+	border: 1px solid rgba(37,61,126,0.12);
+	box-shadow: 0 18px 28px rgba(27,46,106,0.12);
+}
+#kioskq .kiosk-header { overflow: visible; }
+
+#kioskq .time-box { 
+  box-sizing: border-box;
+  min-height: 76px;          /* 2줄 텍스트 안전 높이 */
+}
+
+#kioskq .time-box span {
+    display: block;
+    white-space: nowrap;
+    line-height: 1.25;
+}
+#kioskq #currentDate {
+    font-size: clamp(16px, 1.7vw, 20px);
+}
+
+#kioskq #currentTime {
+    font-size: clamp(22px, 2.4vw, 28px);
+    letter-spacing: 0.03em;
+}
+#kioskq .header-left { display:flex; align-items:center; gap:24px; }
+#kioskq .brand-logo { width:158px; height:auto; }
+#kioskq .brand { margin:0; font-size: clamp(28px,3vw,34px); font-weight:700; }
+#kioskq .tagline { margin:4px 0 0; font-size: clamp(18px,2vw,22px); color:#5d647a; }
+
+#kioskq .search-panel {
+	background:#fff;
+	border-radius:24px;
+	padding:28px 30px 40px;   /* 🔥 250px → 40px로 변경 */
+	border:1px solid rgba(37,61,126,0.1);
+	box-shadow:0 16px 26px rgba(27,46,106,0.1);
+}
+
+/* (키패드 열릴 때만 확장) */
+#kioskq .search-panel.keypad-open {
+    padding-bottom: 40px;
+}
+
+
+
+#kioskq .input_carNo {
+    height: 100%;
+    font-size: clamp(22px, 2.5vw, 28px);
+    padding: 0 22px;
+    border-radius: 18px;
+    border: 1px solid #c7cce7;
+    background: #fbfcff;
+    text-align: center;
+    letter-spacing: 0.12em;
+}
+
+#kioskq .input_carNo::placeholder { color:#9aa0bd; letter-spacing:0; }
+#kioskq .btn-kiosk {
+    height: 100%;
+    border-radius: 18px;
+    border: none;
+    font-weight: 600;
+    font-size: clamp(20px, 2.2vw, 24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: filter .2s ease, transform .15s ease;
+}
+#kioskq .btn-kiosk.primary {
+	background: linear-gradient(135deg,#3f59d8,#2742c3);
+	color:#fff;
+	box-shadow:0 16px 26px rgba(39,66,195,0.24);
+}
+#kioskq .btn-kiosk.neutral {
+	background:#f4f6ff;
+	color:#2742c3;
+	border:1px solid #c7cce7;
+}
+#kioskq .btn-kiosk:hover { filter:brightness(1.05); }
+#kioskq .btn-kiosk:active { transform:translateY(2px); }
+#kioskq .input-hint {
+    margin: 10px 0 0;
+    padding-left: 4px;                 /* 입력칸과 라인 맞춤 */
+    font-size: clamp(16px, 1.8vw, 20px);
+    color: #666e88;
+    text-align: left;
+}
+
+#kioskq .result-panel {
+	background:#fff;
+	border-radius:24px;
+	padding:32px 30px 34px;
+	border:1px solid rgba(37,61,126,0.1);
+	box-shadow:0 16px 26px rgba(27,46,106,0.1);
+}
+#kioskq .result-title { margin:0 0 16px; font-size: clamp(26px,3vw,32px); }
+#kioskq .tableWrap_search {
+	border-radius:18px;
+	border:1px solid #cbd2ec;
+	/* overflow:hidden; */
+}
+#kioskq .result-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin:0 0 16px;
+}
+
+#kioskq .result-title{
+    margin:0;
+    font-size: clamp(26px,3vw,32px);
+}
+
+#kioskq .result-print-btn{
+    flex: 0 0 185px;
+    height: clamp(56px, 7vw, 66px);
+    min-height: clamp(56px, 7vw, 66px);
+    padding: 0 18px;
+    border-radius: 18px;
+    font-size: clamp(20px, 2.2vw, 24px);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+    border: none;
+    cursor: pointer;
+    transition: filter .2s ease, transform .15s ease;
+    background: #f4f6ff;
+    color: #2742c3;
+    border: 1px solid #c7cce7;
+}
+
+#kioskq .result-print-btn:hover{
+    filter: brightness(1.05);
+}
+
+#kioskq .result-print-btn:active{
+    transform: translateY(2px);
+}
+#kioskq .result-print-btn.primary{
+    background: linear-gradient(135deg,#3f59d8,#2742c3);
+    color:#fff;
+    box-shadow:0 16px 26px rgba(39,66,195,0.24);
+}
+
+#kioskq .tableHeader table thead th {
+	background:#32436d !important;
+	color:#fff !important;
+	padding:14px 12px !important;
+	font-size: clamp(18px,2vw,22px);
+	white-space:nowrap;
+}
+#kioskq .tableBody table tbody td {
+	font-size: clamp(20px,2.2vw,24px);
+	padding:16px 12px !important;
+	border-bottom:1px solid #dde2f3 !important;
+}
+#kioskq .tableBody table tbody tr:nth-child(even) td { background:#f6f8ff; }
+#kioskq .tableBody table tbody tr:hover td { background:rgba(63,89,216,0.08); }
+
+
+
+
+
+
+
+/* 반응형 */
+@media (max-width: 960px) {
+	#kioskq .kiosk-wrapper { padding:28px 24px 110px; }
+	#kioskq .search-inline {
+		grid-template-columns:minmax(0,1fr);
+	}
+	#kioskq .btn-kiosk { width:100%; }
+}
+
+
+button{
+    vertical-align: middle !important;
+    height: auto !important;
+}
+
+
+
+/* --- 검색 행 정렬 --- */
+#kioskq .search-panel table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#kioskq .search-panel colgroup col:first-child { width: 140px !important; }
+#kioskq .search-panel colgroup col:last-child  { width: auto !important; }
+
+
+#kioskq .search-inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+
+#kioskq .search-inline .input_carNo {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: clamp(56px, 7vw, 66px);
+    font-size: clamp(22px, 2.5vw, 28px);
+    padding: 0 22px;
+    border-radius: 18px;
+    border: 1px solid #c7cce7;
+    background: #fbfcff;
+    text-align: center;
+    letter-spacing: 0.12em;
+}
+
+#kioskq .search-inline .btn-kiosk {
+    flex: 0 0 185px;
+    height: clamp(56px, 7vw, 66px);
+    min-height: clamp(56px, 7vw, 66px);
+    padding: 0 18px;
+    border-radius: 18px;
+    font-size: clamp(20px, 2.2vw, 24px);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+#kioskq .search-inline {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+}
+/* 안내 문구를 입력칸 시작선에 맞춘다 */
+#kioskq .input-hint {
+    margin: 12px 0 0;
+    padding-left: 4px;
+    text-align: left;
+    font-size: clamp(16px, 1.8vw, 20px);
+    color: #666e88;
+}
+#kioskq .search-panel th {
+    width: 120px;
+    padding: 0 12px 0 6px;
+    display: table-cell;
+    vertical-align: top;
+    position: relative;
+    top: 13px;
+    font-size: clamp(22px, 2.4vw, 26px);
+    font-weight: 700;
+    color: #1f1f29;
+    white-space: nowrap;
+}
+
+#kioskq .search-panel td {
+    display: table-cell;
+    vertical-align: top;
+}
+
+/* 차량번호 영역 */
+#kioskq .carno-area{
+    position: relative;
+    width: 100%;
+}
+
+/* 입력창은 한 줄 꽉 차게 */
+#kioskq .search-inline{
+    display: block;
+    width: 100%;
+}
+
+#kioskq .search-inline .input_carNo{
+    width: 100%;
+    height: clamp(56px, 7vw, 66px);
+    font-size: clamp(22px, 2.5vw, 28px);
+    padding: 0 22px;
+    border-radius: 18px;
+    border: 1px solid #c7cce7;
+    background: #fbfcff;
+    text-align: center;
+    letter-spacing: 0.12em;
+    box-sizing: border-box;
+}
+
+/* 키패드: 입력창 바로 아래, 같은 폭 */
+/* 키패드: 일반 흐름으로 배치해서 아래 결과영역을 같이 밀어냄 */
+#kioskq .carno-keypad-wrap{
+    position: static;
+    width: 100%;
+    display: none;
+    margin-top: 14px;
+    z-index: auto;
+}
+
+#kioskq .carno-keypad-wrap.active{
+    display: block;
+}
+
+#kioskq .carno-keypad{
+    width: 100%;
+    padding: 18px;
+    border: 1px solid #cbd2ec;
+    border-radius: 20px;
+    background: #f8faff;
+    box-shadow: 0 12px 24px rgba(27,46,106,0.10);
+    box-sizing: border-box;
+}
+
+#kioskq .carno-keypad-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+#kioskq .carno-key{
+    height: 84px;
+    border: 1px solid #c7cce7;
+    border-radius: 16px;
+    background: #ffffff;
+    color: #1f1f29;
+    font-size: 56px;
+    font-weight: 700;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: filter .2s ease, transform .15s ease;
+}
+
+#kioskq .carno-key:hover{
+    filter: brightness(1.03);
+}
+
+#kioskq .carno-key:active{
+    transform: translateY(2px);
+}
+
+#kioskq .carno-key.func{
+    background: #eef2ff;
+    color: #2742c3;
+}
+
+#kioskq .carno-key.search{
+    background: linear-gradient(135deg,#3f59d8,#2742c3);
+    color: #fff;
+    border: none;
+    box-shadow: 0 12px 22px rgba(39,66,195,0.22);
+    height: 96px;
+    font-size: 34px;
+}
+
+.car-search-wrap {
+    width: 100%;
+    background: #f7f7f7;
+    border-radius: 30px;
+    padding: 40px 40px 30px 40px;
+    box-sizing: border-box;
+    height: auto;
+    min-height: auto;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+/* 키패드 열렸을 때만 확장 */
+.car-search-wrap.keypad-open {
+    padding-bottom: 80px;
+}
+
+.keypad-area {
+    display: none;
+    margin-top: 20px;
+}
+
+.car-search-wrap.keypad-open .keypad-area {
+    display: block;
+}
+@media (max-width: 960px) {
+    #kioskq .carno-keypad{
+        max-width: 100%;
+    }
+
+    #kioskq .carno-key{
+        height: 64px;
+        font-size: 24px;
+    }
+}
+#kioskq input[type=checkbox] {
+    zoom: 1 !important;
+    transform: scale(2.2);
+    transform-origin: center center;
+}
+
+</style>
+
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+
+<script>
+
+
+var __stkSyncFlag = "Y";
+
+
+/* ===============================
+ * 조회결과 단건 자동체크
+ * - 1건이면 자동 체크
+ * - 2건 이상이면 전체 해제 상태 유지
+ * =============================== */
+function applyAutoCheckSingleRow() {
+    var dataList = gridList.getGridData("gridList");
+
+    if (!dataList || dataList.length === 0) {
+        return;
+    }
+
+    __stkSyncFlag = "N";
+    try {
+        // 다건일 때는 자동체크 없이 전체 해제
+        if (dataList.length > 1) {
+            for (var i = 0; i < dataList.length; i++) {
+                gridList.setRowCheck("gridList", i, false);
+            }
+            return;
+        }
+
+        // 단건일 때는 무조건 체크
+        if (dataList.length === 1) {
+            gridList.setRowCheck("gridList", 0, true);
+        }
+    } finally {
+        __stkSyncFlag = "Y";
+    }
+}
+
+/* ===============================
+ * 그리드 조회 완료 후 자동체크
+ * =============================== */
+ 
+function gridListEventDataBindEnd(gridId, dataLength) {
+    if (gridId !== "gridList") return;
+    applyAutoCheckSingleRow();
+}
+
+function gridListEventRowCheck(gridId, rowNum, checkType){
+
+    if (gridId !== "gridList") return;
+
+    if (__stkSyncFlag !== "Y") return;
+    __stkSyncFlag = "N";
+
+    try {
+        var baseStk = gridList.getColData("gridList", rowNum, "STKNUM");
+        if (!baseStk) return;
+
+        var dataList = gridList.getGridData("gridList");
+        for (var i = 0; i < dataList.length; i++) {
+            var stk = gridList.getColData("gridList", i, "STKNUM");
+            if (stk === baseStk) {
+                gridList.setRowCheck("gridList", i, checkType);
+            }
+        }
+    } finally {
+        __stkSyncFlag = "Y";
+    }
+}
+
+$(document).ready(function(){
+	gridList.setGrid({
+		id : "gridList",
+		editable : true,
+		module : "WmsMobileOutboundPicking_COPY",					  
+		command : "KIOSK_INVOICEPRT",
+		gridMobileType : true,
+		emptyMsgType:false
+	});
+
+
+	$("#VEHINO").on("keydown", function (e) {
+	    var key = e.key;
+
+	    if (key === "Enter") {
+	        e.preventDefault();
+	        hideCarNoKeypad();
+	        searchVehinoPop();
+	        return;
+	    }
+
+	    if (
+	        key === "Backspace" ||
+	        key === "Delete" ||
+	        key === "Tab" ||
+	        key === "ArrowLeft" ||
+	        key === "ArrowRight" ||
+	        key === "Home" ||
+	        key === "End"
+	    ) {
+	        return;
+	    }
+
+	    if (!/^[0-9]$/.test(key)) {
+	        e.preventDefault();
+	    }
+	});
+
+    $("#VEHINO").on("input", function () {
+        this.value = (this.value || "").replace(/[^0-9]/g, "").slice(0, 4);
+    });
+
+    $(document).on("mousedown touchstart", ".carno-keypad, .input_carNo", function (e) {
+        e.stopPropagation();
+    });
+
+    $(document).on("mousedown touchstart", function (e) {
+        if (!$(e.target).closest(".carno-keypad-wrap, #VEHINO").length) {
+            hideCarNoKeypad();
+        }
+    });
+});
+
+
+$(document).on("click", "#vehinoLayerPopup", function(e){
+    if (e.target.id === "vehinoLayerPopup") {
+        closeVehinoLayerPopup();
+        clearAndOpenCarNoInput();
+    }
+});
+
+
+ 	function keypadInputCarNo(val) {
+	    var $input = $("#VEHINO");
+	    var current = ($input.val() || "").replace(/[^0-9]/g, "");
+
+	    if (current.length >= 4) {
+	        return;
+	    }
+
+	    $input.val(current + val);
+	}
+
+	function keypadBackspaceCarNo() {
+	    var $input = $("#VEHINO");
+	    var current = ($input.val() || "").replace(/[^0-9]/g, "");
+	    $input.val(current.slice(0, -1));
+	}
+
+	function keypadClearCarNo() {
+	    $("#VEHINO").val("");
+	}
+ 
+ 	function clearAndOpenCarNoInput() {
+	    var $input = $("#VEHINO");
+
+	    if ($.trim($input.val()) !== "") {
+	        $input.val("").focus();
+	    }
+
+	    showCarNoKeypad();
+	}
+ 
+function showCarNoKeypad() {
+    $("#carNoKeypadWrap").addClass("active");
+    $(".search-panel").addClass("keypad-open");
+}
+
+function hideCarNoKeypad() {
+    $("#carNoKeypadWrap").removeClass("active");
+    $(".search-panel").removeClass("keypad-open");
+}
+
+function keypadInputCarNo(val) {
+    var $input = $("#VEHINO");
+    var current = ($input.val() || "").replace(/[^0-9]/g, "");
+
+    if (current.length >= 4) {
+        return;
+    }
+
+    $input.val(current + val);
+    $input.focus();
+}
+
+function keypadBackspaceCarNo() {
+    var $input = $("#VEHINO");
+    var current = ($input.val() || "").replace(/[^0-9]/g, "");
+    $input.val(current.slice(0, -1));
+    $input.focus();
+}
+
+function keypadClearCarNo() {
+    $("#VEHINO").val("").focus();
+}
+
+function keypadSearchCarNo() {
+    var vehino = ($("#VEHINO").val() || "").trim();
+
+    if (vehino === "") {
+        PlaySound('e');
+        commonUtil.msgBox("차량번호 4자리를 입력해 주세요.", null, null, function () {
+            $("#VEHINO").focus();
+        });
+        return;
+    }
+
+    if (!/^\d{4}$/.test(vehino)) {
+        PlaySound('e');
+        commonUtil.msgBox("차량번호는 숫자 4자리만 입력 가능합니다.", null, null, function () {
+            $("#VEHINO").focus();
+        });
+        return;
+    }
+
+    hideCarNoKeypad();
+    searchVehinoPop();
+}
+
+function searchVehinoPop() {
+	  var vehino = ($("#VEHINO").val() || "").trim();
+
+	  if (vehino === "") {
+	    PlaySound('e');
+	    commonUtil.msgBox("차량번호 4자리를 입력해 주세요.", null, null, function () {
+	      $("#VEHINO").focus();
+	    });
+	    return;
+	  }
+
+	  if (!/^\d{4}$/.test(vehino)) {
+	    PlaySound('e');
+	    commonUtil.msgBox("차량번호는 숫자 4자리만 입력 가능합니다.", null, null, function () {
+	      $("#VEHINO").focus();
+	    });
+	    return;
+	  }
+
+	  var param = new DataMap();
+	  param.put("VEHINO", vehino);
+	  param.put("SCHMODE", "LAST4");
+	  param.put("WAREKY", "<%=wareky%>");
+	  param.put("OWNRKY", "<%=ownrky%>");
+	  param.put("LANGKY", "<%=langky%>");
+	  param.put("KIOSK_MTYPE", "<%=mtype%>");
+
+	  // iframe 전달용
+	  window.KIOSKQ_CARNO_POP_PARAM = param;
+
+	  openVehinoLayerPopup();
+}
+
+function openVehinoLayerPopup() {
+    $("#vehinoLayerPopup").show();
+    $("#vehinoLayerFrame").attr("src", "/mobile/KIOSKQ_CARNO_POP.page");
+}
+
+function closeVehinoLayerPopup() {
+    $("#vehinoLayerFrame").attr("src", "");
+    $("#vehinoLayerPopup").hide();
+}
+
+
+function vehinoPopCallback(data) {
+    $("#VEHINO").val(data.get("VEHINO"));
+
+    hideCarNoKeypad();
+    closeVehinoLayerPopup();
+
+    try {
+        window.KIOSKQ_CARNO_POP_PARAM = null;
+    } catch (e) {}
+
+    searchList();
+}
+ function ShpPrintList() {
+	/* alert("printUnShppingPop called"); */
+    var chkItemList = gridList.getSelectData("gridList");
+
+    if (!chkItemList || chkItemList.length === 0) {
+        commonUtil.msgBox("출력할 선적정보가 없습니다.");
+        return;
+    }
+
+    var row = chkItemList[0];
+
+    var wareky = "<%=wareky%>";
+    var ownrky = "<%=ownrky%>";
+
+    var where =
+        "AND SH.WAREKY='" + wareky + "'" +
+        " AND SH.OWNRKY='" + ownrky + "'" +
+        " AND SH.STATDO IN ('NEW','FAL','FPC','PPC')" +  
+        " AND SI.STKNUM='" + row.get("STKNUM") + "'";
+
+ 
+
+    WriteEZgenElement(
+        "출고지시서(미할당)_선적단위.ezg?ver=0.67",
+        where,
+        "",
+        "<%=langky%>",
+        new DataMap(),
+        1300,
+        950
+    );
+}
+
+function printUnShppingPop(list) {
+
+	   if (!list || list.length === 0) {
+	        commonUtil.msgBox("출력할 선적정보가 없습니다.");
+	        return;
+	    }
+
+
+	    var wareky = "<%=wareky%>";
+	    var ownrky = "<%=ownrky%>";
+	    // 선택된 STKNUM들을 IN으로 묶기
+	    var stkArr = [];
+	    for (var i = 0; i < list.length; i++) {
+	        var stk = list[i].get("STKNUM");
+	        if (stk) stkArr.push("'" + stk + "'");
+	    }
+
+	    if (stkArr.length === 0) {
+	        commonUtil.msgBox("출력할 선적정보가 없습니다.");
+	        return;
+	    }
+
+	    var stkWhere = stkArr.join(",");
+
+	    var where =
+	        "AND SH.WAREKY='" + wareky + "'" +
+	        " AND SH.OWNRKY='" + ownrky + "'" +
+	        " AND SH.STATDO IN ('NEW','FAL','FPC','PPC')" +  
+	        " AND SI.STKNUM IN (" + stkWhere + ")";
+
+	    /* var where =
+	        "AND SH.WAREKY='" + wareky + "'" +
+	        " AND SH.OWNRKY='" + ownrky + "'" +
+	        " AND SI.STKNUM='" + popData.get("STKNUM") + "'"; */
+
+	   
+
+	    WriteEZgenElement(
+	        "출고지시서(미할당)_선적단위.ezg?ver=0.65",
+	        where,
+	        "",
+	        "<%=langky%>",
+	        new DataMap(),
+	        1300,
+	        950
+	    );
+	}
+
+//ps 미작업 상태에서 거래명세서(공급받는자)
+function printPsUnloadedInvoice(list){
+
+    if (!list || list.length === 0) {
+        commonUtil.msgBox("출력할 선적정보가 없습니다.");
+        return;
+    }
+
+    var wareky = "<%=wareky%>";
+    var ownrky = "<%=ownrky%>";
+
+    var dealParam = new DataMap();
+    dealParam.put("list", list);
+
+    var dealJson = netUtil.sendData({
+        url : "/wms/outbound/json/DL081PrintTS.data",
+        param : dealParam
+    });
+
+    if (!dealJson || !dealJson.data || !dealJson.data["DEALKY"]) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    var dealky = dealJson.data["DEALKY"];
+
+    var stkArr = [];
+    for (var i = 0; i < list.length; i++) {
+        var stk = list[i].get("STKNUM");
+        if (stk) stkArr.push("'" + stk + "'");
+    }
+
+    if (stkArr.length === 0) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    var stkWhere = stkArr.join(",");
+
+    var dealWhere =
+        "AND SH.WAREKY='" + wareky + "'" +
+        " AND SH.OWNRKY='" + ownrky + "'" +
+        " AND SH.STATDO IN ('NEW','FAL','FPC')" +
+        " AND SI.STKNUM IN (" + stkWhere + ")";
+
+    var invoicePrintMap = new DataMap();
+    invoicePrintMap.put("DEALKY", dealky);
+    invoicePrintMap.put("i_type", "1");   // 공급자보관용
+
+    WriteEZgenElement(
+        "거래명세서.ezg?ver=0.42",
+        dealWhere,
+        "",
+        "<%=langky%>",
+        invoicePrintMap,
+        1000,
+        900
+    );
+}
+
+//프린트 대상 조회
+function getPrintTargetYn(stkWhere) {
+
+    var wareky = "<%=wareky%>";
+    var ownrky = "<%=ownrky%>";
+
+    var param = new DataMap();
+    param.put("WAREKY", wareky);
+    param.put("OWNRKY", ownrky);
+    param.put("STKNUM", stkWhere);   
+
+    
+    var json = netUtil.sendData({
+        module : "WmsMobileOutboundPicking_COPY",
+        command : "KIOSK_PRINT_TARGET_CHECK",
+        param : param
+    });
+
+   
+    var row = null;
+    if (json) {
+        if (json.data && json.data.length > 0) row = json.data[0];
+        else if (json.data) row = json.data;
+    }
+
+    if (!row) {
+        return { INVOICE_YN: "N", LINER_YN: "N", MOVE_YN: "N" };
+    }
+
+    return {
+        INVOICE_YN : (row.INVOICE_YN || "N"),
+        LINER_YN   : (row.LINER_YN   || "N"),
+        MOVE_YN    : (row.MOVE_YN    || "N")
+    };
+}
+
+function InvoicePrtList(type){
+
+    var list = gridList.getSelectData("gridList");
+
+    if (!list || list.length === 0) {
+        commonUtil.msgBox("VALID_M0006");
+        return;
+    }
+
+    if (type === '') {
+        type = null;
+    }
+
+    /* ===============================
+     * 1) 상태 기준 분기 판단
+     * - NEW/FPC : 미작업(미상차) → 출고지시서(미할당)
+     * - FCK     : 상차완료       → 거래명세서/이송명세서/원지/이동전표
+     * =============================== */
+    var isAllUnloaded = true;  // NEW/FPC만 있는지
+    var isAllLoaded   = true;  // FCK만 있는지
+
+    var unloadedList = [];     // NEW/FPC
+    var loadedList   = [];     // FCK
+
+    for (var i = 0; i < list.length; i++) {
+        var statit = $.trim(list[i].get("STATIT"));
+
+        if (statit === "NEW" || statit === "FAL" || statit === "FPC" || statit === "PPC")  {
+            isAllLoaded = false;
+            unloadedList.push(list[i]);
+        } else if (statit === "FCK") {
+            isAllUnloaded = false;
+            loadedList.push(list[i]);
+        } else {
+            isAllUnloaded = false;
+            isAllLoaded = false;
+        }
+    }
+
+    /*     if (!isAllUnloaded && !isAllLoaded) {
+        commonUtil.msgBox("상태가 다른 건은 함께 출력할 수 없습니다.");
+        return;
+    } */
+
+    /* ===============================
+     * 2) 미상차건 → 출고지시서(미할당)
+     * =============================== */
+    if (unloadedList.length > 0) {
+
+        for (var x = 0; x < unloadedList.length; x++) {
+            if (!unloadedList[x].get("WAREKY")) unloadedList[x].put("WAREKY", "<%=wareky%>");
+            if (!unloadedList[x].get("OWNRKY")) unloadedList[x].put("OWNRKY", "<%=ownrky%>");
+        }
+
+        var unloadPrintParam = new DataMap();
+        unloadPrintParam.put("list", unloadedList);
+        unloadPrintParam.put("columnList", "WAREKY,SHPOKY,STKNUM");
+        unloadPrintParam.put("PRTTYP", "PK_LIST");
+        unloadPrintParam.put("OWNRKY", "<%=ownrky%>");
+
+        var unloadPrintJson = netUtil.sendData({
+            url : "/wms/admin/json/commonPrint.data",
+            param : unloadPrintParam
+        });
+
+        bindPrintSeq(unloadedList, unloadPrintJson);
+        savePrintLog(unloadedList, "1");   // 1: 출고지시서
+
+        if ("<%=mtype%>" === "P") {
+            printPsUnloadedInvoice(unloadedList); //거래명세서(공급받는자)
+        } else {
+            printUnShppingPop(unloadedList); //미출고지시서
+        }
+        
+    }
+
+    /* ===============================
+     * 3) 상차완료(FCK) 상태 검증
+     * =============================== */
+    if (loadedList.length > 0) {
+        for (var j = 0; j < loadedList.length; j++) {
+            if ($.trim(loadedList[j].get("STATIT")) !== "FCK") {
+                commonUtil.msgBox("OUT_M0222");
+                gridList.setRowFocus("gridList", loadedList[j].get("GRowNum"));
+                return;
+            }
+        }
+    } else {
+    	
+    	// 초기화면 열림
+        clearAndOpenCarNoInput();
+        gridList.resetGrid('gridList'); // 그리드 초기화
+        return;
+    }
+
+    /* ===============================
+     * 4) 문서유형별 출력대상 분류
+     * - 거래명세서: 201/206/208/231
+     * - 이송명세서: 221
+     * =============================== */
+    var wareky = "<%=wareky%>";
+    var ownrky = "<%=ownrky%>";
+
+    var allStkArr = [];
+    var invoiceStkArr = [];
+    var transferStkArr = [];
+
+    var invoiceList = [];
+    var transferList = [];
+
+    for (var k = 0; k < loadedList.length; k++) {
+        var row = loadedList[k];
+        var stk = row.get("STKNUM");
+        var shpmty = row.get("SHPMTY") || "";
+
+        if (!stk) continue;
+
+        allStkArr.push(stk);
+
+        // 거래명세서 대상
+        if (shpmty.indexOf("201") > -1 ||
+            shpmty.indexOf("206") > -1 ||
+            shpmty.indexOf("208") > -1 ||
+            shpmty.indexOf("231") > -1) {
+            invoiceStkArr.push(stk);
+            invoiceList.push(row);
+        }
+
+        // 이송명세서 대상
+        if (shpmty.indexOf("221") > -1) {
+            transferStkArr.push(stk);
+            transferList.push(row);
+        }
+    }
+
+    if (allStkArr.length === 0) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    var allStkWhere      = makeStknumInWhere(allStkArr);
+    var invoiceStkWhere  = makeStknumInWhere(invoiceStkArr);
+    var transferStkWhere = makeStknumInWhere(transferStkArr);
+
+    /* ===============================
+     * 5) 공통 출력 대상 체크
+     * - 원지 / 이동전표는 상차완료 선택건 기준
+     * =============================== */
+    var yn = getPrintTargetYn(allStkWhere);
+
+    /* ===============================
+     * 6) 거래명세서용 DEALKY 생성 + commonPrint.data
+     * =============================== */
+    var dealky = null;
+
+    if (yn.INVOICE_YN === "Y" && invoiceList.length > 0) {
+
+        var dealParam = new DataMap();
+        dealParam.put("list", invoiceList);
+
+        var dealJson = netUtil.sendData({
+            url : "/wms/outbound/json/DL081PrintTS.data",
+            param : dealParam
+        });
+
+        if (!dealJson || !dealJson.data || !dealJson.data["DEALKY"]) {
+            yn.INVOICE_YN = "N";
+        } else {
+            dealky = dealJson.data["DEALKY"];
+
+            for (var x = 0; x < invoiceList.length; x++) {
+                if (!invoiceList[x].get("WAREKY")) invoiceList[x].put("WAREKY", "<%=wareky%>");
+                if (!invoiceList[x].get("OWNRKY")) invoiceList[x].put("OWNRKY", "<%=ownrky%>");
+            }
+
+            var printParam = new DataMap();
+            printParam.put("list", invoiceList);
+            printParam.put("columnList", "WAREKY,SHPOKY,STKNUM");
+            printParam.put("PRTTYP", "PK_LIST");
+            printParam.put("OWNRKY", "<%=ownrky%>");
+
+            var printJson = netUtil.sendData({
+                url : "/wms/admin/json/commonPrint.data",
+                param : printParam
+            });
+
+            bindPrintSeq(invoiceList, printJson);
+        }
+    }
+
+    /* ===============================
+     * 7) 최종 출력 가능 여부 판단
+     * =============================== */
+    var canInvoice  = (yn.INVOICE_YN === "Y" && invoiceStkArr.length > 0 && dealky);
+    var canTransfer = (transferStkArr.length > 0);
+    var canLiner    = (yn.LINER_YN === "Y");
+    var canMove     = (yn.MOVE_YN === "Y");
+    
+    // PS : 이동전표 미출력처리
+	if ("<%=mtype%>" === "P") {
+	    canMove = false;
+	}
+    
+    if (!canInvoice && !canTransfer && !canLiner && !canMove) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    /* ===============================
+     * 8) 거래명세서 출력
+     * =============================== */
+    if (canInvoice) {
+        savePrintLog(invoiceList, "2");   // 2: 거래명세서
+
+        var dealWhere =
+            "AND SH.WAREKY='" + wareky + "'" +
+            " AND SH.OWNRKY='" + ownrky + "'" +
+            " AND SH.STATDO IN ('PSH','FSH','FCK')" +
+            " AND SH.SHPMTY IN ('201','206','208','231')" +
+            " AND SI.STKNUM IN (" + invoiceStkWhere + ")";
+
+        var invoicePrintMap = new DataMap();
+        invoicePrintMap.put("DEALKY", dealky);
+        invoicePrintMap.put("i_type", type);
+
+        WriteEZgenElement(
+            "거래명세서.ezg?ver=0.42",
+            dealWhere,
+            "",
+            "<%=langky%>",
+            invoicePrintMap,
+            1000,
+            900
+        );
+    }
+
+    /* ===============================
+     * 9) 원지 출력
+     * =============================== */
+    if (canLiner) {
+        for (var x = 0; x < loadedList.length; x++) {
+            if (!loadedList[x].get("WAREKY")) loadedList[x].put("WAREKY", "<%=wareky%>");
+            if (!loadedList[x].get("OWNRKY")) loadedList[x].put("OWNRKY", "<%=ownrky%>");
+        }
+
+        var linerPrintParam = new DataMap();
+        linerPrintParam.put("list", loadedList);
+        linerPrintParam.put("columnList", "WAREKY,SHPOKY,STKNUM");
+        linerPrintParam.put("PRTTYP", "PK_LIST");
+        linerPrintParam.put("OWNRKY", "<%=ownrky%>");
+
+        var linerPrintJson = netUtil.sendData({
+            url : "/wms/admin/json/commonPrint.data",
+            param : linerPrintParam
+        });
+
+        bindPrintSeq(loadedList, linerPrintJson);
+        savePrintLog(loadedList, "3");   // 3: 원지출력물
+
+        setTimeout(function () {
+
+            var linerWhere =
+                "AND SH.WAREKY='" + wareky + "'" +
+                " AND SH.OWNRKY='" + ownrky + "'" +
+                " AND SH.STATDO IN ('FPC','PSH','FSH','FCK')" +
+                " AND SI.STKNUM IN (" + allStkWhere + ")";
+
+            WriteEZgenElement(
+                "원지출고지시서_선적단위.ezg?ver=2.46",
+                linerWhere,
+                "",
+                "<%=langky%>",
+                new DataMap(),
+                1000,
+                900
+            );
+
+        }, 3000);
+    }
+
+    /* ===============================
+     * 10) 이송명세서 출력
+     * =============================== */
+    if (canTransfer) {
+        for (var x = 0; x < transferList.length; x++) {
+            if (!transferList[x].get("WAREKY")) transferList[x].put("WAREKY", "<%=wareky%>");
+            if (!transferList[x].get("OWNRKY")) transferList[x].put("OWNRKY", "<%=ownrky%>");
+        }
+
+        var transferPrintParam = new DataMap();
+        transferPrintParam.put("list", transferList);
+        transferPrintParam.put("columnList", "WAREKY,SHPOKY,STKNUM");
+        transferPrintParam.put("PRTTYP", "PK_LIST");
+        transferPrintParam.put("OWNRKY", "<%=ownrky%>");
+
+        var transferPrintJson = netUtil.sendData({
+            url : "/wms/admin/json/commonPrint.data",
+            param : transferPrintParam
+        });
+
+        bindPrintSeq(transferList, transferPrintJson);
+        savePrintLog(transferList, "4");   // 4: 이송명세서
+
+        setTimeout(function () {
+
+            var transferWhere =
+                "AND SH.WAREKY='" + wareky + "'" +
+                " AND (";
+
+            for (var t = 0; t < transferStkArr.length; t++) {
+                transferWhere += "SI.STKNUM='" + transferStkArr[t] + "'";
+                if (t !== transferStkArr.length - 1) {
+                    transferWhere += " OR ";
+                }
+            }
+
+            transferWhere += ")";
+
+            WriteEZgenElement(
+                "이송명세서_선적단위.ezg?ver=0.07",
+                transferWhere,
+                "",
+                "<%=langky%>",
+                new DataMap(),
+                1000,
+                1000
+            );
+
+        }, 3200);
+    }
+
+    /* ===============================
+     * 11) 이동전표 팝업
+     * =============================== */
+    if (canMove) {
+        savePrintLog(loadedList, "5");   // 5: 이동전표
+        setTimeout(function () {
+            openMoveSlipPrintPop(loadedList);
+        }, 3500);
+    }
+}
+function makeStknumInWhere(list){
+    var arr = [];
+    for (var i = 0; i < list.length; i++) {
+        var v = (list[i] || "").toString().trim();
+        if (v) arr.push("'" + v + "'");
+    }
+    return arr.join(",");
+}
+
+
+
+
+function searchList(){
+	  if(!validate.check("searchArea")){
+	    $("#VEHINO").focus();
+	    return;
+	  }
+
+	  var param = inputList.setRangeParam("searchArea");
+	  param.put("WAREKY", "<%=wareky%>");
+	  param.put("OWNRKY", "<%=ownrky%>");
+	  param.put("LANGKY", "<%=langky%>");
+	  param.put("KIOSK_MTYPE", "<%=mtype%>"); 
+
+	  gridList.gridList({
+	    id : "gridList",
+	    param : param
+	  });
+ 
+	}
+
+
+function fn_onfocus(objId){
+    $("#" + objId).select();
+}
+
+function bindPrintSeq(list, printJson) {
+    if (!list || list.length === 0) {
+        return;
+    }
+    
+
+    var data = printJson.data;
+
+   
+
+    // 0) data 자체가 단건 문자열/숫자 PRTSEQ 인 경우
+    if (typeof data === "string" || typeof data === "number") {
+        var singlePrtseq = String(data);
+
+        for (var i = 0; i < list.length; i++) {
+            list[i].put("PRTSEQ", singlePrtseq);
+        }
+
+        
+        return;
+    }
+
+    // 1) 단건 객체 PRTSEQ
+    if (data.PRTSEQ) {
+        for (var j = 0; j < list.length; j++) {
+            list[j].put("PRTSEQ", data.PRTSEQ);
+        }
+
+        
+        return;
+    }
+
+    // 2) data.list 형태
+    if (data.list && $.isArray(data.list)) {
+        var seqMap1 = {};
+
+        for (var k = 0; k < data.list.length; k++) {
+            var row1 = data.list[k];
+            if (row1.SHPOKY && row1.PRTSEQ) {
+                seqMap1[row1.SHPOKY] = row1.PRTSEQ;
+            }
+        }
+
+        for (var m = 0; m < list.length; m++) {
+            var shpoky1 = list[m].get("SHPOKY");
+            if (shpoky1 && seqMap1[shpoky1]) {
+                list[m].put("PRTSEQ", seqMap1[shpoky1]);
+            }
+        }
+
+        
+        return;
+    }
+
+    // 3) 배열 자체
+    if ($.isArray(data)) {
+        var seqMap2 = {};
+
+        for (var n = 0; n < data.length; n++) {
+            var row2 = data[n];
+            if (row2.SHPOKY && row2.PRTSEQ) {
+                seqMap2[row2.SHPOKY] = row2.PRTSEQ;
+            }
+        }
+
+        for (var p = 0; p < list.length; p++) {
+            var shpoky2 = list[p].get("SHPOKY");
+            if (shpoky2 && seqMap2[shpoky2]) {
+                list[p].put("PRTSEQ", seqMap2[shpoky2]);
+            }
+        }
+
+       
+        return;
+    }
+
+   
+}
+
+
+/* 출력물 INSERT 공통 */
+function savePrintLog(list, docCd) {
+    if (!list || list.length === 0) {
+        return;
+    }
+
+
+    for (var i = 0; i < list.length; i++) {
+        var row = list[i];
+    }
+    
+    var param = new DataMap();
+    param.put("list", list);
+    param.put("DOC_CD", docCd);
+    param.put("WAREKY", "<%=wareky%>");
+    param.put("OWNRKY", "<%=ownrky%>");
+    
+   
+
+    var json = netUtil.sendData({
+        url : "/wms/outbound/json/saveKioskPrintLog.data",
+        param : param
+    });
+    
+  
+}
+
+function openMoveSlipPrintPop(list){
+    if (!list || list.length === 0) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    var stkArr = [];
+    for (var i = 0; i < list.length; i++) {
+        var stk = list[i].get("STKNUM");
+        if (stk) stkArr.push(stk);
+    }
+
+    if (stkArr.length === 0) {
+        commonUtil.msgBox("출력할 문서가 없습니다.");
+        return;
+    }
+
+    var stkCsv = stkArr.join(",");
+
+    var url = "<%=request.getContextPath()%>/mobile/KIOSKQPRT.page"
+            + "?isMobile=true"
+            + "&STKNUM=" + encodeURIComponent(stkCsv)
+            + "&_ts=" + new Date().getTime();
+
+    window.open(
+        url,
+        "MOVE_SLIP_PRINT",
+        "width=1100,height=900,left=200,top=80,resizable=yes,scrollbars=yes"
+    );
+}
+
+</script>
+</head>
+<body id='kioskq'>
+<div class="kiosk-wrapper">
+
+<div class="kiosk-header">
+    <div class="header-left">
+        <img src="/common/theme/webdek/images/kleannara_logo.png" alt="깨끗한나라 로고" class="brand-logo">
+        <div class="brand-text">
+            <p class="brand">배차 안내 키오스크</p>
+            
+        </div>
+    </div>
+</div>
+    <div class="tem4_content">
+        <section class="search-panel">
+            <table>
+                <colgroup>
+                    <col width="20%" />
+                    <col width="80%" />
+                </colgroup>
+                <tbody id="searchArea">
+                <tr>
+                    <th CL="STD_VEHINO">차량번호</th>
+                    <td>
+					    <div class="carno-area">
+					        <div class="search-inline">
+					            <input type="tel" class="text input_carNo"
+							       id="VEHINO" name="VEHINO"
+							       maxlength="4"
+							       inputmode="numeric"
+							       pattern="[0-9]*"
+							       autocomplete="off"
+							       autocorrect="off"
+							       autocapitalize="off"
+							       spellcheck="false"
+							       placeholder="차량번호는 숫자 4자리만 입력해 주세요. (예: 1234)"
+							       onfocus="fn_onfocus(this.id); showCarNoKeypad();"
+							       onmousedown="clearAndOpenCarNoInput();"
+							       oninput="this.value = this.value.replace(/[^0-9]/g,'').slice(0,4);"
+							       validate="required" />
+					        <div id="carNoKeypadWrap" class="carno-keypad-wrap">
+					            <div class="carno-keypad">
+					                <div class="carno-keypad-grid">
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('1')">1</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('2')">2</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('3')">3</button>
+					
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('4')">4</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('5')">5</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('6')">6</button>
+					
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('7')">7</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('8')">8</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('9')">9</button>
+					
+					                    <button type="button" class="carno-key func" onclick="keypadClearCarNo()">전체삭제</button>
+					                    <button type="button" class="carno-key" onclick="keypadInputCarNo('0')">0</button>
+					                    <button type="button" class="carno-key func" onclick="keypadBackspaceCarNo()">←</button>
+					
+					                    <button type="button" class="carno-key search" style="grid-column: 1 / 4;" onclick="keypadSearchCarNo()">차량검색</button>
+					                </div>
+					            </div>
+					        </div>
+					    </div>
+					</td>
+
+                </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="result-panel">
+    <div class="result-head">
+        <h2 class="result-title">조회 결과</h2>
+        <button type="button" class="result-print-btn primary" onclick="InvoicePrtList()">출력</button>
+    </div>
+    <div class="result-card">
+                <div class="tableWrap_search section kiosk-grid-limit">
+                    <div class="tableHeader" id='tableHeader'>
+                    <%
+                        if(mtype.equals("P")){
+                    %>
+                        <jsp:include page="./KIOSK_CARLIST_PS.jsp" flush="false"/>
+                    <%
+                        } else {
+                    %>
+                        <jsp:include page="./KIOSK_CARLIST_ELSE.jsp" flush="false"/>
+                    <%
+                        }
+                    %>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+<div id="vehinoLayerPopup" style="
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.45);
+    z-index:99999;
+">
+    <div style="
+        position:absolute;
+        top:50%;
+        left:50%;
+        transform:translate(-50%, -50%);
+        width:560px;
+        max-width:95%;
+        height:540px;
+        background:#f7f7fb;
+        border-radius:22px;
+        overflow:hidden;
+        box-shadow:0 18px 40px rgba(0,0,0,0.25);
+    ">
+        <!-- 타이틀 영역 추가 -->
+        <div style="
+            height:64px;
+            line-height:64px;
+            padding:0 24px;
+            background:#32436d;
+            color:#fff;
+            font-size:26px;
+            font-weight:700;
+            text-align:center;
+            position:relative;
+        ">
+            차량조회
+            <span onclick="closeVehinoLayerPopup()" style="
+                position:absolute;
+                right:20px;
+                top:0;
+                font-size:32px;
+                cursor:pointer;
+            ">×</span>
+        </div>
+
+        <!-- iframe 영역 -->
+        <iframe
+            id="vehinoLayerFrame"
+            src=""
+            style="
+                width:100%;
+                height:calc(100% - 64px);
+                border:none;
+                background:#fff;
+                display:block;
+            "
+        ></iframe>
+    </div>
+</div>
+</body>
+
+

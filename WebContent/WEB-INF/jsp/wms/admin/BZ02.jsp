@@ -1,0 +1,617 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+<script type="text/javascript">
+	var dblIdx = 0;
+	var dblIdx2 = 0;
+
+	$(document).ready(function(){
+		gridList.setGrid({
+	    	id : "gridList",
+	    	module : "WmsAdmin",
+	    	pkcol : "SKUG01,PTNRKY",
+			command : "BZ02"
+	    });
+		
+		gridList.setGrid({
+	    	id : "gridList2",
+	    	module : "WmsAdmin",
+	    	pkcol : "",
+			command : "CDATH"
+	    });
+		
+		gridList.setGrid({
+	    	id : "gridList3",
+	    	module : "WmsAdmin",
+			command : "CDATI",
+			emptyMsgType: false
+	    });
+		
+		gridList.setReadOnly('gridList2',true, ['DATETY']);
+	});
+
+	function searchList(){
+		if(validate.check("searchArea")){
+			var param = inputList.setRangeParam("searchArea");
+
+			gridList.gridList({
+		    	id : "gridList",
+		    	param : param
+		    });
+		    
+		}
+	}
+	
+	var lastFocusNum = -1;
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength > 0){
+			searchSubList(0);
+		}else if(gridId == "gridList2" && dataLength > 0){
+			searchSub3List(0);
+		}
+	}
+	
+	function searchSubList(headRowNum){
+		var rowVal = gridList.getColData("gridList", headRowNum, "PTNRKY");
+		var SKUG01 = gridList.getColData("gridList", headRowNum, "SKUG01");
+		var param = inputList.setRangeParam("searchArea");
+		param.put("PTNRKY", rowVal);
+		param.put("SKUG01", SKUG01);
+		
+		gridList.gridList({
+			id : "gridList2",
+			param : param
+		});
+
+		lastFocusNum = headRowNum; //2020.04.13 LHJ 오류수정
+		dblIdx = headRowNum;
+	}
+	
+	function searchSub3List(headRowNum){
+		var rowVal = gridList.getColData("gridList2", headRowNum, "PTNRKY");
+		var SKUG01 = gridList.getColData("gridList2", headRowNum, "SKUG01");
+		var rowVal2 = gridList.getColData("gridList2", headRowNum, "DATETY");
+		var param = inputList.setRangeParam("searchArea");
+		param.put("PTNRKY", rowVal);
+		param.put("SKUG01", SKUG01);
+		param.put("DATETY", rowVal2);
+		
+		gridList.gridList({
+			id : "gridList3",
+			param : param
+		});
+		
+		dblIdx2 = headRowNum;
+	}
+	
+	//그리드 위에 클릭시 아이템 리셋
+	function gridListEventRowFocus(gridId, rowNum){
+		if(gridId == "gridList"){
+			if(dblIdx != rowNum){
+				var modRowCnt = gridList.getModifyRowCount("gridList2");
+				
+				if(modRowCnt == 0){
+					if(dblIdx != rowNum){
+						gridList.resetGrid("gridList2");
+						gridList.resetGrid("gridList3");
+						dblIdx = -1;
+					}
+				//저장
+				}else{
+					if(commonUtil.msgConfirm("COMMON_M0024")){//값이 변화된 데이터가 있습니다. 이동하시겠습니까?
+						gridList.resetGrid("gridList2");
+						gridList.resetGrid("gridList3");
+					}else{
+						//gridListEventRowFocus("gridList", dblIdx);
+						gridList.setRowFocus("gridList", dblIdx, false);
+						return;
+					}
+				}
+			}
+		}else if(gridId == "gridList2"){
+			if(dblIdx2 != rowNum){
+				var modRowCnt = gridList.getModifyRowCount("gridList3");
+				if(modRowCnt == 0){
+					if(dblIdx2 != rowNum){
+						gridList.resetGrid("gridList3");
+						dblIdx2 = -1;
+					}
+				//저장
+				}else{
+					if(commonUtil.msgConfirm("COMMON_M0024")){//값이 변화된 데이터가 있습니다. 이동하시겠습니까?
+						gridList.resetGrid("gridList3");
+					}else{
+						//gridListEventRowFocus("gridList", dblIdx);
+						gridList.setRowFocus("gridList2", dblIdx, false);
+						return;
+					}
+				}
+			}
+		}
+	}
+	
+	function gridListEventRowAddBefore(gridId, rowNum){
+		if(gridId == "gridList") {
+			var headCnt = gridList.getModifyRowCount("gridList");
+			var listCnt = gridList.getModifyRowCount("gridList2");
+			var list2Cnt = gridList.getModifyRowCount("gridList3");
+
+			if(listCnt > 0 || headCnt > 0 || list2Cnt > 0){
+				commonUtil.msgBox("MASTER_M0702");//변경된 row를 저장 후 행추가 하십시오.
+				return false;
+			}
+		} else if(gridId == "gridList2") {
+			var ptnrky = gridList.getColData("gridList", rowNum, "PTNRKY");
+			var param = new DataMap();
+			param.put("PTNRKY", ptnrky);
+			param.put("DATETY", "10");
+			param.put("DESC01", "제조년");
+			param.put("STRIDX", "0");
+			param.put("CHARLN", "0");
+			
+			var dataList = gridList.getGridData(gridId, true);
+			if (dataList.length >= 3) {
+				return false;
+			}
+
+			var exist10 = dataList.find(data => data.get('DATETY') == '10');
+			var exist20 = dataList.find(data => data.get('DATETY') == '20');
+			var exist30 = dataList.find(data => data.get('DATETY') == '30');
+			if (!exist10) {
+				gridList.addNewRow("gridList2", param);
+				return false;;
+			} else if(!exist20) {
+				param.put("DATETY", "20");
+				param.put("DESC01", "제조월");
+				gridList.addNewRow("gridList2", param);
+			} else if(!exist30) {
+				param.put("DATETY", "30");
+				param.put("DESC01", "제조일");
+				gridList.addNewRow("gridList2", param);
+			}
+			return false;
+		}
+	}
+	
+	function gridListEventRowAddAfter(gridId, rowNum){
+		if(gridId == "gridList"){
+			gridList.resetGrid("gridList2");
+			gridList.resetGrid("gridList3");
+			
+			var ptnrky = gridList.getColData("gridList", rowNum, "PTNRKY");
+			var param = new DataMap();
+			
+			param.put("PTNRKY", ptnrky);
+			param.put("DATETY", "10");
+			param.put("DESC01", "제조년");
+			param.put("STRIDX", "0");
+			param.put("CHARLN", "0");
+			
+			gridList.addNewRow("gridList2", param);
+			param.put("DATETY", "20");
+			param.put("DESC01", "제조월");
+			gridList.addNewRow("gridList2", param);
+			param.put("DATETY", "30");
+			param.put("DESC01", "제조일");
+			gridList.addNewRow("gridList2", param);
+			
+			gridList.setColValue("gridList", rowNum, "SKUG01", "10")
+			
+		} else if(gridId == "gridList3") {
+			var headcnt = gridList.getFocusRowNum("gridList");
+			var itemcnt = gridList.getFocusRowNum("gridList2");
+			
+			var ptnrky = gridList.getColData("gridList", headcnt, "PTNRKY");
+			var skug01 = gridList.getColData("gridList", headcnt, "SKUG01");
+			var datety = gridList.getColData("gridList2", itemcnt, "DATETY");
+			var itemCnt = gridList.getGridDataCount("gridList2");
+			
+			if(itemCnt <= 0){
+				alert('일자유형 데이터가 없습니다.')
+				return false;
+			}else{
+				gridList.setColValue("gridList3", rowNum, "PTNRKY", ptnrky)	
+				gridList.setColValue("gridList3", rowNum, "SKUG01", skug01)	
+				gridList.setColValue("gridList3", rowNum, "DATETY", datety)	
+			}
+		}
+	}
+	
+	function gridListEventRowDblclick(gridId, rowNum){
+		if(gridId == "gridList"){
+			if(gridList.getRowState("gridList", rowNum) == "C"){
+				return false;
+			}
+			dblIdx = rowNum;
+			
+			searchSubList(rowNum);
+		}else if(gridId == "gridList2"){
+			if(gridList.getRowState("gridList2", rowNum) == "C"){
+				return false;
+			}
+			dblIdx2 = rowNum;
+			
+			searchSub3List(rowNum);
+		}
+	}
+	
+	function saveData(){
+		if(gridList.getModifyRowCount("gridList") == 0 && gridList.getModifyRowCount("gridList2") == 0
+				&& gridList.getModifyRowCount("gridList3") == 0 ){
+			commonUtil.msgBox("MASTER_M0545");
+			return;
+		}
+		if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+			return;
+		}
+		if(gridList.validationCheck("gridList", "modify") && gridList.validationCheck("gridList2", "modify")
+				&& gridList.validationCheck("gridList3", "modify")){
+			var headNum = gridList.getGridDataCount("gridList") -1;
+			var head = gridList.getGridData("gridList");
+			var list2 = gridList.getGridData("gridList2");
+			var list3 = gridList.getGridData("gridList3");
+			
+			var param = new DataMap();
+			var headIndex = gridList.getSelectIndex("gridList");
+			var ptnrky = "";
+			var skug01 = "";
+			for(var i=0; i<head.length; i++){
+				ptnrky = gridList.getColData("gridList", headIndex, "PTNRKY");
+				skug01 = gridList.getColData("gridList", headIndex, "SKUG01");
+			}
+			
+			param.put("head", head);
+			param.put("list2", list2);
+			param.put("list3", list3);
+			param.put("PTNRKY", ptnrky);
+			param.put("SKUG01", skug01);
+
+			if(ptnrky == ""){
+				alert('거래처를 입력해주세요');
+				return;
+			}
+			
+			var json = netUtil.sendData({
+				url : "/wms/admin/json/saveBZ02.data",
+				param : param
+			});
+			
+			alert(commonUtil.getMsg(json.data));
+			if(json){
+				if(json.data){
+					gridList.resetGrid("gridList2");
+					gridList.resetGrid("gridList3");
+					searchList();
+				}
+			}
+		}
+	}
+
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+		if(gridId == "gridList" && colName == "PTNRKY") {
+			if(colValue.length > 0 && colValue != " ") {
+				var param = new DataMap();
+				param.put("PTNRKY", colValue)				
+				param.put("OWNRKY", "<%=ownrky%>");
+				skug01 = gridList.getColData("gridList", rowNum, "SKUG01");
+				param.put("SKUG01", skug01);
+				
+				var json2 = netUtil.sendData({
+					module: "WmsAdmin",
+					command: "CDATH_CHECK",
+					sendType: "map",
+					param: param
+				}); 
+				
+				var cdCnt = "";
+				
+				if(json2 && json2.data){
+					cdCnt = json2.data["CNT"];
+					if(cdCnt > 0){
+						alert('해당 거래처로 등록된 데이터가 존재합니다');
+						gridList.setColValue("gridList", rowNum, "PTNRKY", "");
+						return false;
+					}
+				}
+				
+				var json = netUtil.sendData({
+					module: "WmsAdmin",
+					command: "BZ02_PTNRNM",
+					sendType: "map",
+					param: param
+				});
+				
+				if(json && json.data) {
+					gridList.setColValue("gridList", rowNum, "NAME01", json.data["NAME01"]);
+					gridList.setColValue("gridList", rowNum, "NAME02", json.data["NAME02"]);
+					gridList.setColValue("gridList", rowNum, "POSTCD", json.data["POSTCD"]);
+					gridList.setColValue("gridList", rowNum, "ADDR01", json.data["ADDR01"]);
+					gridList.setColValue("gridList", rowNum, "TELN01", json.data["TELN01"]);
+					gridList.setColValue("gridList", rowNum, "VATREG", json.data["VATREG"]);
+					gridList.setColValue("gridList", rowNum, "EMAIL1", json.data["EMAIL1"]);				
+				} else {
+					alert(colValue + " : 없는 거래처입니다..");
+					setTimeout(function(){
+						gridList.setColValue("gridList", rowNum, "NAME01", "");
+						gridList.setColValue("gridList", rowNum, "NAME02", "");
+						gridList.setColValue("gridList", rowNum, "POSTCD", "");
+						gridList.setColValue("gridList", rowNum, "ADDR01", "");
+						gridList.setColValue("gridList", rowNum, "TELN01", "");
+						gridList.setColValue("gridList", rowNum, "VATREG", "");
+						gridList.setColValue("gridList", rowNum, "EMAIL1", "");
+						gridList.setColValue("gridList", rowNum, "PTNRKY", "");
+						gridList.setColFocus("gridList", rowNum, "PTNRKY", "");
+					}, 1);
+				}
+			}
+		}
+	}
+	
+	function commonBtnClick(btnName){
+		//commonUtil.debugMsg("commonBtnClick : ", arguments);
+		if(btnName == "Search"){
+			searchList();
+		}else if(btnName == "Save"){
+			saveData();
+		}else if(btnName == "Reflect"){
+			Reflect();
+		}
+	}
+
+	function gridListEventRowRemove(gridId, rowNum){
+		if(gridId == "gridList"){
+			var headCnt = gridList.getModifyRowCount("gridList");
+			var listCnt = gridList.getModifyRowCount("gridList2");
+			var list2Cnt = gridList.getModifyRowCount("gridList3");
+			if(listCnt > 0 || headCnt > 0 || list2Cnt > 0){
+				commonUtil.msgBox("MASTER_M0702");//변경된 row를 저장 후 행추가 하십시오.
+				return false;
+			}
+			
+			var headlist = gridList.getColData("gridList", rowNum, "PTNRKY");
+		
+			var param = new DataMap();
+			param.put("PTNRKY",headlist);
+		
+			var json = netUtil.sendData({
+				module:"WmsAdmin",
+				command:"BZ02PTNRKYval",
+				sendType:"map",
+				param: param
+			});
+				
+			if(json.data["CNT"] > 0){
+				commonUtil.msgBox("VALID_M0016");//아이템리스트도 같이 삭제됩니다.삭제하시겠습니까?
+			}
+		}
+	}
+	
+	function Reflect(){
+		if(gridList.getFocusRowNum("gridList") < 0){
+            commonUtil.msgBox("VALID_M0006");
+            return;
+        }
+		
+		var head = gridList.getGridData("gridList");
+        var headIndex = gridList.getSelectIndex("gridList");
+        
+        var param = new DataMap();
+        var ptnrky = "";
+        var skug01 = "";
+        for(var i=0; i<head.length; i++){
+            ptnrky = gridList.getColData("gridList", headIndex, "PTNRKY");
+            skug01 = gridList.getColData("gridList", headIndex, "SKUG01");
+        }
+        
+        if($.trim($('#EANCOD').val()) == ""){
+        	commonUtil.msgBox("SYSTEM_M0101");
+        	$('#EANCOD').focus();
+        	return;
+        }
+        
+        param.put("PTNRKY", ptnrky);
+        param.put("SKUG01", skug01);        
+        param.put("EANCOD", $('#EANCOD').val());
+        if(ptnrky == ""){
+            alert('거래처를 입력해주세요');
+            return;
+        }
+        
+        var json = netUtil.sendData({
+            url : "/wms/admin/json/checkDateTest.data",
+            param : param
+        });
+        
+        if(json){
+            if(json.data){
+            	alert(json.data);
+            }
+        }
+		
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType){
+	 	var param = dataBind.paramData("searchArea");
+		if(searchCode == "SHBZPTN"){
+			param.put("PTNRTY","VD");
+			param.put("OWNRKY", "<%=ownrky%>");
+		}
+		return param;
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_SEARCH" />
+					<input type="button" CB="Save SAVE BTN_SAVE" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_EANCOD"></dt>
+						<dd style="width:500px;">
+							<input type="text" class="input" id="EANCOD" name="EANCOD" UIFormat="U"/>
+							<input type="button" CB="Reflect REFLECT BTN_PRODDTEX" style="width:110px;"/>
+						</dd>
+					</dl>
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+        <div class="search_next_wrap">
+		<div class="content_layout tabs top_layout">
+			<ul class="tab tab_style02">
+				<li><a href="#tab1-1"><span>거래처정보</span></a></li>
+				<li class="btn_zoom_wrap">
+					<ul>
+						<li><button class="btn btn_bigger"><span>확대</span></button></li>
+					</ul>
+				</li>
+			</ul>
+			<div class="table_box section" id="tab1-1">
+				<div class="table_list01">
+					<div class="scroll">
+						<table class="table_c">
+							<tbody id="gridList">
+								<tr CGRow="true">
+									<td GH="40" GCol="rownum">1</td>
+                                    <td GH="150 STD_SKUG01"  GCol="select,SKUG01">
+                                        <select class="input" id="SKUG01" name="SKUG01">
+                                            <option value="10">상품</option>
+                                            <option value="20">원부자재</option>
+                                        </select>
+                                    </td>
+									<td GH="100 STD_PTNRKY"   GCol="input,PTNRKY,SHBZPTN" validate="required">거래처</td>
+									<td GH="100 STD_PTNRNM"   GCol="text,NAME01">거래처명</td>
+									<td GH="100 STD_NAME02"   GCol="text,NAME02" >대표자이름</td>
+									<td GH="100 STD_POSTCD"   GCol="text,POSTCD" >우편번호</td>
+									<td GH="100 STD_ADDR01"   GCol="text,ADDR01" >대표주소</td>
+									<td GH="100 STD_TELN01"   GCol="text,TELN01" >전화번호</td>
+									<td GH="100 STD_VATREG"   GCol="text,VATREG" >사업자등록번호</td>
+									<td GH="100 STD_EMAIL1"   GCol="text,EMAIL1" >E-MAIL</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="btn_lit tableUtil">
+					<button type='button' GBtn="find"></button>
+					<button type='button' GBtn="sortReset"></button>
+					<button type='button' GBtn="add"></button>
+					<button type='button' GBtn="delete"></button>
+					<button type='button' GBtn="layout"></button>
+					<button type='button' GBtn="excel"></button>
+					<span class='txt_total' >총 건수 : <span GInfoArea='true'>4</span></span>
+				</div>
+			</div>
+		</div>
+		<div class="content-horizontal-wrap h-wrap-min bottom_layout">
+			<div class="content_layout tabs content_left">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span>일자유형</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList2">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">1</td>
+										<td GH="80" GCol="select,DATETY">
+											<select class="input" CommonCombo="DATETY"></select>
+										</td>
+										<td GH="150 STD_DESCNM" GCol="input,DESC01"></td>
+										<td GH="100 STD_STRIDX" GCol="input,STRIDX" GF="N 20"></td>
+										<td GH="100 STD_CHARLN" GCol="input,CHARLN" GF="N 20"></td>
+										<td GH="80" GCol="select,CONVTY">
+											<select class="input" CommonCombo="CONVTY">
+												<option value="">선택</option>
+											</select>
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="add"></button>
+						<button type='button' GBtn="delete"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>4</span></span>
+					</div>
+				</div>
+			</div>
+			
+			<div class="handlerH_wrap">
+				<div class="handlerH"></div>
+			</div>
+			
+			<div class="content_layout tabs content_right">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span>상세정보</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList3">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">1</td>
+										<!-- <td GH="80" GCol="text,TYPENO"></td> -->
+										<td GH="150" GCol="input,CONVCH"></td>
+										<td GH="80" GCol="input,TARGCH"></td>								
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="add"></button>
+						<button type='button' GBtn="delete"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>4</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

@@ -1,0 +1,429 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<style type="text/css">
+ .content_wrap{background: none;}
+ #searchArea .search_wrap dt{width:70px;}
+ #searchArea .search_wrap dd{width:200px;}
+ #searchArea .search_wrap dd:has(input[type="checkbox"]) {width: 30px;}
+</style>
+<script type="text/javascript">
+	$(document).ready(function(){
+		gridList.setGrid({
+	    	id : "gridList",
+			editable : true,
+			pkcol : "PTNRKY,PTNRTY",
+			module : "WmsAdmin",
+			command : "BZPTN",
+			bindArea : "tabs1-2",
+ 			validation : "PTNRKY,PTNRTY",
+		    validationType : "C"
+	    });
+		//gridList.setReadOnly("gridList", true, ['DELMAK','DEPTID']);
+		$("#PTNRTY").val("CT");
+	});
+	
+	function searchList(){
+		if(validate.check("searchArea")){
+			
+			
+			gridList.setReadOnly("gridList", true, ['DEPTID','DELMAK']);
+			var param = inputList.setRangeParam("searchArea");
+
+			gridList.gridList({
+		    	id : "gridList",
+		    	param : param
+		    });
+		}
+	}
+	
+	function saveData(){
+		var param = dataBind.paramData("searchArea");
+		var json = gridList.gridSave({
+	    	id : "gridList",
+	    	param : param
+	    });
+		
+		if(json){
+			if(json.data){
+				searchList();
+			}
+		}		
+	}
+	
+	function collectXY(){
+		
+		var chkRowNumList = gridList.getSelectRowNumList("gridList");
+		if(chkRowNumList.length > 0){
+			var list = gridList.getSelectData("gridList");
+
+			var param = new DataMap();
+			param.put("list", list);
+
+			var json = netUtil.sendData({
+				url : "/common/WmsAdmin/geocode/json/BZPTN_DETAIL_XY.data",
+				param : param
+			});
+
+			if(json){
+				if(json.data){
+					commonUtil.msgBox("COOMON_M0463");	//저장이 완료되었습니다.
+					searchList();
+				}
+			}	
+		}else{
+			commonUtil.msgBox("TASK_M0003"); //* 레코드가 선택되지 않았습니다.
+			return false;
+		}
+	}
+	
+	function collectKM(){
+		
+		// 대표주소 검색입력여부 확인, 위도경도 있는 데이터만 검증
+		var itemSelectList = gridList.getSelectRowNumList("gridList");
+		var routeCount = 0;
+		
+		for (var i = 0; i < itemSelectList.length; i++) {
+			var x = gridList.getColData("gridList", itemSelectList[i], "LATITUDE"); //item상태
+			var y = gridList.getColData("gridList", itemSelectList[i], "LONGITUDE"); //item상태
+
+			if ($.trim(x) == "" || $.trim(y) == ""){
+				gridList.setRowCheck("gridList", itemSelectList[i], false);
+			}
+		}
+		
+		var chkRowNumList = gridList.getSelectRowNumList("gridList");
+		
+
+		// 화면갱신 효과적용
+		setTimeout(function () {
+			var list = gridList.getSelectData("gridList");
+			var routeCount = getCombination(list.length, 2);
+
+			if(confirm(routeCount+"건의 데이터가 수집됩니다. 진행하겠습니까?")){
+				//var list = gridList.getSelectData("gridList");
+
+				if (chkRowNumList.length > 0 && list.length > 0) {
+					var param = new DataMap();
+					param.put("list", list);
+
+					netUtil.sendData({
+						url : "/common/WmsAdmin/route/json/BZPTN_DISTANCE_KM.data",
+						param : param,
+						async : true,
+						callBackFunction : function(json){
+							if(json){
+								if(json.data){
+									commonUtil.msgBox("COOMON_M0463");	//저장이 완료되었습니다.
+									searchList();
+								}
+							}	
+							
+						}
+					});
+				}else{
+					commonUtil.msgBox("TASK_M0003"); //* 레코드가 선택되지 않았습니다.
+					return false;
+				}
+			}
+		}, 10)
+	}
+ 	
+	<%-- function gridListEventRowAddBefore(gridId, rowNum){
+		
+		var param=new DataMap();
+		param.put("WAREKY","<%=wareky%>");
+		var json = netUtil.sendData({
+			module : "WmsAdmin",
+			command : "WAHMA_ADDR05",
+			sendType : "map",
+			param : param
+		});
+		
+		var newData = new DataMap();
+		newData.put("OWNRKY", "<%=ownrky%>");
+		newData.put("PTNL05", "<%=ownrky%>");
+		
+		return newData;
+	} --%>
+	
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+		if(gridId == "gridList" && colName == "PTNRTY"){
+			if(colValue != ""){
+				var param = new DataMap();
+				
+				param.put("PTNRTY",colValue);
+				var json = netUtil.sendData({
+					module : "WmsAdmin",
+					command : "PTNRTYval",
+					sendType : "map",
+					param : param
+				});
+				 if (json.data["CNT"] < 1) {
+					/* alert("업체타입이 정확하지 않습니다.\n다시 입력 해주세요."); */
+					commonUtil.msgBox("MASTER_M1005",colValue);
+					gridList.setColValue("gridList", rowNum, "PTNRTY", ""); 
+				}
+			}
+		} else if(gridId == "gridList" && colName == "PTNL01"){ 
+			if(colValue != ""){
+				var param = new DataMap();	
+				var CDESC1 = "";
+				param.put("CMCDVL",colValue);
+				var json = netUtil.sendData({
+					module : "WmsAdmin",
+					command : "CMCDVDESC",
+					sendType : "map",
+					param : param
+				});
+				
+				 if(json && json.data){
+				 	CDESC1 = json.data["CDESC1"];
+				 	gridList.setColValue("gridList", rowNum, "PTNL01NM", CDESC1); 
+				}else {
+					commonUtil.msgBox("VALID_M2033");
+					gridList.setColValue("gridList", rowNum, "PTNL01", "");
+					gridList.setColValue("gridList", rowNum, "PTNL01NM", "");
+				}	
+			}
+		}
+	} 
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList"){
+
+			var list = gridList.getGridData("gridList");
+			for(var i=0; i < list.length; i++) {
+				var rowData = list[i];
+            	var rowNum = rowData.get("GRowNum");
+				
+            	//gridList.setColValue("gridList", rowNum, "LOTCD", "좌표수집");
+            	
+			}
+		}
+	}
+	
+	function gridListEventRowRemove(gridId, rowNum){
+		if(gridId == "gridList"){
+			var EWGUBN = gridList.getColData(gridId, rowNum, "EWGUBN");
+			if(EWGUBN != "W"){
+				
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/*
+	function gridListEventRowDblclick(gridId, rowNum, colName, colValue){
+		var rowData = gridList.getRowData("gridList", gridList.getFocusRowNum("gridList"));
+		
+        if(gridId == "gridList"){
+        	if (colName == "DISTANCE_COUNT" && colValue > 0) {
+        		page.linkPopOpen("/wms/admin/BZ01POP.page", rowData);
+        	}
+        }
+    }
+	*/
+	function gridListEventRowDblclick(gridId, rowNum){
+		var rowData = gridList.getRowData("gridList", gridList.getFocusRowNum("gridList"));
+
+        if(gridId == "gridList"){
+        	var rowVal = gridList.getColData("gridList", rowNum, "DISTANCE_COUNT");
+        	
+        	if (rowVal > 0) {
+        		page.linkPopOpen("/wms/admin/BZ01POP.page", rowData);
+        	}
+        }
+    }
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			searchList();
+		}else if(btnName == "Save"){
+			saveData();
+		}else if(btnName == "CollectXY"){
+			collectXY();
+		}else if(btnName == "CollectKM"){
+			collectKM();
+		} 
+	}
+	 
+	function searchHelpEventOpenBefore(searchCode, gridType){
+	 	var param = dataBind.paramData("searchArea");
+		if(searchCode == "SHBZPTN"){
+			param.put("OWNRKY", "<%=ownrky%>");
+		} else if(searchCode == "SHCMCDV"){
+			param.put("CMCDKY", "PTNL01");
+		}
+		return param;
+	}
+	
+	// 파스칼의 삼각형 성질을 이용한 nCr 재귀 함수
+	function getCombination(n, r) {
+		if (r === 0 || r === n) return 1;
+		return getCombination(n - 1, r - 1) + getCombination(n - 1, r);
+	}
+ 	
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+					<input type="button" CB="Save SAVE STD_SAVE" />
+					<input type="button" CB="CollectXY COLLECTXY BTN_COLLECT_XY" />
+					<input type="button" CB="CollectKM COLLECTKM BTN_COLLECT_KM" />
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_PTNRTY">업체타입</dt>
+						<dd>
+							<select class="input" Combo="WmsAdmin,BZ01COMBO" name="PTNRTY" id="PTNRTY" style="width: 160px;"></select> 
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_PTNRKY">업체코드</dt>
+						<dd>
+							<input id="PTNRKY" type="text" class="input" name="A.PTNRKY" UIInput="R,SHBZPTN"/> 
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_SKUG05">제품군</dt>
+						<dd>
+							<select class="input" Combo="WmsInventory,SKUG05COMBO" name="PTNL01">
+								<option value=''>전체</option>
+							</select> 
+						</dd>
+					</dl>	
+					
+					<dl>
+						<dt CL="STD_NAME01">설명</dt>
+						<dd>
+							<input type="text" name="A.NAME01" class="input"  UIInput="R" />
+						</dd>
+					</dl>					
+					<dl>
+						<dt CL="STD_ADDR01">주소</dt>
+						<dd>
+							<input type="text" name="A.ADDR01" class="input"  UIInput="SR" />
+						</dd>
+					</dl>					
+					<dl>
+						<dt CL="STD_ITEMDET">Item상세</dt>
+						<dd>
+							<input type="checkbox" id="DETAILYN" name="DETAILYN" value="Y" style="height: 100%;"/>
+						</dd>
+					</dl>					
+					<dl>
+						<dt CL="STD_DELMAK">삭제</dt>
+						<dd>
+							<input type="checkbox" id="DELMAK" name="DELMAK" value="V" style="height: 100%;"/>
+						</dd>
+					</dl>					
+					
+					<dd style="display:none">
+						<input type="text" name="A.OWNRKY"  value="<%=ownrky%>" UIInput="R" />
+					</dd>
+					
+				</div>
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+			</div>
+		</div>
+		<div class="search_next_wrap">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span>일반</span></a></li>  
+				</ul>
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">번호</td>
+										<td GH="40"	GCol="rowCheck">V</td>
+										<td GH="100 STD_OWNRKY"   GCol="text,OWNRKY" >화주</td>
+										<td GH="100 STD_OWNRNM"   GCol="text,OWNRNM" >화주명</td>
+										<td GH="100 STD_PTNRTY"   GCol="text,PTNRTY" >거래처유형</td>
+										<td GH="100 STD_PTNRTYT"  GCol="text,PTNRTYT">거래처유형명</td>
+										<td GH="100 STD_PTNRKY"   GCol="text,PTNRKY">거래처</td>
+										<td GH="100 STD_DELMAK"   GCol="check,DELMAK" >삭제</td>
+										<td GH="100 STD_LOTCD"    GCol="input,LOTCD" >LOT번호코드(상품)</td>
+										<td GH="100 STD_LOTCD2"   GCol="input,LOTCD2" >LOT번호코드(원부자재)</td>
+										<td GH="100 STD_NAME01"   GCol="text,NAME01" >설명</td>
+										<td GH="100 STD_NAME02"   GCol="text,NAME02" >대표자이름</td>
+										<td GH="100 STD_ADDR01"   GCol="input,ADDR01" >대표주소</td>
+										<td GH="100 STD_ADDR02"   GCol="input,ADDR02" >대표주소2</td>
+										<td GH="100 STD_LATITUDE" GCol="text,LATITUDE" >위도</td>
+										<td GH="100 STD_LONGITUDE"GCol="text,LONGITUDE" >경도</td>
+										<td GH="100 STD_DISTANCE_COUNT"   GCol="text,DISTANCE_COUNT" >수집KM(갯수)</td>
+										<td GH="100 STD_CITY01"   GCol="text,CITY01" >도시</td>
+										<td GH="100 STD_POSTCD"   GCol="text,POSTCD" >우편번호</td>
+										<td GH="100 STD_NATNKY"   GCol="text,NATNKY" >국가</td>
+										<td GH="100 STD_TELN01"   GCol="text,TELN01" >전화번호</td>
+										<td GH="100 STD_TELN02"   GCol="text,TELN02" >SMS수신번호</td>
+										<td GH="100 STD_VATREG"   GCol="text,VATREG" >사업자등록번호</td>
+										<td GH="100 STD_EMAIL1"   GCol="text,EMAIL1" >E-MAIL</td>
+										<td GH="100 STD_PROCHA"   GCol="check,PROCHA" >거래처입출고</td>
+										<td GH="100 STD_PTNG01"   GCol="input,PTNG01" >거래처메모</td>
+										<td GH="100 STD_CREDAT"   GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM"   GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR"   GCol="text,CREUSR" >생성자</td>
+										<td GH="100 STD_CUSRNM"   GCol="text,CUSRNM" >생성자명</td>
+										<td GH="100 STD_LMODAT"   GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM"   GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR"   GCol="text,LMOUSR" >수정자</td>
+										<td GH="100 STD_LUSRNM"   GCol="text,LUSRNM" >수정자명</td>
+										<td GH="100 STD_SKUG05"   GCol="select,PTNL01" >
+											<select CommonCombo="SKUG05">
+												<option value=""></option>
+											</select>
+										</td>
+										<!-- <td GH="100 STD_DEPTID"   GCol="select,DEPTID" >
+											<select CommonCombo="DEPTID">
+												<option value=""></option>
+											</select>
+										</td> -->
+										<!-- <td GH="100 STD_USRID1"   GCol="text,USRID1" >영업자 ID</td> -->
+										<!-- <td GH="100 STD_SALT01"   GCol="text,SALT01" >영업 담당자명</td> -->
+										<!-- <td GH="100 STD_PTNL01NM" GCol="input,PTNL01NM" >공급처명</td>		 -->									
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="filter"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

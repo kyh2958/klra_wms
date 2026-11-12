@@ -1,0 +1,783 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	String flag = request.getParameter("FLAG");
+	if(flag==null)flag="";	
+	String ebeln = request.getParameter("EBELN");
+	if(ebeln==null)ebeln="";
+	String docdat = request.getParameter("DOCDAT");
+	if(docdat==null)docdat="";
+%>
+
+<!doctype html>
+<head>
+<style type="text/css">
+.tem5_content .tableWrap_search select	{width:172px;  height:25px; }
+.tem5_content .tableWrap_search .text_2{width:90%; margin-right:3px;height:22px;border:#b8b8b8;}
+
+.select-editable { position:relative; background-color:white; border:solid 1px #b8b8b8; width:172px; height:25px; }
+.select-editable select { top:0px; left:0px; width:172px; height:25px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:23px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+
+.select-editable { position:relative; background-color:white; border:solid 1px #d5d5d5; width:100%; height:32px; }
+.select-editable select { position:absolute; top:0px; left:0px; width:100%; height:32px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:32px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+/* .tableBody{height: 245px !important;} */
+
+</style>
+
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	var data;
+	var opt;
+	var asndky;
+	var skukey;
+	var barcod;
+	var rcvlmtOrg;
+	var flag;
+	var activeType = false;
+	var year;
+	var month;
+	var date;
+	
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR07",
+			gridMobileType : true
+		});
+		var json = netUtil.sendData({
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "GR_CURDATE",
+			bindId : "gridHeadList",
+			sendType : "map"
+		}); 
+		if(json && json.data){
+			year = json.data.DOCDAT.substr(0,4);
+			month = json.data.DOCDAT.substr(4,2);
+			date = json.data.DOCDAT.substr(6,2);
+			
+			$("#DOCDAT").val(year + "." + month + "." + date);
+		}
+		
+		$("#BARCOD").focus();
+		
+		searchList();
+		
+	});
+		
+	function searchList(){	
+		
+		var param = new DataMap();
+		param.put("LANGKY", "<%=langky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("EBELN", $("#EBELN").val());
+		param.put("PROGID", "<%=menuId%>");
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("BWART", "135");
+		
+		param.put("EBELN", $("#EBELN").val());
+		param.put("LOTA14", $("#BARCOD").val());
+		
+		//gridList.resetGrid("gridList");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+
+		$("#BARCOD").focus();
+
+	}
+	
+	function showMain(){
+		//window.top.menuOpen();
+		window.top.closePage();
+		/*
+		if(opt == "pop"){
+			mobile.linkPopClose();
+		}else if(flag == 'Y'){
+			mobile.linkPopClose();
+		}else{
+			window.top.closePage();
+		}
+		*/
+	}
+		 	
+	function saveData(){
+		
+		if(gridList.validationCheck("gridList", "data")){
+			
+			var param = new DataMap();
+			
+			var chkItemIdx = gridList.getSelectRowNumList("gridList");
+			var chkItemLen = chkItemIdx.length;	
+			
+			if( chkItemLen == 0 ){
+				PlaySound('e');
+				commonUtil.msgBox("VALID_M0006",null,null,function(){ $("#BARCOD").focus(); });// 선택된 아이템이 없습니다.
+				return;
+			}
+			
+			var afStlky = $('#STLKY').val();    // 변경할 저장위치
+			
+			var chkItemList = gridList.getSelectData("gridList");
+			
+			for(var i=0; i < chkItemList.length; i++) {
+				
+				var rowData = chkItemList[i];
+				var rowNum = chkItemList[i].get("GRowNum");
+				
+				var wmsmak = chkItemList[i].get("WMSMAK"); // WMS재고관리대상 여부
+				var lota01 = chkItemList[i].get("LOTA01"); // 저장위치
+				var lota02 = chkItemList[i].get("LOTA02"); // 저장위치
+			    var sebeln = chkItemList[i].get("SEBELN"); // 저장위치
+				
+				var lota14 = chkItemList[i].get("LOTA14");
+	            if($.trim(lota14)==""){
+	            	
+	            	PlaySound('e');
+	            	commonUtil.msgBox("VALID_M2118",[sebeln],null,function(){ gridList.setColFocus("gridList", rowNum, "LOTA14"); });// [{0}] 개별바코드가 없는 문서가 존재하여 입고를 할 수 없습니다.
+	                return;
+	            }
+	            
+	            /*
+	            var WMSMAK = chkItemList[i].get("WMSMAK"); // wms 관리대상
+				if(WMSMAK!="V"){
+					gridList.setColFocus("gridList", rowNum, "LOTA01");
+	            	commonUtil.msgBox("VALID_M0963");// WMS재고대상이 아닌 문서가 존재하여 입고를 할 수 없습니다.
+	                return;
+	            }
+	            */
+	            
+				if($.trim(afStlky)!=""){
+					lota01 = afStlky;
+					var wmDataMap = getWmsmak(afStlky, lota02);
+					wmsmak = wmDataMap.get("WMSMAK");
+				}else{
+					var wmDataMap = getWmsmak(lota01, lota02);
+					wmsmak = wmDataMap.get("WMSMAK");
+				}
+				
+				if($.trim(wmsmak)==""){
+					PlaySound('e');
+	            	commonUtil.msgBox("VALID_M2110",[sebeln,lota01,lota02],null,function(){ gridList.setColFocus("gridList", rowNum, "rowCheck"); });// [{0}] 저장위치 [{1}]가(이) 플랜트 [{2}]에 없습니다.
+	                return;
+				}
+				
+				if(wmsmak!="V"){
+					PlaySound('e');
+	            	commonUtil.msgBox("VALID_M0963",null,null,function(){ gridList.setColFocus("gridList", rowNum, "LOTA01"); });// WMS재고대상이 아닌 저장위치의 문서가 존재하여 입고를 할 수 없습니다.
+	                return;
+	            }
+				
+			}
+			
+			// 저장위치 반영
+			var STLKY = $('#STLKY').val();
+			var WMSMAK = $('#WMSMAK').val();
+			if($.trim(STLKY)!=""){
+				for(var i=0; i < chkItemList.length; i++) {
+					var rowData = chkItemList[i];
+					rowData.put("LOTA01",STLKY);
+					rowData.put("WMSMAK",WMSMAK);
+				}
+			}
+			//console.log("chkItemList : "+JSON.stringify(chkItemList));
+			
+			// 20220817 입고 오더 데이터 변경 VALIDATION
+			if(!validationOrderGr02(chkItemList)){
+				return;	
+			}
+			
+			/*
+			if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+				return;
+			}
+			*/
+			
+			// 저장하시겠습니까?
+			commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM, null
+					            , function(){
+				
+										var headList = getHeadList(chkItemList);
+										//console.log("headList : " + headList);
+										
+										param.put("OWNRKY", "<%=ownrky%>");
+										param.put("EACHYN", "Y");  			// 개별처리 여부(PDA 생산,반납입고 처리)
+										param.put("head", headList);		// 헤더처리
+										param.put("list", chkItemList);
+										param.put("PROGID", "<%=menuId%>");
+										
+										var json = netUtil.sendData({
+											//url : "/mobile/mobileInboundGoodsReceipt/json/SavePDGR01_POP.data",
+											//url : "/wms/inbound/json/SaveGR02.data",
+											url : "/wms/inbound/json/SaveGR02New.data",
+											param : param
+										});
+										
+										//console.log(JSON.stringify(json));
+										if(json.data && json.data.RESULTMSG ){
+											PlaySound('e');
+											var msgList = json.data.RESULTMSG.split("†");
+											var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+											commonUtil.msg(msgTxt);
+											return;
+										}
+										
+										if(json && json.data){
+											PlaySound('s');
+											
+											var inRsCode = json.data.inRsCode; // 입고저장 결과코드
+								            var inRsMsg = json.data.inRsMsg;   // 입고저장 결과 메시지
+											
+											var ifRsCode = json.data.ifRsCode; // 인터페이스 전송 결과코드
+								            var ifRsMsg = json.data.ifRsMsg;   // 인터페이스 전송 결과 메시지
+								            
+								            var totCnt = json.data.totCnt;     // 입고 전체 건수
+								            var sucCnt = json.data.sucCnt;     // 입고 성공 건수
+								            var failCnt = json.data.failCnt;   // 입고 실패 건수 
+								            
+								            //var sucList = json.data.sucList;   // 입고 성공 오더목록 ( 부분입고 여부 확인 불가 )
+								            
+								            console.log("전체 : " + totCnt + " - 성공 : " + sucCnt + " - 실패 : " + failCnt);
+								            
+								        	console.log("inRsCode : " + inRsCode);
+								        	console.log("ifRsCode : " + ifRsCode);
+								        	
+								        	if(inRsCode != "S" && ifRsCode != "S"){
+								        		console.log("inRsMsg : " + inRsMsg);
+								        		console.log("ifRsMsg : " + ifRsMsg);
+								        		//commonUtil.msgBox("VALID_M0950"); // 입고 저장에 실패하였습니다.
+								        		//commonUtil.msgBox("VALID_M0953",[totCnt,sucCnt,failCnt]); // 저장 및 인터페이스 전송에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								        		var msgTxt = commonUtil.getMsg("VALID_M0953",[totCnt,sucCnt,failCnt]); // 저장 및 인터페이스 전송에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								        		alert(msgTxt + "\n" + inRsMsg + "" + ifRsMsg);
+								        	}else if(inRsCode != "S"){
+								            	console.log("inRsMsg : " + inRsMsg);
+								            	//commonUtil.msgBox("VALID_M0950"); // 입고 저장에 실패하였습니다.
+								            	//commonUtil.msgBox("VALID_M0951",[totCnt,sucCnt,failCnt]); // 입고 저장에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								            	var msgTxt = commonUtil.getMsg("VALID_M0951",[totCnt,sucCnt,failCnt]); // 입고 저장에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								            	alert(msgTxt + "\n" + inRsMsg);
+								        	}else if(ifRsCode != "S"){
+								            	console.log("ifRsMsg : " + ifRsMsg);
+								            	//commonUtil.msgBox("VALID_M0942"); // 인터페이스 전송에 실패하였습니다.
+								            	//commonUtil.msgBox("VALID_M0952",[totCnt,sucCnt,failCnt]); // 인터페이스 전송에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								            	var msgTxt = commonUtil.getMsg("VALID_M0952",[totCnt,sucCnt,failCnt]); // 인터페이스 전송에 실패 하였습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								            	alert(msgTxt + "\n" + ifRsMsg);
+								            }else{
+								            	//commonUtil.msgBox("MASTER_M0564"); // 저장 완료되었습니다.
+								            	commonUtil.msgBox("VALID_M0954",[totCnt,sucCnt,failCnt]); // 저장 완료되었습니다. 전체[{0}] 성공[{1}] 실패[{2}]
+								            	
+								            	$("#BARCOD").val("");
+												searchList();
+								            }
+											
+										}else{
+											PlaySound('e');
+										}
+				
+								}
+								, function(){
+									  $("#BARCOD").focus();
+								  }
+			);
+			
+			
+			
+		}
+	}
+	
+	function getHeadList(chkItemList){
+		
+		var headList = new Array();
+		
+		for(var i=0; i < chkItemList.length; i++) {
+			var rowData = chkItemList[i];
+			
+			var sebeln = rowData.get("SEBELN");
+			var newYN = true;
+			
+			for(var j=0; j < headList.length; j++) {
+				var headData = headList[j];
+				var hSebeln = headData.get("SEBELN");
+				if(sebeln==hSebeln){
+					newYN = false;
+					break;
+				}
+			}
+			
+			if(newYN){
+				headList.push(rowData);
+			}
+		}
+		return headList;
+	}
+	
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+	
+	//초기화 버튼
+	function clearData(){
+		gridList.resetGrid("gridList");
+
+	    $("#DOCDAT").val(year+"."+month+"."+date);	   //전기일자
+	    $("#EBELN").val(""); // 오더번호
+	    $("#BARCOD").val(""); // 바코드
+	    $("#EBELNCOMBO").val("");
+	    $('#STLKY').val("");
+		$('#WMSMAK').val("");
+	    
+	    searchList();
+	}
+	
+	function eventKeydown(event,objId){
+		if(event.keyCode == "13"){
+			
+			if($("#DOCDAT").val() == ""){
+				PlaySound('e');
+				commonUtil.msgBox("VALID_M1590"); //전기일자가 입력되지 않았습니다.
+				return;
+			}	
+			
+			var param = inputList.setRangeParam("searchArea");
+			param.put("EBELN", $("#EBELN").val());
+			param.put("WAREKY", "<%=wareky%>");
+			$("#EBELN").select();
+			
+			searchList();
+		}
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "WmsMobileInboundGoodsReceipt,PDGR01_TASOTY"){
+			var param = new DataMap();
+			param.put("PROGID", "<%=menuId%>");
+			return param;
+		}else if(comboAtt == "WmsMobileInboundGoodsReceipt,EBELNCOMBO"){
+			var param = new DataMap();
+			param.put("WAREKY", '<%= wareky%>');
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			param.put("PROGID", "<%=menuId%>");
+			
+			return param;
+		}
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList"){
+			//var list = gridList.getGridData("gridList");
+			
+			var rowCnt = gridList.getGridDataCount(gridId);
+			if(rowCnt>0){
+				PlaySound('s');
+			}else{
+				PlaySound('e');
+			}
+		}
+	}
+	
+	function searchEndEventFunction(){
+		$("#BARCOD").focus();
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		
+	}
+	
+	function dateChange(){
+		var input = $("#DOCDAT").val().substr(5,2);
+		if(month != input){
+			PlaySound('e');
+			commonUtil.msgBox("VALID_M0131"); // 전기일자는 당월이어야 합니다. VALID_M0131
+			$("#DOCDAT").val(year + "." + month + "." + date);
+		}
+		
+		searchList();
+	}
+	
+	function reloadCombo(){
+		$comboObj = $("#EBELNCOMBO");
+		inputList.reloadCombo($comboObj, configData.INPUT_COMBO, "WmsMobileInboundGoodsReceipt,EBELNCOMBO");
+		
+		$("#EBELN").focus();
+	}
+	
+	function setBarcod(){
+ 		
+ 		var barcod = $.trim($("#BARCOD").val());
+ 		
+ 		if(barcod==""){
+ 			$("#BARCOD").val("");
+ 			PlaySound('e');
+ 			commonUtil.msgBox("VALID_M2050",null,null,function(){ $("#BARCOD").focus(); }); // 바코드를 입력하여주세요.
+ 			return;
+ 		}
+ 		
+ 		var gridId = "gridList";
+ 		var list = gridList.getGridData(gridId);
+ 		var duplyn = false;
+ 		var duplRowNum = -1;
+ 		
+		for(var i=0; i < list.length; i++) {
+			var rowData = list[i];
+			var rowNum = list[i].get("GRowNum");
+			var lota14 = list[i].get("LOTA14");
+			var rowCheck = gridList.getSelectType(gridId, rowNum);
+			
+			if(barcod==lota14){
+				duplyn=true;
+				if(duplRowNum==-1){
+					duplRowNum = rowNum;
+				}
+			}
+			
+			if(barcod==lota14 && rowCheck == false ){
+				
+				gridList.setRowCheck(gridId, rowNum, true);
+				gridList.setColFocus(gridId, rowNum, "rowCheck");
+				
+				$("#BARCOD").focus();
+				
+				// 20220817 입고 오더 데이터 변경 VALIDATION
+				var validationList = new Array();
+				validationList.push(rowData);
+				validationOrderGr02(validationList);
+				
+				return;
+			}
+		}
+		
+		if(duplyn==true){
+			PlaySound('e');
+			// 이미 선택한 바코드[{0}] 입니다.
+			commonUtil.msgBox("VALID_M2142",[barcod],null
+							 , function(){ 
+									gridList.setColFocus(gridId, duplRowNum, "rowCheck");
+									$("#BARCOD").focus(); 
+							   }
+							 );
+		}else{
+			PlaySound('e');
+			
+			// 20221007 입고 완료된 바코드 여부  VALIDATION
+			if(!validationCompleteBarcod(barcod)){
+				return;
+			}
+			
+			// 존재하지 않는 바코드[{0}] 입니다.
+			commonUtil.msgBox("VALID_M2141",[barcod],null,function(){ $("#BARCOD").focus(); });
+		}
+		
+ 	}
+	
+	function searchStlkyList(){
+		
+		var param = new DataMap();
+		
+		param.put('WAREKY', '<%=wareky%>');
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		
+		mobile.linkPopOpen('/mobile/PDGR01_STLKY_POP.page', param);
+		
+	}
+	
+	function stlkyPopCallback(data) {
+		
+		var STLKY = data.get('STLKY');
+		var WMSMAK = data.get('WMSMAK');
+		
+		$('#STLKY').val(STLKY);
+		$('#WMSMAK').val(WMSMAK);
+		
+	}
+	
+	function setStlkyInfo(){
+		
+		var param = new DataMap();
+		
+		var LOTA01 = $('#STLKY').val();
+		
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("MTYPE", "<%=mtype%>");
+		param.put("LOTA01", LOTA01);
+		
+		if(LOTA01==""){
+			$('#STLKY').val("");
+			$('#WMSMAK').val("");
+		}else{
+			var json = netUtil.sendData({
+				module : "WmsMobileInboundGoodsReceipt",
+				command : "PDGR01_POP_STLKYINFO",
+				sendType : "map",
+				param : param
+			});
+			
+			if(json && json.data){
+				$('#WMSMAK').val(json.data["WMSMAK"]);
+				PlaySound('s');
+			} else {
+				PlaySound('e');
+				$('#STLKY').val("");
+				$('#WMSMAK').val("");
+				commonUtil.msgBox("VALID_M2084",null,null,function(){ $("#STLKY").focus(); }); // 존재하지 않는 저장소입니다.
+			}
+		}
+	}
+	
+	function getWmsmak(STLKY, PLNTKY){
+		
+		var rsMap = new DataMap();
+		
+		var param = new DataMap();
+		param.put("STLKY", STLKY);
+		param.put("PLNTKY", PLNTKY);
+		param.put("WAREKY", "<%= wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("MTYPE", "<%=mtype%>");
+		
+		// 제조일자
+		var json = netUtil.sendData({
+			module : "WmsMobileInboundGoodsReceipt",
+			command : "PDGR01_WMSMAK",
+			sendType : "map",
+			param : param
+		});
+		//console.log("getLotaInfo : " + JSON.stringify(json));
+		if (json.data){
+			var WMSMAK = json.data["WMSMAK"];
+			rsMap.put("WMSMAK", WMSMAK);
+		}
+		
+		return rsMap;
+		
+	}
+	
+	function validationOrderGr02(list){
+		
+		// 20220817 입고 오더 데이터 변경 VALIDATION
+		var vParam = new DataMap();
+		vParam.put("OWNRKY", "<%=ownrky%>");
+		vParam.put("list", list);
+		
+		var json = netUtil.sendData({
+			url : "/wms/inbound/json/validationOrderGr02.data",			
+			param : vParam
+		});
+		if(json.data == "OK"){
+			return true;
+		}else if(json.data != "OK"){
+			PlaySound('e');
+			var msgList = json.data.split("†");
+			var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+			commonUtil.msgBox(msgTxt);										//작업아이템번호에 입력된 지번은 등록되지 않았습니다.
+			
+			searchList();
+			
+			return false;
+		}
+		
+	}
+	
+	function validationCompleteBarcod(barcod){
+		
+		// 20221007 입고 완료된 바코드 여부  VALIDATION
+		var vParam = new DataMap();
+		vParam.put("OWNRKY", "<%=ownrky%>");
+		vParam.put("BARCOD", barcod);
+		vParam.put("BWART", "135"); // 반납입고
+		
+		var json = netUtil.sendData({
+			url : "/mobile/mobileInboundGoodsReceipt/json/validationCompleteBarcod.data",			
+			param : vParam
+		});
+		if(json.data == "OK"){
+			return true;
+		}else if(json.data != "OK"){
+			PlaySound('e');
+			var msgList = json.data.split("†");
+			var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+			commonUtil.msgBox(msgTxt,null,null,function(){ 
+				$("#BARCOD").focus();
+				 $("#BARCOD").select();
+			}); // 입고 완료 된 바코드[{0}] 입니다.
+			return false;
+		}
+		
+	}
+	
+	function barcodFocus(){
+		$("#BARCOD").focus();
+		$("#BARCOD").select();
+	}
+	
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div class="searchArea" id="searchArea">
+					<table>
+						<colgroup>
+							<col width="80px" />
+							<col />
+							<col width="70px" />
+						</colgroup>
+						<tbody id="paramArea">
+							
+							<tr>
+								<th CL="STD_DOCDAT" width="100">전기일자</th>
+								<td colspan="2">
+									<input type="text" class="text" inputmode="none" name="DOCDAT" id="DOCDAT" UIFormat="C" onchange="dateChange()" onkeydown="eventKeydown(event,this.id)" style="width:calc(100% - 45px);text-align:center;float:left;"/>
+								</td>
+							</tr>
+							<tr>
+								<th  CL='STD_BARCOD'>바코드</th>
+								<td colspan="2">
+									<div class="select-editable" style="width:calc(100% - 7px); border:0px">
+									<input type="text" class="text" name="BARCOD" id="BARCOD" value="" style="text-align: center;" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'setBarcod()')" />
+									</div>
+								</td>
+							</tr>
+							
+							<tr>
+								<th CL='STD_LOTA01'>저장위치</th>
+								<td>
+									<input type="text" class="text" name="STLKY" id="STLKY" style="text-align: center;" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'setStlkyInfo()')" onChange="setStlkyInfo(this)" />
+									<input type="hidden" name="WMSMAK" id="WMSMAK" />
+								</td>
+								<td onclick ="searchStlkyList()">
+									<button class="bt" style="height: 32px;">
+										<p CL='BTN_FINDDATA'></p>
+									</button>
+								</td>
+							</tr>
+							
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+			<div class="tableWrap_search section">
+					<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="30px" />
+							<col width="60px" />
+							<col width="130px" />
+							<col width="150px" />
+							<col width="300px" />
+<!-- 						<col width="61px" /> -->
+							<col width="81px" />
+							<col width="51px" />
+							<col width="81px" />
+							<col width="90px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="81px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th CL="STD_NO">No.</th>
+								<th GBtnCheck="true"></th>
+								<th CL='STD_LOTA14'>제조LOT</th>
+								<th CL='STD_SKUKEY'>상품코드</th>
+								<th CL='STD_DESC01'>상품명</th>
+<!-- 								<th CL='STD_QTYORD'>오더수량</th> -->
+								<th CL='STD_QTYRCV'>입고수량</th>
+								<th CL='STD_UOMKEY'>단위</th>
+								<th CL='STD_BOXQT'>BAG/BOX</th>
+								<th CL='STD_RCPTTY'>입고유형</th>
+								<th CL='STD_EBELN'>오더번호</th>
+								<th CL='STD_EBELP'>오더순번</th>
+								<th CL='STD_LOTA06'>재고상태</th>
+								<th CL='STD_LOTA11' >제조일자</td>
+								<th CL='STD_LOTA12' >입고일자</td>
+								<th CL='STD_LOTA13' >유통기한</td>
+								<th CL='STD_LOTA02'>플랜트</th>
+								<th CL='STD_LOTA01'>저장위치</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				
+				<div class="tableBody">
+<!-- 					<table style="width: 100%; overflow:hidden;word-wrap:break-word;"> -->
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="30px" />
+							<col width="60px" />
+							<col width="130px" />
+							<col width="150px" />
+							<col width="300px" />
+<!-- 						<col width="61px" /> -->
+							<col width="81px" />
+							<col width="51px" />
+							<col width="81px" />
+							<col width="90px" />
+							<col width="150px" />
+							<col width="100px" />
+							<col width="81px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+							<col width="100px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								<td GCol="rowCheck"></td>
+								<td GCol="text,LOTA14">제조LOT</td>
+								<td GCol="text,SKUKEY">상품코드</td>
+								<td GCol="text,DESC01">상품명</td>
+<!-- 								<td GCol="text,MENGE" GF="N 20,3">오더수량</td> -->
+								<td GCol="text,QTYRCV" GF="N 20,3">입고수량</td>
+								<td GCol="text,UOMKEY">단위</td>
+								<td GCol="text,BOX" GF="N 20,3">BAG/BOX</td>
+								<td GCol="text,RCPTNM">입고유형</td>
+								<td GCol="text,SEBELN">오더번호</td>
+								<td GCol="text,SEBELP">오더순번</td>
+								<td GCol="text,LOTA06NM">재고상태</td>
+								<td GCol="text,LOTA11" GF="D">제조일자</td>
+								<td GCol="text,LOTA12" GF="D">입고일자</td>
+								<td GCol="text,LOTA13" GF="D">유통기한</td>
+								<td GCol="text,LOTA02NM">플랜트</td>
+								<td GCol="text,LOTA01NM">저장위치</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;">
+<!-- 			<div class="footer_5" "> -->
+				<table>
+					<tr>
+						<td class=f_1 onclick ="showMain()" width="33.3%"><label CL='BTN_CLOSE'></label></td>
+						<td  class=f_1 onclick="clearData()" width="33.3%"><label CL='BTN_CLEAR'></label></td>
+						<td class=f_1 onclick="saveData()" width="33.3%"><label CL='STD_INBOUND'></label></td>
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->	
+		</div>
+	</div>
+</body>

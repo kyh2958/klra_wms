@@ -1,0 +1,714 @@
+package project.mobile.service;
+
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+import project.common.util.Util;
+import project.wms.service.IFService;
+import project.wms.service.InboundService;
+import project.wms.service.WmsService;
+
+@Service
+public class MobileInboundGoodsReceiptService {
+
+	private static Logger log = Logger.getLogger(MobileInboundGoodsReceiptService.class);
+	
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired
+	public WmsService wmsService;
+	
+	@Autowired
+	private Util util;
+	
+	@Autowired
+	public IFService iFService;
+	
+	@Autowired
+	public InboundService inboundService;
+	
+	
+	@Transactional
+	public String savePDGR01(DataMap map) throws Exception {
+		// Validation
+		StringBuffer sb = new StringBuffer();
+		String rcptty = map.getString("ASNTTY");
+		sb.append("SELECT  '").append(map.get("ASNTTY")).append("' AS RCPTTY, ");
+		sb.append("        '").append(map.get("PTNRKY")).append("' AS PTNRKY, ");
+		sb.append("        '").append(map.get("ASNINV")).append("' AS ASNDKY, ");
+		sb.append("        '").append(map.get("LOCAKY")).append("' AS LOCAKY, ");
+		sb.append("        '").append(map.get("SKUKEY")).append("' AS SKUKEY, ");
+		sb.append("         ").append(map.get("QTYRCV")).append("  AS QTYRCV, ");
+		sb.append("        '").append(map.get("RCVLMT")).append("' AS RCVLMT, ");
+		sb.append("         ").append(map.get("LOTA12")).append("  AS LOTA12, ");
+		sb.append("        '").append(map.get("LOTA13")).append("' AS LOTA13, ");
+		sb.append("        '").append(map.get("VEHDAT")).append("' AS VEHDAT, ");
+		sb.append("        '").append(map.get(CommonConfig.SES_USER_OWNER_KEY).toString()).append("'  AS OWNRKY, ");
+		sb.append("        '").append(map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY)).append("'  AS WAREKY, ");
+		sb.append("        '").append(map.get("UOMKEY")).append("' AS UOMKEY FROM DUAL ");
+		
+		map.put("VALIDATION_SQL", sb.toString());
+		map.put("RCPTTY", map.get("ASNTTY"));
+		map.put("LOCAKY", map.get("LOCAKY"));
+		map.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR01"); // 쿼리키값 넣을것
+		List<DataMap> validList = commonDao.getValidation(map);
+		if(validList.size() > 0){
+			for(DataMap valid : validList){
+				if(!valid.getString("MSG").equals("OK"))
+					return valid.getString("MSG");
+			}
+		}
+		
+		String docNum = wmsService.getDocSeq(rcptty);
+		
+		map.put("RECVKY", docNum);
+		map.put("ASNDKY", map.getString("ASNDKY"));
+		map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+		map.put("WAREKY", map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+		map.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		map.put("BARCOD", map.getString("SKUKEY"));
+		
+		commonDao.insert("WmsMobileInboundGoodsReceipt.PDGR01_H", map);
+		commonDao.insert("WmsMobileInboundGoodsReceipt.PDGR01_I", map);
+		
+		return docNum;
+	}
+	
+	@Transactional
+	public DataMap savePDGR01_POP(DataMap map) throws Exception {
+		
+		List<DataMap> list = map.getList("list");
+		
+		//String docNum = "";
+		
+		// Validation
+		StringBuffer sb = new StringBuffer();
+		
+		DataMap rsMap = new DataMap();
+		List docNumList = new ArrayList();
+		DataMap row;
+		DataMap itemRow;
+		
+		int itemCount = 0;
+		
+		List<DataMap> ifidList = new ArrayList<DataMap>();     // IFID : 인터페이스 전송 목록
+		
+		List<String> rcpttyList = new ArrayList<String>();     // IF 실적 : 입고유형
+		DataMap rcpttyMap = new DataMap();                     // IF 실적 : 입고유형별 입고헤더키
+		
+		List<String> rcQtrList = new ArrayList<String>();      // IF 품질검사 : 입고유형
+		DataMap rcQtrMap = new DataMap();                      // IF 품질검사 : 입고유형별 입고헤더키
+		
+		List<String> rcStnList = new ArrayList<String>();      // IF 즉시불출 : 입고유형
+		DataMap rcStnMap = new DataMap();                      // IF 즉시불출 : 입고유형별 입고헤더키
+		
+		if(list!=null && list.size()>0){
+			
+			sb = new StringBuffer();
+			
+			DataMap hmap = list.get(0);
+			
+			for(DataMap item : list){
+				if(sb.length() > 0) 
+					sb.append(" UNION ALL\n ");
+				
+				sb.append(" SELECT '").append(item.getMap("map").get("SEBELN")).append("' AS SEBELN, ");
+				sb.append("        '").append(item.getMap("map").get("SEBELP")).append("' AS SEBELP, ");
+				sb.append("        '").append(item.getMap("map").get("RCPTTY")).append("' AS RCPTTY, ");
+				sb.append("        '").append(item.getMap("map").get("WAREKY")).append("' AS WAREKY, ");
+				sb.append("        '").append(item.getMap("map").get("OWNRKY")).append("' AS OWNRKY, ");
+				sb.append("        '").append(item.getMap("map").get("PTNRTY")).append("' AS PTNRTY, ");
+				sb.append("        '").append(item.getMap("map").get("DPTNKY")).append("' AS DPTNKY, ");
+				sb.append("        '").append(item.getMap("map").get("LOCAKY")).append("' AS LOCAKY, ");
+				sb.append("        '").append(item.getMap("map").get("SKUKEY")).append("' AS SKUKEY, ");
+				sb.append("         ").append(item.getMap("map").get("QTYRCV")).append("  AS QTYRCV, ");
+				sb.append("        '").append(item.getMap("map").get("UOMKEY")).append("' AS UOMKEY FROM DUAL ");
+			}
+			
+			map.setModuleCommand("WmsInbound", "GOODS_RECEIPT"); // 쿼리키값 넣을것
+			map.put("APPEND_QUERY", sb.toString());
+			map.put("RCPTTY", hmap.get("RCPTTY"));
+			List<DataMap> validList = commonDao.getValidation(map);
+			if(validList.size() > 0){
+				DataMap valid = validList.get(0);
+				return valid;
+			}
+			
+			row = hmap.getMap("map");
+			String RCPTTY = (String) row.get("RCPTTY");
+			String docNum = wmsService.getDocSeq(RCPTTY);
+			docNumList.add(docNum);
+			
+			row.put("RECVKY", docNum);
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand("WmsInbound", "GR02");
+			
+			commonDao.insert(row);
+			
+			for(int k = 0 ; k < list.size() ; k ++){
+			
+				itemRow = list.get(k).getMap("map");
+				
+				// 입고 시 실적 IF 데이터 추출
+				String I_RCPTTY    = row.getString("RCPTTY");   // 입고유형
+				String I_IFID      = row.getString("IFID");     // 실적 IF_ID
+				String I_IFID_QTR  = row.getString("IFID_QTR"); // 품질 IF_ID
+				String I_IFID_STN  = row.getString("IFID_STN"); // 즉시불출 IF_ID
+				String I_OWNRKY    = row.getString("OWNRKY");
+				String I_RECVKY    = row.getString("RECVKY");
+				String I_QRTAYN    = itemRow.getString("QRTAYN"); // 품질검사여부
+				String I_SHTAYN    = itemRow.getString("SHTAYN"); // 즉시불출여부
+				
+				itemRow.put("RECVKY", docNum);
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				
+				itemCount += 10;
+				String snum = String.valueOf(itemCount);
+				String inum = String.valueOf("000000").substring(0,(6-snum.length()))+snum;
+				
+				itemRow.put("RECVIT", inum);
+				//itemRow.put("AREAKY", list.get(k).getString("AREAKY"));
+				//itemRow.put("ASNDAT", list.get(k).getString("ASNDAT"));
+				
+				// LOTA15 LOT번호 없을 경우 신규 채번
+				String LOTA15 = itemRow.getString("LOTA15").trim();
+				if(StringUtils.isEmpty(LOTA15)) {
+					itemRow.put("RCPTTY",row.getString("RCPTTY"));
+					itemRow.setModuleCommand("WmsInbound", "GENNOTNO");
+					String NW_LOTA15 = (String) commonDao.getObject(itemRow);
+					log.debug("LOTA15 : " + LOTA15 + " - NW_LOTA15 : " + NW_LOTA15);
+					itemRow.put("LOTA15", NW_LOTA15);
+				}
+				
+				// 실적 인터페이스 데이터 생성
+				if(null!=I_IFID && !"".equals(I_IFID.trim())) {
+					if(!rcpttyList.contains(I_RCPTTY)) {
+						rcpttyList.add(I_RCPTTY);
+						rcpttyMap.put(I_RCPTTY,""+I_RECVKY+"");
+						rcpttyMap.put(I_RCPTTY+"_IFID",I_IFID);
+						rcpttyMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+					}else {
+						String docNums = rcpttyMap.getString(I_RCPTTY);
+						if(docNums!=null && !"".contentEquals(docNums.trim())) {
+							docNums += ","+I_RECVKY+"";
+						}else {
+							docNums += ""+I_RECVKY+"";
+						}
+						rcpttyMap.put(I_RCPTTY,docNums);
+					}
+				}
+				
+				// 품질검사
+				if( ((null!=I_RCPTTY && "131".equals(I_RCPTTY)) || (null!=I_QRTAYN && "V".equals(I_QRTAYN))) && (null!=I_IFID_QTR && !"".equals(I_IFID_QTR.trim())) ) {
+					itemRow.put("LOTA06", "05");
+					
+					// 품질검사 인터페이스 데이터 생성
+					if(!rcQtrList.contains(I_RCPTTY)) {
+						rcQtrList.add(I_RCPTTY);
+						rcQtrMap.put(I_RCPTTY,""+I_RECVKY+"");
+						rcQtrMap.put(I_RCPTTY+"_IFID",I_IFID_QTR);
+						rcQtrMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+					}else {
+						String docNums = rcQtrMap.getString(I_RCPTTY);
+						if(docNums!=null && !"".contentEquals(docNums.trim())) {
+							docNums += ","+I_RECVKY+"";
+						}else {
+							docNums += ""+I_RECVKY+"";
+						}
+						rcQtrMap.put(I_RCPTTY,docNums);
+					}
+					
+				}
+				
+				// 즉시불출
+				if(null!=I_SHTAYN && "V".equals(I_SHTAYN) && (null!=I_IFID_STN && !"".equals(I_IFID_STN.trim())) ) {
+					rcStnList.add(I_RECVKY);
+					rcStnMap.put("IFID_STN",I_IFID_STN);
+					rcStnMap.put("RECVKYS", rcStnList);
+				}
+				
+				//ifList.add(itemRow);
+				itemRow.setModuleCommand("WmsInbound", "GR02Sub");
+				commonDao.insert(itemRow);
+				
+			}
+			
+			// 실적 인터페이스 저장
+			inboundService.dataInsertIF(map, rcpttyList, rcpttyMap, ifidList);
+			
+			// 품질 인터페이스 저장
+			inboundService.dataInsertIF(map, rcQtrList, rcQtrMap, ifidList);
+			
+			// 즉시불출 인터페이스 저장
+			inboundService.dataInsertIFStn(map, rcStnMap, ifidList);
+			
+		}
+		
+		rsMap.put("ifidList",ifidList);
+		
+		StringBuilder sb1 = new StringBuilder();
+		for(int k = 0 ; k < docNumList.size() ; k ++){
+			if(k != 0){
+				sb1.append(",");
+			}
+			sb1.append("'").append(docNumList.get(k)).append("'");
+		}
+		rsMap.put("RECVKY", sb1.toString());
+		
+		return rsMap;
+		
+	}
+
+	@Transactional
+	public String savePDGR02(DataMap map) throws Exception {
+		int itemCount = 0;
+		
+		// Validation
+		StringBuffer sb = new StringBuffer();
+		String rcptty = map.getString("RCPTTY");
+		sb.append("SELECT  '").append(map.get("SEBELN")).append("' AS SEBELN, ");
+		sb.append("        '").append(map.get("RCPTTY")).append("' AS RCPTTY, ");
+		sb.append("        '").append(map.get("LOCAKY")).append("' AS LOCAKY, ");
+		sb.append("        '").append(map.get("SKUKEY")).append("' AS SKUKEY, ");
+		sb.append("        '").append(map.get("LOTA12")).append("' AS LOTA12, ");
+		sb.append("        '").append(map.get("LOTA13")).append("' AS LOTA13, ");
+		sb.append("         ").append(map.get("QTYRCV")).append("  AS QTYRCV, ");
+		sb.append("        '").append(map.get(CommonConfig.SES_USER_OWNER_KEY).toString()).append("'  AS OWNRKY, ");
+		sb.append("        '").append(map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY)).append("'  AS WAREKY, ");
+		sb.append("        '").append(map.get("UOMKEY")).append("' AS UOMKEY FROM DUAL ");
+		
+		map.put("VALIDATION_SQL", sb.toString());
+		map.put("RCPTTY", map.get("RCPTTY"));
+		map.put("LOCAKY", map.get("LOCAKY"));
+		map.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR02");
+		List<DataMap> validList = commonDao.getValidation(map);
+		if(validList.size() > 0){
+			for(DataMap valid : validList){
+				if(!valid.getString("MSG").equals("OK"))
+					return valid.getString("MSG");
+			}
+		}
+		
+		//RECDH/I INSERT
+		String docNum = wmsService.getDocSeq(rcptty);
+		map.put("RECVKY", docNum);
+		map.put("SEBELN", map.getString("SEBELN"));
+		map.put("SEBELP", map.getString("SEBELP"));
+		map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+		map.put("WAREKY", map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+		map.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		map.put("BARCOD", map.getString("SKUKEY"));
+		
+		commonDao.insert("WmsMobileInboundGoodsReceipt.PDGR02", map);
+		commonDao.insert("WmsMobileInboundGoodsReceipt.PDGR02Sub", map);
+
+		
+		return docNum;
+	}
+	
+	@Transactional
+	public DataMap savePDGR05(DataMap map) throws Exception {
+		
+		DataMap rsMap = new DataMap();
+		
+		List<DataMap> ifidList = new ArrayList<DataMap>();     // IFID : 인터페이스 전송 목록
+		
+		List<String> rcpttyList = new ArrayList<String>();     // IF 실적 : 입고유형
+		DataMap rcpttyMap = new DataMap();                     // IF 실적 : 입고유형별 입고헤더키
+		
+		List<String> rcQtrList = new ArrayList<String>();      // IF 품질검사 : 입고유형
+		DataMap rcQtrMap = new DataMap();                      // IF 품질검사 : 입고유형별 입고헤더키
+		
+		List<String> rcStnList = new ArrayList<String>();      // IF 즉시불출 : 입고유형
+		DataMap rcStnMap = new DataMap();                      // IF 즉시불출 : 입고유형별 입고헤더키
+		
+		List<String> rcItmList = new ArrayList<String>();      // IF 수입밀롤 : 입고유형
+		DataMap rcItmMap = new DataMap();                      // IF 수입밀롤 : 입고유형별 입고헤더키
+		
+		
+		DataMap row = new DataMap();
+		DataMap itemRow = new DataMap();
+		
+		row.putAll(map);
+		
+		row.setModuleCommand("WmsInbound", "GR40Confirm");
+		
+		List<DataMap> list = commonDao.getList(row);
+		
+		
+		if(list!=null && list.size()>0){
+			
+			for(int k = 0 ; k < list.size() ; k ++){
+			
+				itemRow = list.get(k).getMap("map");
+				
+				// 입고 시 실적 IF 데이터 추출
+				String I_RCPTTY    = itemRow.getString("RCPTTY");   // 입고유형
+				String I_IFID      = itemRow.getString("IFID");     // 실적 IF_ID
+				String I_IFID_QTR  = itemRow.getString("IFID_QTR"); // 품질 IF_ID
+				String I_IFID_STN  = itemRow.getString("IFID_STN"); // 즉시불출 IF_ID
+				String I_IFID_ITM  = itemRow.getString("IFID_ITM"); // 수입밀롤 IF_ID
+				String I_OWNRKY    = itemRow.getString("OWNRKY");
+				String I_RECVKY    = itemRow.getString("RECVKY");
+				String I_QRTAYN    = itemRow.getString("QRTAYN"); // 품질검사여부
+				String I_SHTAYN    = itemRow.getString("SHTAYN"); // 즉시불출여부
+				
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				
+				// 실적 인터페이스 데이터 생성
+				if(null!=I_IFID && !"".equals(I_IFID.trim())) {
+					if(!rcpttyList.contains(I_RCPTTY)) {
+						rcpttyList.add(I_RCPTTY);
+						rcpttyMap.put(I_RCPTTY,""+I_RECVKY+"");
+						rcpttyMap.put(I_RCPTTY+"_IFID",I_IFID);
+						rcpttyMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+					}else {
+						String docNums = rcpttyMap.getString(I_RCPTTY);
+						if(docNums!=null && !"".contentEquals(docNums.trim())) {
+							docNums += ","+I_RECVKY+"";
+						}else {
+							docNums += ""+I_RECVKY+"";
+						}
+						rcpttyMap.put(I_RCPTTY,docNums);
+					}
+				}
+				
+				// 품질검사
+				if( ((null!=I_RCPTTY && "131".equals(I_RCPTTY)) || (null!=I_QRTAYN && "V".equals(I_QRTAYN))) && (null!=I_IFID_QTR && !"".equals(I_IFID_QTR.trim())) ) {
+					itemRow.put("LOTA06", "05");
+					
+					// 품질검사 인터페이스 데이터 생성
+					if(!rcQtrList.contains(I_RCPTTY)) {
+						rcQtrList.add(I_RCPTTY);
+						rcQtrMap.put(I_RCPTTY,""+I_RECVKY+"");
+						rcQtrMap.put(I_RCPTTY+"_IFID",I_IFID_QTR);
+						rcQtrMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+					}else {
+						String docNums = rcQtrMap.getString(I_RCPTTY);
+						if(docNums!=null && !"".contentEquals(docNums.trim())) {
+							docNums += ","+I_RECVKY+"";
+						}else {
+							docNums += ""+I_RECVKY+"";
+						}
+						rcQtrMap.put(I_RCPTTY,docNums);
+					}
+					
+				}
+				
+				// 즉시불출
+				if(null!=I_SHTAYN && "V".equals(I_SHTAYN) && (null!=I_IFID_STN && !"".equals(I_IFID_STN.trim())) ) {
+					rcStnList.add(I_RECVKY);
+					rcStnMap.put("IFID_STN",I_IFID_STN);
+					rcStnMap.put("RECVKYS", rcStnList);
+				}
+				
+				// 수입밀롤
+				if(null!=I_RCPTTY && "121".equals(I_RCPTTY) && (null!=I_IFID_ITM && !"".equals(I_IFID_ITM.trim())) ) {
+					
+					// IF 수입밀롤 입고유형별 입고키 넣기
+					if(!rcItmList.contains(I_RCPTTY)) {
+						rcItmList.add(I_RCPTTY);
+						rcItmMap.put(I_RCPTTY,""+I_RECVKY+"");
+						rcItmMap.put(I_RCPTTY+"_IFID",I_IFID_ITM);
+						rcItmMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+					} else {
+						String docNums = rcItmMap.getString(I_RCPTTY);
+						if(docNums!=null && !"".contentEquals(docNums.trim())) {
+							docNums += ","+I_RECVKY+"";
+						}else {
+							docNums += ""+I_RECVKY+"";
+						}
+						rcItmMap.put(I_RCPTTY,docNums);
+					}
+					
+				}
+				
+				// RECDI 임시저장 입고처리
+				itemRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_RECDI_COMPLETE");
+				commonDao.update(itemRow);
+				
+				// ROLLMA 임시저장 입고처리
+				itemRow.put("RECYN", "V");
+				itemRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_ROLLMA_MERGE");
+				commonDao.insert(itemRow);
+				
+			}
+			
+			// 임시저장 입고처리
+			map.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_RECDH_COMPLETE");
+			commonDao.update(map);
+			
+			// 실적 인터페이스 저장
+			inboundService.dataInsertIF(map, rcpttyList, rcpttyMap, ifidList);
+			
+			// 품질 인터페이스 저장
+			inboundService.dataInsertIF(map, rcQtrList, rcQtrMap, ifidList);
+			
+			// 즉시불출 인터페이스 저장
+			inboundService.dataInsertIFStn(map, rcStnMap, ifidList);
+			
+			// 수입밀롤 인터페이스 저장
+			inboundService.dataInsertIFItm(map, rcItmList, rcItmMap, ifidList);
+			
+		}
+		
+		map.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_IF_COMPLETE");
+		commonDao.update(map);
+		
+		rsMap.put("ifidList",ifidList);
+		
+		rsMap.put("RECVKY", map.getString("RECVKY"));
+		
+		return rsMap;
+		
+	}
+	
+	@Transactional
+	public DataMap savePDGR05_POP(DataMap map) throws Exception {
+		
+		List<DataMap> list = map.getList("list");
+		
+		// Validation
+		StringBuffer sb = new StringBuffer();
+		
+		DataMap rsMap = new DataMap();
+		List docNumList = new ArrayList();
+		DataMap row;
+		DataMap itemRow;
+		
+		int itemCount = 0;
+		
+		if(list!=null && list.size()>0){
+			
+			sb = new StringBuffer();
+			
+			DataMap hmap = list.get(0);
+			
+			for(DataMap item : list){
+				if(sb.length() > 0) 
+					sb.append(" UNION ALL\n ");
+				
+				sb.append(" SELECT '").append(item.getMap("map").get("SEBELN")).append("' AS SEBELN, ");
+				sb.append("        '").append(item.getMap("map").get("SEBELP")).append("' AS SEBELP, ");
+				sb.append("        '").append(item.getMap("map").get("RCPTTY")).append("' AS RCPTTY, ");
+				sb.append("        '").append(item.getMap("map").get("WAREKY")).append("' AS WAREKY, ");
+				sb.append("        '").append(item.getMap("map").get("OWNRKY")).append("' AS OWNRKY, ");
+				sb.append("        '").append(item.getMap("map").get("PTNRTY")).append("' AS PTNRTY, ");
+				sb.append("        '").append(item.getMap("map").get("DPTNKY")).append("' AS DPTNKY, ");
+				sb.append("        '").append(item.getMap("map").get("LOCAKY")).append("' AS LOCAKY, ");
+				sb.append("        '").append(item.getMap("map").get("SKUKEY")).append("' AS SKUKEY, ");
+				sb.append("         ").append(item.getMap("map").get("QTYRCV")).append("  AS QTYRCV, ");
+				sb.append("        '").append(item.getMap("map").get("UOMKEY")).append("' AS UOMKEY FROM DUAL ");
+			}
+			
+			map.setModuleCommand("WmsInbound", "GOODS_RECEIPT"); // 쿼리키값 넣을것
+			map.put("APPEND_QUERY", sb.toString());
+			map.put("RCPTTY", hmap.get("RCPTTY"));
+			List<DataMap> validList = commonDao.getValidation(map);
+			if(validList.size() > 0){
+				DataMap valid = validList.get(0);
+				return valid;
+			}
+			
+			row = hmap.getMap("map");
+			String RCPTTY = (String) row.get("RCPTTY");
+			
+			String docNum = "";
+			
+			
+			DataMap recvkyRow = new DataMap();
+			recvkyRow.put("SEBELN", row.getString("SEBELN"));
+			recvkyRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_RECVKY");
+			recvkyRow = commonDao.getMap(recvkyRow);
+			
+			String recvky = "";
+			String recvit = "";
+			
+			if(recvkyRow!=null) {
+				recvky = recvkyRow.getString("RECVKY").trim();
+				recvit = recvkyRow.getString("RECVIT").trim();
+			}
+			
+			if("".equals(recvky)) {
+				docNum = wmsService.getDocSeq(RCPTTY);
+				
+				row.put("RECVKY", docNum);
+				row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				row.setModuleCommand("WmsInbound", "GR02");
+				
+				commonDao.insert(row);
+				
+			}else {
+				docNum = recvky;
+			}
+			
+			if( !"".equals(recvit) && !"0".equals(recvit) ) {
+				itemCount = Integer.parseInt(recvit);
+			}
+			
+			docNumList.add(docNum);
+			
+			for(int k = 0 ; k < list.size() ; k ++){
+			
+				itemRow = list.get(k).getMap("map");
+				
+				String recvitOrg = itemRow.getString("RECVIT").trim(); // 기존에 임시저장인지 여부 확인 필드
+				
+				if("".equals(recvitOrg)) {
+				
+					itemRow.put("RECVKY", docNum);
+					itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+					
+					itemCount += 10;
+					String snum = String.valueOf(itemCount);
+					String inum = String.valueOf("000000").substring(0,(6-snum.length()))+snum;
+					
+					itemRow.put("RECVIT", inum);
+					//itemRow.put("AREAKY", list.get(k).getString("AREAKY"));
+					//itemRow.put("ASNDAT", list.get(k).getString("ASNDAT"));
+					
+					// LOTA15 LOT번호 없을 경우 신규 채번
+					String LOTA15 = itemRow.getString("LOTA15").trim();
+					if(StringUtils.isEmpty(LOTA15)) {
+						itemRow.put("RCPTTY",row.getString("RCPTTY"));
+						itemRow.setModuleCommand("WmsInbound", "GENNOTNO");
+						String NW_LOTA15 = (String) commonDao.getObject(itemRow);
+						log.debug("LOTA15 : " + LOTA15 + " - NW_LOTA15 : " + NW_LOTA15);
+						itemRow.put("LOTA15", NW_LOTA15);
+					}
+					
+					itemRow.setModuleCommand("WmsInbound", "GR02Sub");
+					commonDao.insert(itemRow);
+				
+				} else {
+					
+					itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+					itemRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_RECDI");
+					commonDao.update(itemRow);
+					
+				}
+				
+				// ROLLMA MERGE
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				itemRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR05_ROLLMA_MERGE");
+				commonDao.insert(itemRow);
+				
+			}
+			
+		}
+		
+		StringBuilder sb1 = new StringBuilder();
+		for(int k = 0 ; k < docNumList.size() ; k ++){
+			if(k != 0){
+				sb1.append(",");
+			}
+			sb1.append("'").append(docNumList.get(k)).append("'");
+		}
+		rsMap.put("RECVKY", sb1.toString());
+		
+		return rsMap;
+		
+	}
+	
+	
+	
+	@Transactional
+	public DataMap savePDGR08(DataMap map) throws Exception {
+		
+		List<DataMap> list = map.getList("list");
+		
+		// Validation
+		StringBuffer sb = new StringBuffer();
+		
+		DataMap rsMap = new DataMap();
+		DataMap itemRow;
+		
+		int itemCount = 0;
+		
+		if(list!=null && list.size()>0){
+			
+			sb = new StringBuffer();
+			
+			for(DataMap item : list){
+				if(sb.length() > 0) 
+					sb.append(" UNION ALL\n ");
+				
+				sb.append(" SELECT '").append(item.getMap("map").get("STKNUM")).append("' AS STKNUM, ");
+				sb.append("        '").append(item.getMap("map").get("LOTA14")).append("' AS LOTA14 FROM DUAL ");
+			}
+			
+			map.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR08_INT"); // 쿼리키값 넣을것
+			map.put("APPEND_QUERY", sb.toString());
+			List<DataMap> validList = commonDao.getValidation(map);
+			if(validList.size() > 0){
+				DataMap valid = validList.get(0);
+				return valid;
+			}
+			
+			for(int k = 0 ; k < list.size() ; k ++){
+			
+				itemRow = list.get(k).getMap("map");
+				
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				//ifList.add(itemRow);
+				itemRow.setModuleCommand("WmsMobileInboundGoodsReceipt", "PDGR08");
+				commonDao.insert(itemRow);
+				
+				itemCount++;
+			}
+			
+		}
+		
+		return rsMap;
+		
+	}
+	
+	@Transactional
+	public String validationCompleteBarcod(DataMap map) throws SQLException {
+		String result = "OK";
+		
+		String barcod = map.getString("BARCOD");
+		
+		map.setModuleCommand("WmsMobileInboundGoodsReceipt", "COMPLETE_BARCOD_CHECK");  
+		map.put("BARCOD", barcod);
+	
+		List<DataMap> validList = commonDao.getValidation(map);
+		if(validList.size() > 0){
+			DataMap valid = validList.get(0);
+			return valid.getString("RESULTMSG");
+		}
+		
+		return result;
+	}
+	
+	@Transactional
+	public String validationCompleteInBarcod(DataMap map) throws SQLException {
+		String result = "OK";
+		
+		String barcod = map.getString("BARCOD");
+		
+		map.setModuleCommand("WmsMobileInboundGoodsReceipt", "COMPLETE_IN_BARCOD_CHECK");  
+		map.put("BARCOD", barcod);
+	
+		List<DataMap> validList = commonDao.getValidation(map);
+		if(validList.size() > 0){
+			DataMap valid = validList.get(0);
+			return valid.getString("RESULTMSG");
+		}
+		
+		return result;
+	}
+	
+	
+}

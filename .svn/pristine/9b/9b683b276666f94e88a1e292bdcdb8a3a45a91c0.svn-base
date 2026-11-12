@@ -1,0 +1,367 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%	String STKNUM = request.getParameter("STKNUM");
+
+	if(STKNUM == null){
+		STKNUM = "";
+	}
+	
+%>
+<!doctype html>
+<head>
+<style type="text/css">
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "DL042",
+			command : "DL042_HEAD",
+			gridMobileType : true,
+			emptyMsgType:false
+		});
+		
+		searchList();
+	});
+	
+	// 작업지시번호로 문서정보검색
+	function searchList(type){		
+		
+		if(!validate.check("searchArea")){
+			return;
+		}
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LANGKY", "<%=langky%>");		
+		param.put("RQSHPDFROM", $("#RQSHPD").val().replace(/[^0-9]/g, ""));
+		param.put('LOTA02', $('#LOTA02').val());
+		param.put("RCPTTY_LIST", "'201','221'");
+		
+		/*
+		if ($("#RCPTTY_201").prop("checked") && $("#RCPTTY_221").prop("checked")) {
+			param.put("RCPTTY_LIST", "'201','221'");
+		} else if ($("#RCPTTY_201").prop("checked")){
+			param.put("RCPTTY_LIST", "'201'");
+		} else if ($("#RCPTTY_221").prop("checked")){
+			param.put("RCPTTY_LIST", "'221'");
+		}
+		*/
+		
+		// 미작업
+		if ($("#STAT01").prop("checked") == true) {
+			param.put("STAT01", "V");
+		}
+		
+		// 할당
+		if ($("#STAT03").prop("checked") == true) {
+			param.put("STAT02", "V");	
+			param.put("STAT03", "V");	
+		}
+				
+		// 피킹
+		if ($("#STAT05").prop("checked") == true) {
+			param.put("STAT04", "V");
+			param.put("STAT05", "V");
+		}
+
+		// 플래트 유지
+		if (type == undefined && $.cookie("<%=menuId%>_LOTA02")) {
+			$('#LOTA02').val($.cookie("<%=menuId%>_LOTA02"));
+			param.put('LOTA02', $.cookie("<%=menuId%>_LOTA02"));
+		} 
+		
+		// 플랜트 변경
+		if (type == 'LOTA02') {
+			$.cookie("<%=menuId%>_LOTA02", $('#LOTA02').val(), { expires: 30 });
+		}
+		
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+	
+	}
+	
+	// 더블클릭 이벤트	
+	function gridListEventRowDblclick(gridId, rowNum){
+	}
+	
+	// 그리드 클릭 시 rowNum 변수 저장
+	function gridListEventRowClick(gridId, rowNum) {
+		selectedRowNum = rowNum;
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength == 0){
+			PlaySound('e');
+			gridList.resetGrid("gridList");
+			
+			commonUtil.msgBox("VALID_M0005", null, null, function () {  //조회된 데이터가 없습니다.
+				$('#STKNUM').focus();            			
+			}); 
+		}else if(gridId == "gridList" && dataLength > 1){
+			PlaySound("s");
+		}
+	}
+
+	
+	function eventKeydown(event,objId){
+		if(event.keyCode == "13"){	
+			
+			if($("#RQSHPD").val() == ""){
+				PlaySound('e');
+				commonUtil.msgBox("VALID_M1590"); //전기일자가 입력되지 않았습니다.
+				return;
+			}	
+			
+			var param = inputList.setRangeParam("searchArea");
+			param.put("LOTA02", $("#LOTA02").val());
+			param.put("WAREKY", "<%=wareky%>");
+			$("#LOTA02").select();
+			
+			searchList();
+		}
+	}
+
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			param.put("WAREKY", '<%=wareky%>');
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			return param;
+		}
+	}
+	
+	function SaveCarNo() {
+
+    	//var headList = gridList.getSelectData("gridList");
+    	//차량번호 숫자만 입력되게 처리하기
+    	
+    	var headList = gridList.getModifyData("gridList", "A");
+        var param = new DataMap();
+        param.put("headList", headList);
+
+        if(headList.length == 0){
+            commonUtil.msgBox("VALID_M1573"); // 변경된 데이터가 없습니다.
+            return;
+        }        
+
+        commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM, null, function(){
+        	// SAP I/F, SHPDH 업데이트
+    		var json = netUtil.sendData({
+    			url : "/wms/outbound/json/saveCarNo.data",
+    			param : param
+    		});
+
+    		if(json && json.data && json.data.RESULT == "S"){
+    			searchList();
+            }else {
+            	console.dir(json)
+            }
+        })
+	}
+
+	function searchStknumList(){
+		var param = new DataMap();
+		param.put('WAREKY', '<%=wareky%>');
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("STATIT", "FPC");
+		
+		mobile.linkPopOpen('/mobile/PDPK05_DOC_POP.page', param);
+	}
+	
+	// 팝업 callback
+	function DocPopCallback (data) {
+		$('#STKNUM').val(data.get('STKNUM'));
+		
+		searchList();
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div id="searchArea">
+					<table>
+						<colgroup>
+							<col width="20%" />
+							<col width="25%" />
+							<col width="25%" />
+							<col width="*" />
+						</colgroup>
+						<tbody>
+							<tr>
+								<th CL='STD_LOTA02'>플랜트</th>
+								<td>
+									<select id="LOTA02" name="LOTA02" Combo="Wms,PLNTKYCOMBO" onchange="searchList('LOTA02');"></select>
+								</td>
+								<th CL="STD_RQSHPD" width="100">출하요청일자</th>
+								<td >
+									<input type="text" class="text" inputmode="none" name="RQSHPD" id="RQSHPD" UIFormat="C -1" onchange="searchList()" onkeydown="eventKeydown(event,this.id)" style="width:calc(100% - 45px);text-align:center;float:left;"/>
+								</td>
+							</tr>
+							<!-- 
+							<tr>
+								<th CL="STD_SSHTYP"></th>
+								<td>
+									<input type="checkbox" class="input" id="RCPTTY_201" name="RCPTTY_201" value="201" checked="checked" onchange="searchList();"/>
+									<label CL="판매출고" for="RCPTTY_201">판매출고</label>
+								</td>
+								<td>
+									<input type="checkbox" class="input" id="RCPTTY_221" name="RCPTTY_221" value="221" checked="checked" onchange="searchList();"/>
+									<label CL="이송출고" for="RCPTTY_221">이송출고</label>
+								</td>
+								<td>
+								</td>
+							</tr>
+							 -->
+							<tr>
+								<th CL="STD_STATDO"></th>
+								<td>
+									<input type="checkbox" class="input" id="STAT01" name="STAT01" value="V" checked="checked" onchange="searchList();"/>
+									<label CL="STD_EMPTYTRAN" for="STAT01">미작업</label>
+								</td>
+								<td>
+									<input type="checkbox" class="input" id="STAT03" name="STAT03" value="V" onchange="searchList();"/>
+									<label CL="STD_ALLOCATE" for="STAT03">할당</label>
+								</td>
+								<td>
+									<input type="checkbox" class="input" id="STAT05" name="STAT05" value="V" onchange="searchList();"/>
+									<label CL="STD_PICKIN" for="STAT05">피킹</label>
+								</td>
+							</tr>
+							<tr>
+								<th CL='STD_STKNUM'>선적번호</th>
+								<td colspan="2">
+									<input type="text" class="text" name="STKNUM" id="STKNUM" inputmode="none" onfocus="this.select();" onkeydown="eventKeydown(event,this.id)"/>
+								</td>
+								<td onclick ="searchStknumList()">
+									<button class="bt" style="height: 32px;">
+										<p CL='BTN_SEARCH'></p>
+									</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="tableWrap_search section" >
+				<div class="tableHeader">
+					<table style='width:1000px;'> 
+						<colgroup>
+							<col width="20px" />
+							<col width="45px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="45px" />
+							<col width="45px" />
+							<col width="45px" />
+							<col width="35px" />
+							<col width="50px" />
+							
+							<col width="40px" />
+							<col width="30px" />
+							<col width="20px" />
+							<col width="35px" />
+						</colgroup> 
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO">NO</th>			
+								<th CL="STD_STKNUM">선적</th>			     
+								<th CL="STD_DPTNNM3">납품처명</th>
+								<th CL="STD_DRVCMP">운송업체</th>
+								<th CL="STD_VEHINO">차량번호</th>
+                                <th CL="STD_CARTON" >톤수</th>
+                               	<th CL="STD_CARART" >차량구분</th>
+                                <th CL="STD_DRIVER" >이름</th>
+                                <th CL="STD_WADT01" >연락처</th>
+                                
+                                <th CL="STD_TOTWG"> 총중량</th>
+								<th CL="STD_BOXQT" >BOX</th>						
+								<th CL="STD_PLTQT">Pallet</th>
+								<th CL="STD_STATUS">상태</th> 
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 1000px;">
+						<colgroup>
+							<col width="20px" />
+							<col width="45px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="45px" />
+							<col width="45px" />
+							<col width="45px" />
+							<col width="35px" />
+							<col width="50px" />
+							
+							<col width="40px" />
+							<col width="30px" />
+							<col width="20px" />
+							<col width="35px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">NO</td>
+								<td GCol="text,STKNUM">선적번호</td>                
+								<td GCol="text,DPTNKYNM">납품처명</td>
+								<td GCol="select,TDLNR">
+									<select Combo="airfw,CARRIERCOMBO" >
+										<option value=" "></option>
+									</select>
+								</td>
+								<td GCol="input,CARNO">차량번호</td>
+                                <td GCol="select,CARTON">
+									<select Combo="airfw,CARTONCOMBO" >
+										<option value=" "></option>
+									</select>
+								</td>
+                               	<td GCol="select,CARART">
+									<select Combo="airfw,CARARTCOMBO" >
+										<option value=" "></option>
+									</select>
+								</td>
+                                <td GCol="input,DRIVER">이름</td>
+                                <td GCol="input,DRIVERCEL">연락처</td>
+                                 
+                                <td GCol="text,TOT" GF="N 20,1"	>총중량</td>
+								<td GCol="text,BOX" GF="N 20,2"	>BAG/BOX</td>													
+								<td GCol="text,PLT" GF="N 20,2"	>BOX/Pallet</td>
+								<td GCol="text,STATDONM"		>아이템상태</td>      
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<!-- end table_body -->
+			<div class="footer_5" style="position:fixed;" >
+				<table>
+					<tr>
+						<td class=f_1 width="30%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>						
+						<td class=f_1 width="30%" onclick ="searchList()" >
+							<label CL='BTN_REFRESH'></label>
+						</td>
+						<td class=f_1 width="30%" onclick="SaveCarNo()">
+							<label CL='BTN_SAVE'></label>
+						</td>						
+					</tr>
+				</table>
+			</div><!-- end footer_5 -->	
+		</div>
+	</div>
+</body>

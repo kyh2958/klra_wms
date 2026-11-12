@@ -1,0 +1,297 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ page import="project.common.airfw.*"%>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<style type="text/css">
+ .content_wrap{background: none;}
+</style>
+<%
+	User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<script type="text/javascript">
+	$(document).ready(function(){
+		gridList.setGrid({
+	    	id : "gridList",
+			module : "WmsInbound",
+			command : "GR12"
+	    });
+
+		initSearchArea();
+		
+	});
+	
+	function initSearchArea() {
+	  // 플랜트
+      <%if(null!=plant && plant.trim().equals("")){%>
+        $('select[id="PLNTKY"]').multipleSelect('checkAll');
+      <%}else{%>
+        $('select[id="PLNTKY"]').multipleSelect('setSelects', ['<%=plant%>']);
+      <%}%>
+      
+      //$('select[id="SKUL01"]').val("");
+      $('select[id="UNITNO"]').multipleSelect('checkAll');
+      
+    }
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			searchList();
+		}
+	}
+	
+	function searchList(){
+		if(validate.check("searchArea")){
+			var param = inputList.setRangeParam("searchArea");
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			//console.log(JSON.stringify(param));
+			gridList.gridList({
+		    	id : "gridList",
+		    	param : param
+		    });  
+		}
+	}
+	
+	function gridExcelDownloadEventBefore(gridId){
+		var param = new DataMap();
+		if(gridId == "gridList"){
+			param.put("dataGridExcel", "생산_계획량_리스트");
+		}
+		return param;
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType, $inputObj){
+		var param = new DataMap();
+		
+		if(searchCode == "SHSTLMA"){
+			param.put("OWNRKY", "<%=ownrky%>");
+			return param;
+		}else if(searchCode == "SHSKUMA"){
+			param.put("OWNRKY", "<%=ownrky%>");
+			return param;
+		}else{
+			param.put("OWNRKY", "<%=ownrky%>");
+			return param;
+		}
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			
+			//var WAREKY_LIST = ['<%= wareky%>'];
+			//param.put("WAREKY_LIST", WAREKY_LIST);
+			
+			var WAREKYS = "'<%= wareky%>'";
+			param.put("WAREKYS", WAREKYS);
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			return param;
+		}else if(comboAtt == "WmsInbound,UNITNOOMBO"){
+			var param = new DataMap();
+			
+			//var $selPLNTKY = $('select[id="PLNTKY"] option:selected');
+			var $selPLNTKY = $('select[id="PLNTKY"] option');
+			var PLNTKYS = "";
+			
+			//$selPLNTKY.multipleSelect('checkAll');
+			
+			for(var i=0;i<$selPLNTKY.length;i++){
+				if(PLNTKYS!=""){
+					PLNTKYS += ",";
+				}
+				PLNTKYS += "'"+ $selPLNTKY.eq(i).val() +"'";
+			}
+			param.put("PLNTKYS", PLNTKYS);
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			return param;
+		}
+		
+	}
+	
+	function plntkyChange(obj){
+		
+		var $selPLNTKY = $('select[id="PLNTKY"] option:selected');
+		//alert( $selPLNTKY.length );
+		
+		var comboAtt = "Wms,PLNTKYCOMBO";
+		comboAtt = $(obj).attr("combo");
+		comboEventDataBindeBefore(comboAtt)
+	}
+	
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+				</div>
+				<div class="fl_r">
+					<input type="button" CB="Search SEARCH BTN_DISPLAY" />
+					<!-- <input type="button" CB="GetVariant GETVARIANT BTN_GETVARIANT" />
+					<input type="button" CB="SaveVariant SAVEVARIANT BTN_SAVEVARIANT" /> -->
+				</div>
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap ">
+					<dl>
+						<dt CL="STD_WAREKY">거점</dt>
+						<dd>
+							<input type="text" class="input" name="WAREKY" value="<%=wareky%>" readonly="readonly" validate="required"/>
+						</dd>
+					</dl>
+					<dl style="display:none;">
+						<dt CL="STD_OWNRKY">화주</dt>
+						<dd>
+							<!-- <select type="text" class="input" Combo="WmsOrder,OWNRKYCOMBO" name="OWNRKY" id="OWNRKY" STYLE="width: 150px;">
+							</select> -->
+							<input type="text" class="input" name="OWNRKY" value="<%=ownrky %>" />
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_LOTA02">플랜트</dt>
+						<dd>
+							<select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="PN.PLNTKY" id="PLNTKY" ComboType="MS" validate="required" >
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_PROPLNDT">생산계획일</dt>
+						<dd>
+							<input type="text" class="input" name="PN.PRDDTS" UIInput="R" UIFormat="C 61" validate="required(STD_PROPLNDT)"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_LOTA04">호기</dt>
+						<dd>
+<!-- 							<select CommonCombo="UNITNO" name="UNITNO" ComboCodeView=false  style="width:150px" > -->
+<!-- 							<option value=""></option> -->
+<!-- 							</select> -->
+							<select type="text" class="input" Combo="WmsInbound,UNITNOOMBO" name="PN.UNITNO" id="UNITNO" ComboType="MS" >
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_SKUG01">품목유형</dt>
+						<dd>
+							<select class="input" name="SKUG01" Combo="WmsInbound,SKUG01COMBO" style="width: 177px;">
+								<option value=""/>
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_SKUL01">품목구분</dt>
+						<dd>
+							<!-- <select CommonCombo="SKUL01" name="SKUL01" ComboCodeView=false  style="width: 200px" >
+							<option value=""></option>
+							</select> -->
+							<select class="input" CommonCombo="SKUL01" name="SKUL01" id="SKUL01" style="width: 177px;">
+							  <option value=""></option>
+							</select>
+						</dd>
+					</dl>
+					
+					<dl>
+						<dt CL="STD_SKUKEY">품목코드</dt>
+						<dd>
+							<input type="text" class="input" name="PN.SKUKEY" UIInput="R,SHSKUMA" UIFormat="U"/>
+						</dd>
+					</dl>
+					<dl>
+						<dt CL="STD_DESC01">품목명</dt>
+						<dd>
+							<input type="text" class="input" name="SM.DESC01" UIInput="R"/>
+						</dd>
+					</dl>
+					
+				</div>
+				
+				<div class="btn_tab">
+					<input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+				</div>
+				
+			</div>
+		</div>
+		<div class="search_next_wrap">
+			<div class="content_layout tabs">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_LIST">탭메뉴1</span></a></li>  
+				</ul>
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40" GCol="rownum">번호</td>
+										<td GH="60 STD_PLNTKY" GCol="text,PLNTKY">플랜트</td>
+										<td GH="100 STD_PLNTNM" GCol="text,PLNTNM">플랜트</td>
+										<td GH="120 STD_LOTA04" GCol="text,UNITNM">호기</td>
+<!-- 												<td GH="150 STD_SKUG01" GCol="text,SKUG01NM">품목유형</td> -->
+										<td GH="100 STD_SKUL01" GCol="text,SKUL01NM">품목구분</td>
+										<td GH="130 STD_SKUKEY" GCol="text,SKUKEY">품목코드</td>
+										<td GH="230 STD_DESC01" GCol="text,DESC01">품목명</td>
+										<td GH="100 STD_QTY" GCol="text,QTYPRD" GF="N 20,3">수량</td>
+										<td GH="80 STD_UOMKEY" GCol="text,UOMKEY" GF="S 3"/>단위</td>
+										
+										<td GH="100 STD_PRDDTS" GCol="text,PRDDTS" GF="D">생산시작일</td>
+										<td GH="100 STD_PRDDTE" GCol="text,PRDDTE" GF="D">생산종료일</td>
+										<td GH="200 STD_REMAKS" GCol="text,REMARK">비고</td>
+										
+										<td GH="100 STD_TOTWG" GCol="text,TOT" GF="N 20,3">총중량</td>
+										<td GH="100 STD_BOXBAG" GCol="text,BOXBAG" GF="N 20,3">BOXBAG</td>
+										<td GH="100 STD_BAGQT" GCol="text,BAG" GF="N 20,3">BAG</td>
+										<td GH="100 STD_BOXQT" GCol="text,BOX" GF="N 20,3">BOX</td>
+										<td GH="100 STD_PLTQT" GCol="text,PLT" GF="N 20,3">BOX/Pallet</td>
+										<td GH="100 STD_SOKQT" GCol="text,SOK" GF="N 20,3">속(개/BALE)</td>
+										<td GH="100 STD_EAQTY" GCol="text,EA" GF="N 20,3">매(sheet/속)</td>
+										
+										<td GH="100 STD_CREDAT" GCol="text,CREDAT" GF="D">생성일자</td>
+										<td GH="100 STD_CRETIM" GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR" GCol="text,CREUSR">생성자명</td>
+										<td GH="100 STD_CUSRNM" GCol="text,CUSRNM">생성자ID</td>
+										<td GH="100 STD_LMODAT" GCol="text,LMODAT" GF="D">수정일자</td>
+										<td GH="100 STD_LMOTIM" GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR" GCol="text,LMOUSR">수정자명</td>
+										<td GH="100 STD_LUSRNM" GCol="text,LUSRNM">수정자ID</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<button type='button' GBtn="subTotal"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

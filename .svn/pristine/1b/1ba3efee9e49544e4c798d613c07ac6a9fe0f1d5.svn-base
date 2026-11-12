@@ -1,0 +1,36 @@
+#SAP INFO
+#sap.jco.ASHOST=10.2.14.210
+#sap.jco.SYSNUM=01
+#sap.jco.SYSID=DPQ
+#sap.jco.CLIENT=100
+#sap.jco.USERID=PDA001
+#sap.jco.PASSWD=Klean22709290
+#sap.jco.LANGKY=KO
+
+#TEST
+#sap.jco.ASHOST=10.2.14.215
+#sap.jco.SYSNUM=00
+#sap.jco.SYSID=KND
+#sap.jco.CLIENT=500
+#sap.jco.USERID=WMSSYS
+#sap.jco.PASSWD=init12345
+#sap.jco.LANGKY=KO
+ 
+#SAP QA
+#sap.jco.ASHOST=10.2.14.216
+#sap.jco.SYSNUM=01
+#sap.jco.SYSID=KND
+#sap.jco.CLIENT=100
+#sap.jco.USERID=WMSSYS
+#sap.jco.PASSWD=a12345678
+#sap.jco.LANGKY=KO
+
+#SAP QA(TEST)
+sap.jco.ASHOST=10.2.14.210
+sap.jco.SYSNUM=01
+sap.jco.SYSID=DPQ
+sap.jco.CLIENT=100
+sap.jco.USERID=WMS001
+sap.jco.PASSWD=Klean22709290
+sap.jco.LANGKY=KO
+

@@ -1,0 +1,216 @@
+package project.wms.controller;
+
+import java.sql.SQLException;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.controller.BaseController;
+import project.common.service.CommonService;
+import project.wms.service.InboundService;
+import project.wms.service.OutboundServiceDL082;
+
+/**
+* @packageName  project.wms.controller
+* @fileName     OutboundControllerDL08.java
+* @description  출고관리(코드 수정 건 별개 복제)
+* @history
+* DATE_______AUTHOR__NOTE__________________________________<br>
+* 2023.11.04 YH 출고완료, 출고취소 처리 방법 변경
+* 2023.11.16 YH 자체출고, 자체출고취소 반영, MES 재처리 추가
+* 2023.12.29 KYH 출고완료(선적단위) 컨트롤러 + 서비스 적용
+*/
+
+@Controller
+public class OutboundControllerDL082 extends BaseController {
+	
+	private static Logger log = Logger.getLogger(OutboundControllerDL082.class);
+	
+	@Autowired
+	private OutboundServiceDL082 outboundServiceDL082;
+		
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired
+	private CommonService commonService;
+	
+	// 231004 출고완료
+	@RequestMapping("/wms/outbound/json/sendEcmsNew.*")
+	public String sendEcms(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.sendEcmsDL082(map); //ERP전송
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	// 출고취소
+	@RequestMapping("/wms/outbound/json/cancelDL08New.*")
+	public String cancelDL08(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.cancelDL082(map); 	// ERP전송
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	// 231104 자체완료처리(WMS)
+	@RequestMapping("/wms/outbound/json/sendEcmsWms.*")
+	public String sendEcmsWMS(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.sendEcmsEX_X(map); //ERP전송X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	// 231104 자체취소처리(WMS)
+	@RequestMapping("/wms/outbound/json/cancelWms.*")
+	public String cancelDL08WMS(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.cancelDL08EX_X(map); 	// ERP전송X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+
+	
+	// 231104 재전송처리(WMS->MES)
+	@RequestMapping("/wms/outbound/json/ResendEcms.*")
+	public String ReSendEcms(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.RecallEcmsMes(map);
+				
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+
+	@RequestMapping("/wms/outbound/json/validateSendEcmsDL081.*")
+	public String validateSendEcmsDL081(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object result = outboundServiceDL082.validateSendEcmsDL081(map);
+		
+		model.put("data", result);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/outbound/json/sendEcmsDL081.*")
+	public String sendEcmsDL081(HttpServletRequest request, Map model) throws SQLException{
+
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.sendEcmsDL081(map); //ERP전송
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/outbound/json/sendEcmsDL081Bundle.*")
+	public String sendEcmsDL081Bundle(HttpServletRequest request, Map model) throws SQLException{
+
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		// sendEcmsDL081Bundle 만들어서 묶음처리 호출방식 변경하기 (sendEcms.* 메서드 로직 재적용)
+		DataMap rsMap = outboundServiceDL082.sendEcmsDL081Bundle(map); //ERP전송
+		//outboundServiceDL082.sendEcmsDL081(map); //ERP전송
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+
+	@RequestMapping("/wms/outbound/json/saveDL081.*")
+	public String saveDL081(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.saveDL081(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	/**
+	* @methodName   cancelDL081
+	* @param 		request, model 
+	* @return 		String 성공/실패 유무
+	* @throws 		Exception
+	* @description	선적번호 기준 출고취소
+	* @history
+	* __DATE_______AUTHOR__NOTE__________________________________<br>
+	* * 2023.10.16	KYH		DL081.cancelEcms().cancel() 호출<br>
+	*/
+	@RequestMapping("/wms/outbound/json/cancelDL081.*")
+	public String cancelDL081(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+
+		DataMap rsMap = outboundServiceDL082.cancelDL081(map); 	// ERP전송
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	
+	}
+	
+	/**
+	* @methodName   DL081PrintTS
+	* @param 		request, model 
+	* @return 		String 성공/실패 유무
+	* @throws 		Exception
+	* @description	선적번호 기준 거래명세서(Trading statement) 출력
+	* @history
+	* __DATE_______AUTHOR__NOTE__________________________________<br>
+	* * 2023.10.16	KYH		DL081.PePrintList() 호출<br>
+	*/
+	@RequestMapping("/wms/outbound/json/DL081PrintTS.*")
+	public String DL081PrintTS(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap rsMap = outboundServiceDL082.DL081PrintTS(map);
+
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/outbound/json/DL081POPSave.*")
+	public String DL081POPSave(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap rsMap = outboundServiceDL082.DL081POPSave(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/outbound/json/saveCarNo.*")
+	public String saveCarNo(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = outboundServiceDL082.saveCarNo(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+}

@@ -1,0 +1,100 @@
+
+<table style="width: 100%">
+	<colgroup>
+			    <col width="30px" />
+				<col width="30px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<!-- <col width="50px" />
+				<col width="50px" /> -->
+				<col width="50px" />
+				<col width="50px" />
+				<!-- <col width="50px" />
+				<col width="50px" /> -->
+		
+	</colgroup>
+	<thead>
+		<tr>
+			<th CL="STD_NO">1</th>
+			<th GBtnCheck="true"></th>
+			<th CL="STD_KUNNR">납품처</th>
+			<th CL="STD_REGION">지역</th>
+			<th CL="STD_STKNUM">선적번호</th>
+		<!-- 	<th CL="STD_VEHINO">차량번호</th>
+			<th CL="STD_WADT01">연락처</th> -->
+		 	<th CL='STD_BOXQT'>BAG/BOX</th> 
+			<th CL='STD_PLTQT'>BOX/Pallet</th>
+			<!-- <th CL='STD_STATDONM'>상태명</th>
+			<th CL='STD_DOCUTY'>문서유형</th> -->
+		
+		</tr>
+	</thead>
+</table>
+</div>
+</div>
+<div class="tableWrap_search section">
+	<div class="tableBody">
+		<table style="width: 100%">
+			<colgroup>
+				<col width="30px" />
+				<col width="30px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<!-- <col width="50px" />
+				<col width="50px" /> -->
+				<col width="50px" />
+				<col width="50px" />
+				<!-- <col width="50px" />
+				<col width="50px" /> -->
+		
+			</colgroup>
+			<tbody id="gridList">
+				<tr CGRow="true">
+					<td GCol="rownum">1</td>
+					<td GCol="rowCheck"></td>
+					<td GCol="text,KUNNR">납품처</td>
+					<td GCol="text,REGION">지역</td>
+					<td GCol="text,STKNUM">선적번호</td>
+					<!-- <td GCol="text,VEHINO">차량번호</td>
+					<td GCol="text,WADT01">연락처</td> -->
+					<td Gcol="text,BOXQT" GF="N 20, 2">BOXQT</td>
+					<td Gcol="text,PLTQT" GF="N 20, 2">BOX/Pallet</td>
+					<!-- <td Gcol="text,STATNM">상태명</td>
+					<td Gcol="text,SHPMTY">문서유형</td> -->
+					
+				</tr>
+			</tbody>
+		</table>
+		<table style="width: 100%; display: none">
+			<colgroup>
+				<col width="30px" />
+				<col width="30px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<!-- <col width="50px" />
+				<col width="50px" /> -->
+				<col width="50px" />
+				<col width="50px" />
+			<!-- 	<col width="50px" />
+				<col width="50px" /> -->
+				
+			</colgroup>
+			<tbody id="gridListSkuSum">
+				<tr CGRow="true">
+					<td GCol="rownum">1</td>
+					<td GCol="rowCheck"></td>
+					<td GCol="text,KUNNR">납품처</td>
+					<td GCol="text,REGION">지역</td>
+					<td GCol="text,STKNUM">선적번호</td>
+					<!-- <td GCol="text,VEHINO">차량번호</td>
+					<td GCol="text,WADT01">연락처</td> -->
+					<td Gcol="text,BOXQT" GF="N 20, 2">BOXQT</td> 
+					<td Gcol="text,PLTQT" GF="N 20, 2">BOX/Pallet</td>
+					<!-- <td Gcol="text,STATNM">상태명</td>
+					<td Gcol="text,SHPMTY">문서유형</td> -->
+				</tr>
+			</tbody>
+		</table>

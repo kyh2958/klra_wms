@@ -1,0 +1,336 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<%
+    User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+<style>
+    input[type="checkbox"]{height:unset;} 
+</style>
+<script type="text/javascript">
+
+	var tabPage = 1;
+
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList1",
+			module : "WmsOutbound",
+			command : "DL101"
+		});
+		
+		<%if(plant.equals("")){%>
+        $('select[name="TI.LOTA02"]').multipleSelect('checkAll');
+       <%}else{%>
+         $('select[name="TI.LOTA02"]').multipleSelect('setSelects', ['<%=plant%>']);
+       <%}%>
+       
+        /* 출고유형 전체선택 */
+        var $selRCPTTY = $('select[id="SH.SHPMTY"]');
+        $selRCPTTY.multipleSelect('checkAll');     
+        
+        tabChg(1, true);
+	});
+	
+	function searchList(){
+		
+		var inputListParam = inputList.setRangeParam("searchArea");
+		var docdat_from = "";
+		var docdat_to = "";
+
+		if(inputListParam.map.RANGE_DATA_PARAM){    // datail 조회 시 searchArea 조회조건 출하요청일자 범위 필요
+            rageDataMap = inputListParam.map.RANGE_DATA_PARAM;
+
+            if(rageDataMap){
+                if(rageDataMap.containsKey("SH.DOCDAT_Range")){
+                    docdat_from = toDate(rageDataMap.get("SH.DOCDAT_Range").substr(2,8));
+                    docdat_to = toDate(rageDataMap.get("SH.DOCDAT_Range").substr(11,8))
+
+                    var diffMs = docdat_to - docdat_from;
+
+					// 일수 차이
+					var diffDays = diffMs / (1000 * 60 * 60 * 24);
+					
+					// 31일 초과시 알림
+					if (diffDays > 31) {
+						commonUtil.msgBox("VALID_M0009", '조회 기간은 31일을 초과할 수 없습니다.');
+					    return;
+					} else {
+					    // 조회
+					}
+                }else {
+                	commonUtil.msgBox("VALID_M0009", '전기일자 기간을 입력해주세요');
+                	return; 
+                }
+            }
+	    }else {
+	    	commonUtil.msgBox("VALID_M0009", '전기일자 기간을 입력해주세요');
+        	return; 
+	    }
+
+		if(validate.check("searchArea")){
+			var gridId = "gridList"+tabPage;
+			var param = inputList.setRangeParam("searchArea");
+			param.put("LANGKY", "<%=langky%>");
+			param.put("WAREKY", "<%=wareky%>");
+			
+			gridList.resetGrid(gridId);
+
+			gridList.gridList({
+				id : gridId,
+				param : param
+			});
+		}
+	}
+	
+	
+	
+	function searchHelpEventOpenBefore(searchCode, gridType, $inputObj){
+		var param = new DataMap();
+		if(searchCode == "SHSKUMA"){
+            param.put("OWNRKY", "<%=ownrky%>");
+			return param;
+		}else if(searchCode == "SHBZPTN"){
+			param.put("PTNRTY", "CT");
+			param.put("OWNRKY", "<%=ownrky%>");			
+			return param;
+		}else if(searchCode == "SHSTLMAP"){
+	    	
+	    	var PLNTKY = $('select[name="TI.LOTA02"]').val();
+			
+			if(!PLNTKY) {
+				var label = commonLabel.getLabel("STD_LOTA02", 1);
+				commonUtil.msgBox("VALID_required",[label]); // {0} 은(는) 필수 입력항목입니다.
+				return false;
+			}
+			param.put("PLNTKY", PLNTKY);
+	    	
+	    	return param;
+	    }
+	}
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			var param = new DataMap();
+			param.put("PROGID", "<%= menuId%>");
+			param.put("LGTYPE", "SEARCH");
+			var json = netUtil.sendData({
+				url: "/wms/system/json/saveLog.data",
+				param : param
+			});
+			searchList();
+		} else if(btnName == "Cancel"){
+			cancelShipment();
+		} else if(btnName == "Print"){
+			PrintList();
+		}
+	}
+	
+
+	function comboEventDataBindeBefore(comboAtt){
+        if(comboAtt == "Wms,PLNTKYCOMBO"){
+            var param = new DataMap();
+	        param.put("WAREKYS", "'<%= wareky%>'");
+            param.put("OWNRKY", "<%=ownrky%>");
+            param.put("LANGKY", "<%=langky%>");
+            
+            return param;
+        }else if(comboAtt == "WmsOrder,RCPTTYCOMBO"){
+        	
+        	
+            var param = new DataMap();
+
+	 			param.put("PROGID", configData.MENU_ID);
+            
+            return param;
+           
+       }else if(comboAtt == "SKUL01"){
+       	
+       	
+           var param = new DataMap();
+
+	 			param.put("PROGID", configData.MENU_ID);
+           
+           return param;
+          
+      }else if(comboAtt == "Wms,DEPTID"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }else if(comboAtt == "Wms,VTXTK"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }else if(comboAtt == "Wms,KVGR"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }
+    }
+	
+	function tabChg(num, isInit){
+		tabPage = num;
+
+		var gridId = "gridList"+num;
+		gridList.resetGrid(gridId);
+	}
+	
+	function getMonth() {
+	   var now = new Date(); //날짜객체생성
+	   var YYYY = now.getFullYear();// 년도 
+	   var MM = now.getMonth() + 1; // 월
+	   MM = MM <= 9 ? "0"+MM : MM;  // 1~9월이면 0 붙이기
+	   //$("[name=DATEYM]").val(YYYY+"."+MM); // HTML에서 DATEYM에 넣기
+	}
+	
+	function toDate(yyyymmdd) {
+	    var y = parseInt(yyyymmdd.substring(0, 4), 10);
+	    var m = parseInt(yyyymmdd.substring(4, 6), 10) - 1; // JS 월은 0부터 시작
+	    var d = parseInt(yyyymmdd.substring(6, 8), 10);
+	    return new Date(y, m, d);
+	}
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+    <div class="content_inner">
+        <%@ include file="/common/include/webdek/title.jsp" %>
+        <div class="content_serch" id="searchArea">
+            <div class="btn_wrap">
+                <div class="fl_l">
+                </div>
+                <div class="fl_r">
+                    <input type="button" CB="Search SEARCH BTN_DISPLAY" />
+                </div>
+            </div>
+            <div class="search_inner">
+                <div class="search_wrap ">
+                    <input type="hidden" class="input" name="OWNRKY" value="<%=ownrky %>" />
+                    <dl>
+                        <dt CL="STD_LOTA02">플랜트</dt>
+                        <dd>
+                            <select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="TI.LOTA02" id="TI.LOTA02" ComboType="MS" style="width: 160px;" validate="required">
+                            </select>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_LOTA01">저장위치</dt>
+                        <dd>
+                            <input type="text" class="input" name="TI.LOTA01" UIInput="R,SHSTLMAP" />
+                        </dd>
+                    </dl>
+                    <!-- 
+                    <dl>
+                        <dt CL="STD_SKUKEY">품목코드</dt>
+                        <dd>
+                            <input type="text" class="input" name="TI.SKUKEY" UIInput="SR" UIFormat="U"/>
+                        </dd>
+                    </dl>
+                     -->
+                     <!-- 
+                    <dl>
+						<dt CL="STD_DATEYM">조회월</dt>
+						<dd>
+							<input type="text" class="input" name="DATEYM" UIInput="U" UIFormat="MS" id='monthSelect' validate="required" />
+						</dd>
+					</dl>
+					 -->
+                    <dl>
+                        <dt CL="STD_DOCDAT">전기일자</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.DOCDAT" UIFormat="C -1 1" UIInput="R" validate="required"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_WAREKY">거점</dt>
+                        <dd>
+							<select name="TH.WAREKY" class="input" combo="Wms,USERWAHCOMBO" ComboType="S" validate="required">
+							</select>
+						</dd>
+                    </dl>
+                </div>
+                <div class="btn_tab">
+                    <input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+                </div>
+            </div>
+        </div>
+        <div class="search_next_wrap">
+            <div class="content_layout tabs">
+                <ul class="tab tab_style02">
+                    <li><a href="#tab1-1" onclick="tabChg(1);"><span CL="STD_LIST">리스트</span></a></li>
+                    <li class="btn_zoom_wrap">
+                        <ul>
+                            <li><button class="btn btn_bigger"><span>확대</span></button></li>
+                        </ul>
+                    </li>
+                </ul>
+                <div class="table_box section" id="tab1-1">
+                    <div class="table_list01">
+                        <div class="scroll">
+                            <table class="table_c">
+                                <tbody id="gridList1">
+                                    <tr CGRow="true">
+                                        <td GH="40" GCol="rownum">1</td>
+                                        <td GH="100 STD_DOCDAT"     GCol="text,DOCDAT" GF="D">전기일자</td>
+                                        <td GH="100 STD_YEARLY" 	GCol="text,YEARLY">년</td>
+                                        <td GH="100 STD_MONTH"    	GCol="text,MONTH">월</td>
+                                        <td GH="100 STD_DATE"    	GCol="text,DATE">일</td>
+                                        <td GH="100 STD_WAREKY"     GCol="text,WAREKY">거점</td>
+                                        <td GH="100 STD_WAREKYNM"     GCol="text,WAREKYNM">거점명</td>
+                                        <td GH="100 STD_SHPMTY"     GCol="text,SHPMTY">출고유형</td>
+                                        <td GH="100 STD_STKNUM"     GCol="text,STKNUM">선적번호</td>
+                                        <td GH='100 STD_SVBELN' 	GCol="text,SVBELN">출고오더번호</td>                                                                 
+                                        <td GH="100 STD_DPTNKY"     GCol="text,DPTNKYNM">거래처</td>
+                                        <td GH="100 STD_KUNAG"     	GCol="text,PTRCVRNM">판매처</td>
+                                        <td GH="100 STD_SKUG01"     GCol="text,SKUG01" >품목유형</td>
+                                        <td GH="100 STD_ASKL01"     GCol="text,ASKL01" >지종코드</td>
+                                        <td GH="100 STD_ASKL03"     GCol="text,ASKL03" >평량</td>
+                                        <td GH="100 STD_ASKL04"     GCol="text,ASKL04" >규격(지폭)</td>
+                                        <td GH="100 STD_ASKL05"     GCol="text,ASKL05" >규격(지정)</td>
+                                        <td GH="100 STD_IOFLG"    	GCol="text,IOFLG">수출내수</td>
+                                        <td GH="100 STD_SKUKEY"  	GCol="text,SKUKEY">제품상품</td>
+                                        <td GH="100 STD_SKU"  		GCol="text,SKU">제품상품</td>
+                                        <td GH="100 STD_SKU_LAST"   GCol="text,SKU_LAST">포장</td>
+                                        <td GH="100 STD_SKU_LASTN"  GCol="text,SKU_LASTN">시트원지</td>
+	                                    <td GH="100 STD_LOTA02"     GCol="text,LOTA02">플랜트</td>	                                   	                                   	                                    
+	                                    <td GH="100 STD_LOTA01"     GCol="text,LOTA01">저장위치</td>	                                   	                                   	                                    
+	                                    <td GH="100 STD_LOTA01NM"   GCol="text,LOTA01NM">저장위치</td>	                                   	                                   	                                    
+	                                    <td GH="100 STD_SDUOKY"     GCol="text,SDUOKY">기본단위</td>	                                   	                                   	                                    
+	                                    <td GH="100 STD_TOTWG" 		GCol="text,TOTWG" GF="N 20,3">총중량</td>
+	                                    <!-- 
+										<td GH="100 STD_BOXQT" 		GCol="text,BOXQT" GF="N 20,3">BOX</td>
+										<td GH="100 STD_PLTQT" 		GCol="text,PLTQT" GF="N 20,3">Pallet</td>		
+										 -->									
+										<td GH="100 STD_RBALE" 		GCol="text,RQT" GF="N 20,3">RQT</td>
+										<td GH="100 STD_STDSPEC" 	GCol="text,STDSPEC">정규격</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="btn_lit tableUtil">
+                        <button type='button' GBtn="find"></button>
+                        <button type='button' GBtn="sortReset"></button>
+                        <button type='button' GBtn="total"></button>
+                        <button type='button' GBtn="layout"></button>
+                        <button type='button' GBtn="excel"></button>
+                        <button type='button' GBtn="subTotal"></button>
+                        <span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

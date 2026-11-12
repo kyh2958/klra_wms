@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans   
+       http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSource" />
+		<property name="mapperLocations">
+			<list>
+				<value>classpath:/mybatis/${jdbc.db}/*.xml</value>
+				<value>classpath:/mybatis/${jdbc.db}/**/*.xml</value>
+				<value>classpath:/mybatis/${jdbc.db}/**/**/*.xml</value>
+			</list>
+		</property>
+		<property name="configLocation" value="/WEB-INF/conf/mybatis/mybatis-config.xml"/>
+	</bean>
+
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactory" />
+		<constructor-arg index="1" value="SIMPLE" />
+	</bean>
+	
+	<bean id="batchSession" class="org.mybatis.spring.SqlSessionTemplate"
+		destroy-method="clearCache">
+		<constructor-arg index="0" ref="sqlSessionFactory" />
+		<constructor-arg index="1" value="BATCH" />
+	</bean>
+	
+	
+
+	<bean id="sqlSessionFactory2" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSource2" />
+		<property name="mapperLocations">
+			<list>
+				<value>classpath:/mybatis/${jdbc.db2}/*.xml</value>
+				<value>classpath:/mybatis/${jdbc.db2}/**/*.xml</value>
+				<value>classpath:/mybatis/${jdbc.db2}/**/**/*.xml</value>
+			</list>
+		</property>
+		<property name="configLocation" value="/WEB-INF/conf/mybatis/mybatis-config.xml"/>
+	</bean>
+
+	<bean id="sqlSession2" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactory2" />
+		<constructor-arg index="1" value="SIMPLE" />
+	</bean>
+	
+	<bean id="batchSession2" class="org.mybatis.spring.SqlSessionTemplate"
+		destroy-method="clearCache">
+		<constructor-arg index="0" ref="sqlSessionFactory2" />
+		<constructor-arg index="1" value="BATCH" />
+	</bean>
+	
+	<!-- WCS -->
+	<bean id="sqlSessionFactoryWcs" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSourceWcs" />
+		<property name="mapperLocations">
+			<list>
+				<value>classpath:/mybatis/mysql/wcs/*.xml</value>
+			</list>
+		</property>
+		<property name="configLocation" value="/WEB-INF/conf/mybatis/mybatis-config.xml"/>
+	</bean>
+	
+	<bean id="sqlSessionWcs" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactoryWcs" />
+		<constructor-arg index="1" value="SIMPLE" />
+	</bean>
+	
+	<!-- KPP -->
+	<bean id="sqlSessionFactoryKpp" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="dataSource" ref="dataSourceKpp" />
+		<property name="mapperLocations">
+			<list>
+				<value>classpath:/mybatis/oracle/kpp/*.xml</value>
+			</list>
+		</property>
+		<property name="configLocation" value="/WEB-INF/conf/mybatis/mybatis-config.xml"/>
+	</bean>
+
+	<bean id="sqlSessionKpp" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg ref="sqlSessionFactoryKpp" />
+		<constructor-arg index="1" value="SIMPLE" />
+	</bean>
+</beans>

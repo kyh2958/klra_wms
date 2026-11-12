@@ -1,0 +1,83 @@
+<div class="tableWrap_search section" >
+	<div class="tableHeader">						 
+		<table style="width: 100%">
+			<colgroup>
+				<col width="25px" />
+				<col width="120px" />
+				<col width="160px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="55px" />
+				<col width="50px" />
+				<col width="50px" />
+				<!-- 
+				<col width="55px" />
+				<col width="55px" />
+				<col width="55px" />
+				<col width="55px" />				
+				<col width="80px" />
+				 -->
+			</colgroup> 
+			<thead>
+				<tr>
+					<th CL="STD_NO">NO</td>		
+					<th CL="STD_MATNR">품목코드</th>
+					<th CL="STD_DESC01">품목명</th>
+					<th CL="STD_QTYORG">오더수량</th>
+					<th CL="STD_QTJCMPBOX">피킹수량BOX</th>
+					<th CL="STD_UOMKEY">단위</th>
+					<th CL="STD_QTJCMP">피킹수량</th>
+					<th CL="STD_SDUOKY">기본단위</th>
+					<!-- 
+					<th CL="STD_QTYORGBOX">오더수량BOX</th>
+					<th CL="STD_QTYRCV1">지시수량</th>
+					<th CL="STD_STATIT">아이템상태</th>
+					<th CL="STD_LOTA07">MTO</th>
+					<th CL="STD_QTSHPOBOX">지시수량BOX</th>
+					 -->
+				</tr>
+			</thead>
+		</table>
+	</div>
+	<div class="tableBody">
+		<table style="width: 100%">
+			<colgroup>
+				<col width="25px" />
+				<col width="120px" />
+				<col width="160px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<col width="50px" />
+				<!-- 
+				<col width="55px" />
+				<col width="55px" />
+				<col width="55px" />
+				<col width="55px" />
+				<col width="60px" />
+				 -->					
+			</colgroup>
+			<tbody id="gridList">
+				<tr CGRow="true">
+					<td GCol="rownum">NO</td>
+					<td GCol="text,SKUKEY">품목코드</td>
+					<td GCol="text,DESC01">품목명</td>
+					<td GCol="text,QTYORG" GF="N 20">오더수량</td>
+					<td GCol="text,QTJCMPBOX" GF="N 20">피킹수량BOX</td>
+					<td GCol="text,UOMKEY">오더단위</td>
+					<td GCol="text,QTJCMP" GF="N 20">피킹수량</td>
+					<td GCol="text,DUOMKY">기본단위</td>
+					<!-- 
+					<td GCol="text,QTYORGBOX" GF="N 20">오더수량BOX</td>
+					<td GCol="text,QTJCMPBOX" GF="N 20">피킹수량BOX</td>
+					<td GCol="text,QTSHPO" GF="N 20,2">지시수량</td>
+					<td GCol="text,STATIT">아이템상태</td>								
+					<td GCol="text,LOTA07">MTO</td>
+					<td GCol="text,QTSHPOBOX" GF="N 20,2">지시수량BOX</td>
+					 -->
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>

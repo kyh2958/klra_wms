@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!--Converted at: Wed Feb 23 09:49:03 KST 2022-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="KppIF">
+	<!--
+		Sorry, I can`t migrate	DataMap
+		See console output for further details 
+	-->
+	<!--
+		Sorry, I can`t migrate	StringMap
+		See console output for further details 
+	-->
+	
+	<select id="KPP_TB_IF_DATA_LIST" parameterType="Map" resultType="DataMap">
+		SELECT * 
+		FROM TB_IF_DATA
+	</select>
+	
+
+	<!-- 기본 구문생성, 로직 작성후 수정 필요 -->
+	<insert id="KPP_TB_IF_DATA_INSERT" parameterType="Map">
+    INSERT INTO TB_IF_DATA
+    (
+        CST_COD,
+        SEND_DAT,
+        SEND_SEQ,
+        IF_KEY,
+        DATA_TYP,
+        DOC_TYP,
+        SND_DAT,
+        ARV_DAT,
+
+        CST_SND_CST_COD,
+        CST_SND_CST_NAM,
+        CST_SND_CST_TEL,
+        CST_SND_CST_ADDR,
+
+        CST_ORD_CST_COD,
+        CST_ORD_CST_NAM,
+        CST_ORD_CST_TEL,
+        CST_ORD_CST_ADDR,
+
+        CST_ARV_CST_COD,
+        CST_ARV_CST_NAM,
+        CST_ARV_CST_TEL,
+        CST_ARV_CST_ADDR,
+
+        PRD_COD,
+        DLV_QTY,
+        CHIT_NUM,
+        CAR_NUM,
+        TRN_CST_NAM,
+        DRIVER_NAM,
+        DRIVER_TEL,
+
+        ITEM,
+        ETC_DESC,
+        KPP_GET_YN,
+        REG_DAT
+    )
+    VALUES
+    (
+        #{CST_COD},  <!-- NOT NULL -->
+
+        NVL(#{SEND_DAT}, TO_CHAR(SYSDATE,'YYYYMMDD')),
+        NVL(TO_NUMBER(#{SEND_SEQ}), 0),
+        NVL(#{IF_KEY}, ' '),
+
+        NVL(#{DATA_TYP}, ' '),
+        NVL(#{DOC_TYP}, ' '),
+        NVL(#{SND_DAT}, TO_CHAR(SYSDATE,'YYYYMMDD')),
+        NVL(#{ARV_DAT}, ' '),
+
+        NVL(#{CST_SND_CST_COD}, ' '),
+        NVL(#{CST_SND_CST_NAM}, ' '),
+        NVL(#{CST_SND_CST_TEL}, ' '),
+ 		NVL(SUBSTRB(#{CST_SND_CST_ADDR}, 1, 100), ' '),
+ 		
+        NVL(#{CST_ORD_CST_COD}, ' '),
+        NVL(#{CST_ORD_CST_NAM}, ' '),
+        NVL(#{CST_ORD_CST_TEL}, ' '),
+        NVL(SUBSTRB(#{CST_ORD_CST_ADDR}, 1, 100), ' '),
+
+        NVL(#{CST_ARV_CST_COD}, ' '),
+        NVL(#{CST_ARV_CST_NAM}, ' '),
+        NVL(#{CST_ARV_CST_TEL}, ' '),
+        NVL(SUBSTRB(#{CST_ARV_CST_ADDR}, 1, 100), ' '),
+        NVL(#{PRD_COD}, ' '),
+        NVL(TO_NUMBER(#{DLV_QTY}), 0),
+        NVL(#{CHIT_NUM}, ' '),
+        NVL(SUBSTR(#{CAR_NUM}, -4), ' '),
+        NVL(#{TRN_CST_NAM}, ' '),
+        NVL(#{DRIVER_NAM}, ' '),
+        NVL(#{DRIVER_TEL}, ' '),
+
+        NVL(#{ITEM}, ' '),
+        NVL(#{ETC_DESC}, ' '),
+
+        NVL(#{KPP_GET_YN}, 'N'),
+        SYSDATE
+    )
+</insert>
+
+	
+	<select id="IFKPPSEQNO_MAP" parameterType="Map" resultType="DataMap">
+        SELECT NVL(MAX(SEND_SEQ), 0) + 1 AS SEND_SEQ
+	      FROM TB_WMS_PALLET_IF
+	     WHERE SEND_DAT   = TO_CHAR(SYSDATE,'YYYYMMDD')
+	</select>
+</mapper>

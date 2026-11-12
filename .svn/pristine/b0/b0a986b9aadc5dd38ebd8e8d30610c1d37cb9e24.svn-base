@@ -1,0 +1,217 @@
+<!-- <body>	 -->
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="75%" />
+<!-- 						<col width="25%" /> -->
+<!-- 						<col width="25%" /> -->
+					</colgroup>
+					<tbody>
+						<tr>
+							<th  CL='STD_BARCOD'>바코드</th>
+							<td colspan="2">
+								<input type="text" class="text" name="BARCOD" inputmode="none" id="BARCOD" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')" validate="required"/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section" style="margin-bottom: 0px;">
+				<div class="tableHeader">
+					<table> 
+						<colgroup>
+							<col width="20px" />
+							<col width="120px" />
+							<col width="130px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="70px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="120px" />
+							<col width="40px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="120px" />
+							<col width="100px" />
+							<col width="80px" />
+							<col width="100px" />
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO"			>No.</th>
+								<th CL="STD_SKUKEY"		>품목코드</th>
+								<th CL="STD_DESC01"		>품목명</th>
+								<th CL="STD_QTSIWH"		>재고수량</th>
+								<th CL="STD_USEQTY"		>가용수량</th>
+								<th CL="STD_QTTAOR"		>작업수량</th>
+								<th CL="STD_PLTQT"		>BOX/Pallet</th>
+								<th CL="STD_LOCASR"		>From 로케이션</th>
+								<th CL="STD_LOTA11"		>제조일자</th>
+								<th CL="STD_UOMKEY"		>단위</th>
+								<th CL="STD_LOTA14"		>제조LOT</th>
+								<th CL="STD_BOXQT"		>BAG/BOX</th>
+								<th CL="STD_LOCATG"		>To 로케이션</th>
+								<th CL="STD_LOTA06"		>재고상태</th>
+								<th CL="STD_TOTWG"		>총중량</th>
+								<th CL="STD_BAGQT"		>EA/BAG</th>
+								<th CL="STD_SOKQT"		>속(개/BALE)</th>
+								<th CL="STD_EAQTY"		>매(sheet/속)</th>
+								<th CL="STD_SKUL01"		>품목구분</th>
+								<th CL="STD_LOTA01"		>저장위치</th>
+								<th CL="STD_LOTA08"		>국가코드</th>
+								<th CL="STD_LOTA09"		>거래처코드MTO</th>
+								<th CL="STD_LOTA12"		>입고일자</th>
+								<th CL="STD_LOTA13"		>유통기한</th>
+								<th CL="STD_LOTA15"		>SAP 배치번호</th>
+								<th CL="STD_LOTA02"		>플랜트</th>
+								<th CL="STD_WAREKY"		>거점</th>
+								<th CL="STD_WAREKYNM"	>거점명</th>
+								<th CL="STD_QTSIWHBOX"	>재고수량BOX</th>
+								<th CL="STD_USEQTYBOX"	>가용수량BOX</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table>
+						<colgroup>
+							<col width="20px" />
+							<col width="120px" />
+							<col width="130px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="70px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="120px" />
+							<col width="40px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="120px" />
+							<col width="100px" />
+							<col width="80px" />
+							<col width="100px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum"		>No.</td>
+								<td GCol="text,SKUKEY"	>품목코드</td>
+								<td GCol="text,DESC01"	>품목명</td>
+								<td GCol="text,QTSIWH"	GF="N 20,2">재고수량</td>
+								<td GCol="text,USEQTY"	GF="N 20,2">가용수량</td>
+								
+								<td GCol="input,QTTAOR" GF="N 20,2">작업수량</td>
+								<td Gcol="text,PLTQT"	GF="N 20,2">BOX/Pallet</td>
+								<td GCol="text,LOCASR"	>From 로케이션</td>
+								<td GCol="text,LOTA11"	GF="D">제조일자</td>
+								<td GCol="text,UOMKEY"	>단위</td>
+								<td GCol="text,LOTA14"	>제조LOT</td>
+								<td Gcol="text,BOXQT"	>BAG/BOX</td>
+								<td GCol="input,LOCATG"	>To 로케이션</td>
+								<td GCol="text,LOTA06NM">재고상태</td>
+								<td Gcol="text,TOTWG"	GF="N 20,2">총중량</td>
+								<td Gcol="text,BAGQT"	GF="N 20,2">EA/BAG</td>
+								<td Gcol="text,SOKQT"	GF="N 20,2">속(개/BALE)</td>
+								<td Gcol="text,EAQTY"	GF="N 20,2">매(sheet/속)</td>
+								<td GCol="text,SKUL01NM">품목구분</td>
+								<td GCol="text,LOTA01"	>저장위치</td>
+								<td GCol="text,LOTA08"	>국가코드</td>
+								<td GCol="text,LOTA09"	>거래처코드MTO</td>
+								<td GCol="text,LOTA12"	GF="D">입고일자</td>
+								<td GCol="text,LOTA13"	GF="D">유통기한</td>
+								<td GCol="text,LOTA15"	>SAP 배치번호</td>
+								<td GCol="text,LOTA02"	>플랜트</td>
+								<td GCol="text,WAREKY"	>거점</td>
+								<td GCol="text,WARENM"	>거점명</td>
+								<td GCol="text,QTSIWHBOX"	GF="N 20,2">재고수량BOX</td>
+								<td GCol="text,USEQTYBOX"	GF="N 20,2">가용수량BOX</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="select_box">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+					</colgroup>
+					<tbody>
+						<tr>
+							<th CL='STD_LOCATG'>To 로케이션</th>
+							<td colspan="2">
+								<input type="text" class="text" name="LOC_TEMP" id="LOC_TEMP" onfocus="fn_onfocus(this.id)" onchange="onReadTargetLocation(this.value)"/>
+							</td>
+							<td onclick ="searchLocMstList()">
+								<button class="bt" style="height: 32px;">
+									<p CL='BTN_FINDDATA'></p>
+								</button>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_QTTAOR'>작업수량</th>
+							<td colspan="2">
+								<input type="text" class="text" name="QTTAOR_TEMP" id="QTTAOR_TEMP" onfocus="fn_onfocus(this.id)" onKeyup="this.value=this.value.replace(/[^-\.0-9]/g,'');" onchange="setQTTAOR(this.value)"/>
+							</td>
+							<td style='margin-left:5px'>
+								<input type="text" class="text" name="UOMKEY_TEMP" id="UOMKEY_TEMP" GF="N 20,3" CL='STD_DUOMKY' readonly />
+							</td>
+						</tr>
+						<tr id="RECLOC_TR" style='visibility: hidden;'>
+							<th CL='STD_RECLOC'>로케이션추천</th>
+							<td colspan="3">
+								<input type="text" class="text" name="RECLOC" id="RECLOC" readonly/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="50%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>
+						<td class=f_1 width="50%" onclick ="saveData()" >
+							<label CL='BTN_COMPLE'></label>
+						</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+<!-- </body>	 -->

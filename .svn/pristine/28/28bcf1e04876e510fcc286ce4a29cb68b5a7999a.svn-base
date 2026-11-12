@@ -1,0 +1,599 @@
+package project.common.task;
+
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.servlet.http.HttpSession;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.util.StringUtils;
+
+import project.common.airfw.PropertyUtil;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+import project.common.task.shedlock.JdbcLockService;
+import project.common.util.FileUtil;
+import project.wms.service.IFService;
+
+@Service
+public class InterfaceSchedule {
+
+	private static Logger log = Logger.getLogger(InterfaceSchedule.class);	
+
+	@Autowired
+	private IFService batchInterfaceService;
+
+	@Autowired
+	private HttpSession session;
+
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired 
+	private PlatformTransactionManager transactionManager;
+	
+    private static final int SECOND= 1000;
+    
+    private String SERVER_TYPE =  "prod";	//dev, prod
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStart() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStart");
+				try {
+					List batchList = batchInterfaceService.listIF();
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+						DataMap rtn = null;
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(   !masterInfo.get("IFID").equals("WMS_IF_301") //출고예정-주문
+							   && !masterInfo.get("IFID").equals("WMS_IFC301")
+							   && !masterInfo.get("IFID").equals("WMS_IFB301")
+							   && !masterInfo.get("IFID").equals("WMS_IFS301")
+							   && !masterInfo.get("IFID").equals("WMS_IF_302") //출고예정-이송
+							   && !masterInfo.get("IFID").equals("WMS_IFC302")
+							   && !masterInfo.get("IFID").equals("WMS_IFB302")
+							   && !masterInfo.get("IFID").equals("WMS_IFS302")
+							   && !masterInfo.get("IFID").equals("WMS_IF_206") // 반품입고
+							   && !masterInfo.get("IFID").equals("WMS_IFC206")
+							   && !masterInfo.get("IFID").equals("WMS_IFB206")
+							   && !masterInfo.get("IFID").equals("WMS_IFS206")
+							   && !masterInfo.get("IFID").equals("WMS_IFC3012")	// TMS 납품문서 신규
+							   && !masterInfo.get("IFID").equals("WMS_IFB3012") // TMS 납품문서 수정
+							   ) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+	
+									batchInterfaceService.run(session, masterInfo);
+									
+									log.debug("End Job!! ##### "+rtn);
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+//	@Scheduled(cron="0/60 * * * * *")
+//	public void batchStartSync() throws Exception{
+//
+//		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+//		if( serverType.equals(SERVER_TYPE)) {
+//			
+//			JdbcLockService.startCrontabTask("WMS_SCHEDULE_SYNC",59*SECOND,59*SECOND,()-> {
+//			
+//				// I/F 송수신 설정마스터정보를 조회한다.
+//				log.debug("batchStartSync");
+//				try {
+//					List batchList = batchInterfaceService.listIFID("WMS_IF_301");
+//					
+//					if(batchList != null){
+//						// 배치실행 시점의 시간을 기록한다.
+//						Calendar cal = Calendar.getInstance();
+//						Date currentTime = cal.getTime();
+//						
+//						DataMap masterInfo = null;
+//
+//						for(int i=0; i<batchList.size(); i++){
+//							masterInfo = (DataMap)batchList.get(i);
+//							
+//							if(masterInfo.get("IFID").equals("WMS_IF_301")) {
+//								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+//									// 배치설정 주기와 동일시간인지 체크한다.
+//									if(checkExecTime(masterInfo, currentTime) == false){
+//										continue;
+//									}
+//									
+//									log.debug("Start Job!!" + masterInfo.get("IFID"));
+//									
+//									batchInterfaceService.runWMS_IF_301(session, masterInfo);
+//									
+//									log.debug("End Job!! ##### ");
+//								}
+//							}
+//						}
+//					}
+//				} catch (SQLException e) {
+//					log.debug("WMS_SCHEDULE_SYNC : EXCEPTION " + e.getMessage());
+//				}
+//			});
+//			
+//		}
+//	}
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartC3012() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("TMS_SCHEDULE_C3012",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartC3012");
+				try {
+					List batchList = batchInterfaceService.listIFID("TMS_IFC3012");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("TMS_IFC3012")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runTMS_IFC3012(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("TMS_SCHEDULE_C3012 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartB3012() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("TMS_SCHEDULE_B3012",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartB3012");
+				try {
+					List batchList = batchInterfaceService.listIFID("TMS_IFB3012");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("TMS_IFB3012")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runTMS_IFB3012(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("TMS_SCHEDULE_C3012 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartC301() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_C301",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartC301");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFC301");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFC301")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFC301(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_C301 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartB301() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_B301",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartB301");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFB301");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFB301")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFB301(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_B301 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartC302() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_C302",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartC302");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFC302");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFC302")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFC302(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_C302 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartB302() throws Exception{
+
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_B302",59*SECOND,59*SECOND,()-> {
+			
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartB302");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFB302");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFB302")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFB302(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_B302 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartC206() throws Exception{
+		
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_C206",59*SECOND,59*SECOND,()-> {
+				
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartC206");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFC206");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+						
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFC206")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFC206(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_C206 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	@Scheduled(cron="0/60 * * * * *")
+	public void batchStartB206() throws Exception{
+		
+		String serverType = PropertyUtil.getProperty("commonconfig.properties", "server.type");
+		if( serverType.equals(SERVER_TYPE)) {
+			
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_B206",59*SECOND,59*SECOND,()-> {
+				
+				// I/F 송수신 설정마스터정보를 조회한다.
+				log.debug("batchStartB206");
+				try {
+					List batchList = batchInterfaceService.listIFID("WMS_IFB206");
+					
+					if(batchList != null){
+						// 배치실행 시점의 시간을 기록한다.
+						Calendar cal = Calendar.getInstance();
+						Date currentTime = cal.getTime();
+						
+						DataMap masterInfo = null;
+						
+						for(int i=0; i<batchList.size(); i++){
+							masterInfo = (DataMap)batchList.get(i);
+							
+							if(masterInfo.get("IFID").equals("WMS_IFB206")) {
+								if(masterInfo != null && masterInfo.get("IFSTAT").equals("ON")){
+									// 배치설정 주기와 동일시간인지 체크한다.
+									if(checkExecTime(masterInfo, currentTime) == false){
+										continue;
+									}
+									
+									log.debug("Start Job!!" + masterInfo.get("IFID"));
+									
+									batchInterfaceService.runWMS_IFB206(session, masterInfo);
+									
+									log.debug("End Job!! ##### ");
+								}
+							}
+						}
+					}
+				} catch (SQLException e) {
+					log.debug("WMS_SCHEDULE_B206 : EXCEPTION " + e.getMessage());
+				}
+			});
+		}
+	}
+	
+	//@Scheduled(cron="0/10 * * * * *")
+	public void batchStar1(){
+		try {
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_sub",9*SECOND,9*SECOND,()-> {
+				log.debug("batchStart-sub1");
+			});
+		} catch (Exception e) {
+			log.debug("WMS_SCHEDULE1 : EXCEPTION " + e.getMessage());
+		}
+	}
+	
+	//@Scheduled(cron="0/10 * * * * *")
+	public void batchStar2(){
+		try {
+			JdbcLockService.startCrontabTask("WMS_SCHEDULE_sub",9*SECOND,9*SECOND,()-> {
+				log.debug("batchStart-sub2");
+			});
+		} catch (Exception e) {
+			log.debug("WMS_SCHEDULE2 : EXCEPTION " + e.getMessage());
+		}
+	}
+	
+	public boolean checkExecTime(Map batchInfo, Date startTime) {
+		boolean resultFlag = false;
+		String currentTime = "";
+		String remark = (String) batchInfo.get("REMARK");
+		String execTime = (String) batchInfo.get("POLLTM");
+		String formatType = (String) batchInfo.get("POLLTY");
+		String formatTime = "";
+
+		if (formatType.equals("MI")) {
+			// 분 "MI" MI : 05 (5분마다 실행)
+			formatTime = "mm";
+		} else if (formatType.equals("HM")) {
+			// 특정시간 "HM" HH24MI : 1730 (매일 17시 30분에 실행)
+			formatTime = "HHmm";
+		} else if (formatType.equals("DHM")) {
+			// 매월 00일00시00분 "DHM" ddHH24MI : 010700 (매월 01일 07시 00분에 실행)
+			formatTime = "ddHHmm";
+		}
+
+//		log.debug(formatTime);
+		if (StringUtils.isEmpty(execTime.trim()) == false) {
+			SimpleDateFormat sdf = new SimpleDateFormat(formatTime);
+			currentTime = sdf.format(startTime);
+
+			if (formatType.equals("MI")) {
+//				log.debug(Integer.valueOf(currentTime) + " : "+ Integer.valueOf(execTime));
+				if ((Integer.valueOf(currentTime) % Integer.valueOf(execTime)) == 0) {
+					resultFlag = true;
+				} else {
+					resultFlag = false;
+				}
+			} else if (formatType.equals("HM")) {
+//				log.debug(currentTime + " : "+ Integer.valueOf(execTime));
+				if (execTime.indexOf(currentTime) >= 0) {
+					resultFlag = true;
+				} else {
+					resultFlag = false;
+				}
+			} else if (formatType.equals("DHM")) {
+				log.debug(Integer.valueOf(currentTime) + " : " + Integer.valueOf(execTime));
+				if ((Integer.valueOf(currentTime) % Integer.valueOf(execTime)) == 0) {
+					resultFlag = true;
+				} else {
+					resultFlag = false;
+				}
+			}
+		}
+
+		return resultFlag;
+	}
+	
+	//@Scheduled(cron="0 0/5 * * * *")
+	public void cronFiveMinute(){
+		log.debug("cronFiveMinute");
+	}
+}

@@ -1,0 +1,196 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+	String flag = request.getParameter("FLAG");
+	if(flag==null)flag="";	
+	String ebeln = request.getParameter("EBELN");
+	if(ebeln==null)ebeln="";
+	String docdat = request.getParameter("DOCDAT");
+	if(docdat==null)docdat="";
+%>
+
+<!doctype html>
+<head>
+<style type="text/css">
+.tem5_content .tableWrap_search select	{width:172px;  height:25px; }
+.tem5_content .tableWrap_search .text_2{width:90%; margin-right:3px;height:22px;border:#b8b8b8;}
+
+.select-editable { position:relative; background-color:white; border:solid 1px #b8b8b8; width:172px; height:25px; }
+.select-editable select { top:0px; left:0px; width:172px; height:25px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:23px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+
+.select-editable { position:relative; background-color:white; border:solid 1px #d5d5d5; width:100%; height:32px; }
+.select-editable select { position:absolute; top:0px; left:0px; width:100%; height:32px; font-size:14px;  border:none;  }
+.select-editable input { position:absolute; top:0px; left:0px; width:90%; height:32px; font-size:12px;  border:none;   }
+.select-editable select:focus, .select-editable input:focus { outline:none; }
+/* .tableBody{height: 245px !important;} */
+
+#gridList tr td.gridColText{word-spacing:-2px;overflow: hidden;height: 25px;line-height: 15px;}
+
+</style>
+
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script>
+
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsTask",
+			command : "WMS_DBLOCK",
+			gridMobileType : true
+		});
+
+		searchList();
+	});
+		
+	function searchList(type){	
+		
+		var param = new DataMap();
+		param.put("LANGKY", "<%=langky%>");
+		
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});
+
+	}
+	 	
+	function showMain(){
+		window.top.closePage();
+	}
+	
+	function saveData(){
+	}
+
+	function eventKeydown(event,objId){
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+	}
+
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList"){
+			for(var i = 0; i< dataLength;i++){
+				var wait_minute =  gridList.getColData(gridId,i,"POLLTM");
+				
+				if (wait_minute < 1) {
+					gridList.setRowReadOnly(gridId, i, true, ["rowCheck"]);
+				} else {
+	 				gridList.setRowCss(gridId, i, {'color':'red'});
+				}
+			}
+		}
+	}
+	
+	function searchEndEventFunction(){
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		if(gridId == "gridList"){
+			gridList.checkAll('gridList', false)
+			
+			if ($("#gridList tr:eq("+rowNum+")").css("color") == 'rgb(255, 0, 0)') {
+				gridList.setRowCheck(gridId, rowNum, true);
+			}
+		}
+	}
+	
+	function killTask(){
+		var chkItemList = gridList.getSelectData("gridList");
+
+		if( chkItemList.length == 0 ){
+			PlaySound('e');
+			commonUtil.msgBox("VALID_M0006");// 선택된 아이템이 없습니다.
+			return;
+		}
+		
+		for(var i=0; i < chkItemList.length; i++) {
+			var rowData = chkItemList[i];
+			var sid = chkItemList[i].get("SJ01SSIOID");
+			var waitMinute = chkItemList[i].get("POLLTM");
+
+			if (confirm(waitMinute+'분 경과된 프로세스 입니다. Kill 하겠습니까?')) {
+				var param = new DataMap();
+				param.put("SID", sid);
+
+				var json = netUtil.sendData({
+					url : "/wms/task/json/KillDbSession.data",
+					param : param
+				});
+				
+				if (json.data.CNT) {
+					searchList();
+				}
+			}
+		}
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="bindArea">
+				<div class="searchArea" id="searchArea">
+				</div>
+			</div>
+			
+			<div class="tableWrap_search section">
+					<div class="tableHeader">
+					<table style="width: 100%">
+						<colgroup>
+							<col width="30px" />
+							<col width="30px" />
+							<col width="30px" />
+							<col width="200px" />
+							<col width="50px" />
+						</colgroup>
+						<thead>
+							<tr>
+								<th CL="STD_NO">No.</th>
+								<th></th>
+								<th CL='STD_SJ01SSIOID'>개별바코드</th>
+								<th CL='STD_REFTBL'>품목코드</th>
+								<th CL='ITF_POLLTM'>품목명</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				
+				<div class="tableBody">
+					<table style="width: 100%;">
+						<colgroup>
+							<col width="30px" />
+							<col width="30px" />
+							<col width="50px" />
+							<col width="200px" />
+							<col width="50px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum">1</td>
+								<td GCol="rowCheck"></td>
+								<td GCol="text,SJ01SSIOID">sid_serial</td>
+								<td GCol="text,REFTBL">object_names</td>
+								<td GCol="text,POLLTM">wait_minutes</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 onclick="showMain()" width="33.3%"><label CL='BTN_CLOSE'></label></td>
+						<td class=f_1 onclick="searchList()" width="33.3%"><label CL='BTN_REFRESH'></label></td>
+						<td class=f_1 onclick="killTask()" width="33.3%"><label CL='BTN_IFSTOP'></label></td>
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+</body>

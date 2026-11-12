@@ -1,0 +1,3762 @@
+package project.mobile.service;
+
+import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.text.CharacterIterator;
+import java.text.SimpleDateFormat;
+import java.text.StringCharacterIterator;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+import javax.swing.border.EmptyBorder;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+
+import project.common.airfw.Utils;
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+import project.common.util.Util;
+import project.wms.service.IFService;
+import project.wms.service.InboundService;
+import project.wms.service.OutboundService;
+import project.wms.service.WmsService;
+
+@Service
+public class MobileOutboundPickingService_COPY {
+
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired
+	public WmsService wmsService;
+	
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired
+	private OutboundService outboundService;
+	
+	@Autowired
+	private IFService ifservice;
+	
+	@Autowired 
+	private PlatformTransactionManager transactionManager;
+	
+	@Autowired
+	private Util util;
+	
+	@Transactional
+	public DataMap makeTaskCheckNomal(DataMap map) throws SQLException {
+		DataMap rsMap = new DataMap();
+		String validationSql = util.createValidationSql(map, "WAREKY,OWNRKY,SKUKEY,TASOTY,LOCATG,LOCASR,LOTA13,AVAILABLEQTY,QTTAOR");
+		if(validationSql.length() > 0){
+			map.put(CommonConfig.VALIDATION_SQL_KEY, validationSql);
+			map.setModuleCommand("WmsMobilePutaway", "MV01");
+			
+			List<DataMap> vList = commonDao.getValidation(map);
+			if(vList.size() > 0){
+				rsMap = vList.get(0);
+				if(!rsMap.getString("MSG").equals("OK")){
+					return rsMap;
+				}					
+			}
+		}		
+		
+		return rsMap;
+	}
+	
+	@Transactional
+	public DataMap makeTaskNomal_PDMV04(DataMap map) throws SQLException {
+		
+		DataMap result = makeTaskCheckNomal(map);
+		
+		if(!result.getString("MSG").equals("OK")){
+			return result;
+		}
+		
+		List<DataMap> dataList = map.getList("DATA");
+		List typeArray = map.getList("TYPE");
+		List<DataMap> workList = new ArrayList<DataMap>();
+		
+		DataMap copy = new DataMap();
+		
+		for(int k=0;k<typeArray.size();k++){
+			int QTTAOR_SUM = 0;
+			workList = new ArrayList<DataMap>();
+			for(int i = 0 ; i < dataList.size() ; i ++){
+				DataMap tempList = dataList.get(i).getMap("map");
+				if(tempList.getString("TASOTY").equalsIgnoreCase(""+typeArray.get(k))){
+					QTTAOR_SUM += tempList.getInt("QTTAOR");
+					copy = new DataMap(dataList.get(i).getMap("map"));
+					workList.add(copy);
+				}
+			}
+			String docNum = wmsService.getDocSeq(""+typeArray.get(k));
+			//result.add(docNum);
+			map.setModuleCommand("WmsMobilePutaway", "PDMV01HEAD");
+			map.put("TASOTY", typeArray.get(k));
+			List<DataMap> head = commonDao.getList(map);
+			
+			DataMap row = head.get(0).getMap("map");
+			row.setModuleCommand("WmsMobilePutaway", "TASDH_PDMV01");
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+			row.put("QTTAOR", QTTAOR_SUM);
+			row.put("TASKKY", docNum);
+			row.put("TASOTY", typeArray.get(k));
+			commonDao.insert(row);
+			DataMap itemRow;
+			int rowIndex = 0;
+			for(int i = 0 ; i < workList.size() ; i ++){
+				itemRow = workList.get(i).getMap("map");
+				int allQty = itemRow.getInt("QTTAOR");
+				itemRow.put("DOCUTY",typeArray.get(k));
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				itemRow.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				itemRow.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+				
+				itemRow.setModuleCommand("WmsMobilePutaway", "PDMV01BODY");
+				List<DataMap> list = commonDao.getList(itemRow);
+				for(int j=0;j<list.size();j++){
+					if(allQty - list.get(j).getInt("QTTAOR") >= 0){
+						rowIndex += 10;
+						row = list.get(j).getMap("map");
+						row.put("DROPID", "V");
+						row.put("TASKKY", docNum);
+						row.put("TASKIT", rowIndex);
+						if(typeArray.get(k).equals("310") || typeArray.get(k).equals("311")){
+							row.put("TASKTY", "PT");
+						}else{
+							row.put("TASKTY", "MV");
+						}
+						row.put("STATIT", "FPC");
+						row.put("QTTAOR", row.getString("AVAILABLEQTY"));
+						row.put("QTCOMP", row.getString("AVAILABLEQTY"));
+						row.put("LOCATG", map.getString("LOCATG"));
+						row.put("LOCAAC", map.getString("LOCATG"));
+						row.put("SECTAC", row.getString("SECTTG"));
+						row.put("PAIDAC", row.getString("PAIDTG"));
+						row.put("TRNUTG", map.getString("TRNUTG"));
+						row.put("TRNUAC", map.getString("TRNUTG"));
+						row.put("ATRUTY", row.getString("TTRUTY"));
+						row.put("AMEAKY", row.getString("TMEAKY"));
+						row.put("AUOMKY", row.getString("TUOMKY"));
+						row.put("QTAPUM", row.getString("QTTPUM"));
+						row.put("ADUOKY", row.getString("TDUOKY"));
+						row.put("QTADUM", row.getString("QTTDUM"));
+						row.put("QTSTKM", row.getString("AVAILABLEQTY"));
+						row.put("QTSTKC", row.getString("AVAILABLEQTY"));
+						row.setModuleCommand("WmsMobilePutaway", "TASDIEND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						row.setModuleCommand("WmsMobilePutaway", "TASDREND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						allQty = allQty - list.get(j).getInt("QTTAOR");
+					}else if(allQty > 0){
+						rowIndex += 10;
+						row = list.get(j).getMap("map");
+						row.put("DROPID", "V");
+						row.put("TASKKY", docNum);
+						row.put("TASKIT", rowIndex);
+						if(typeArray.get(k).equals("310") || typeArray.get(k).equals("311")){
+							row.put("TASKTY", "PT");
+						}else{
+							row.put("TASKTY", "MV");
+						}
+						
+						row.put("STATIT", "FPC");
+						row.put("QTTAOR", allQty);
+						row.put("QTCOMP", allQty);
+						row.put("LOCATG", map.getString("LOCATG"));
+						row.put("LOCAAC", map.getString("LOCATG"));
+						row.put("SECTAC", row.getString("SECTTG"));
+						row.put("PAIDAC", row.getString("PAIDTG"));
+						row.put("TRNUTG", map.getString("TRNUTG"));
+						row.put("TRNUAC", map.getString("TRNUTG"));
+						row.put("ATRUTY", row.getString("TTRUTY"));
+						row.put("AMEAKY", row.getString("TMEAKY"));
+						row.put("AUOMKY", row.getString("TUOMKY"));
+						row.put("QTAPUM", row.getString("QTTPUM"));
+						row.put("ADUOKY", row.getString("TDUOKY"));
+						row.put("QTADUM", row.getString("QTTDUM"));
+						row.put("QTSTKM", allQty);
+						row.put("QTSTKC", allQty);
+						row.setModuleCommand("WmsMobilePutaway", "TASDIEND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						row.setModuleCommand("WmsMobilePutaway", "TASDREND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						allQty = 0;
+					}
+				}
+				itemRow = new DataMap();
+				itemRow.put("DOCCAT", "300");
+				itemRow.put("DOCUKY", docNum);
+				itemRow.put("DOFLAG", "Z");
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				
+				commonDao.getMap("WmsMobilePutaway.PDMV03_AIRWMS_DOCUMENT_PROCESS", itemRow);
+			}
+		}
+		
+		return result; 
+	}
+	
+	@Transactional
+	public int PDPK01Save(DataMap map) throws SQLException {
+		List<DataMap> headList = map.getList("head");
+		List<DataMap> saveItemList = new ArrayList<DataMap>();
+				
+		DataMap HeadRowMap = new DataMap();
+		String taskkyHead;
+		String taskkyGrid = headList.get(0).getMap("map").getString("TASKKY");				
+		
+		
+		int count = 1;
+		int qtcomp = 0;
+		DataMap row;
+		DataMap rowTot = new DataMap();
+		
+		for(int k=0;k<headList.size();k++){
+					
+			HeadRowMap = headList.get(k).getMap("map");
+			taskkyHead = HeadRowMap.getString("TASKKY");
+			saveItemList.clear();
+			rowTot.put("TASKKY", taskkyHead);
+			rowTot.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			
+			HeadRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK01_SAVE");
+			saveItemList = commonDao.getList(HeadRowMap);
+			
+						/*  Tasdi 삭제 */
+			for(int j=0;j<saveItemList.size();j++){
+				row = saveItemList.get(j).getMap("map");
+				row.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+				commonDao.delete(row);
+			}
+				
+				    	/*  Tasdi 인써트 */
+			count = 1;
+			qtcomp = 0;
+		
+			for(int i=0;i<saveItemList.size();i++){
+				
+				row = saveItemList.get(i).getMap("map");
+				row.put("QTCOMP", row.getString("QTCOMP"));
+				qtcomp = Integer.parseInt(row.getString("QTCOMP"));
+				
+				if (qtcomp > 0) {
+					row.put("STATIT","FPC");
+					row.put("QTTAOR", row.get("QTCOMP"));
+					row.put("LOCAAC", row.get("LOCATG"));
+					row.put("TRNUAC", row.get("TRNUTG"));
+					row.put("SECTAC", row.get("SECTTG"));
+					row.put("PAIDAC", row.get("PAIDTG"));
+					row.put("ATRUTY", row.get("TTRUTY"));
+					row.put("AMEAKY", row.get("TMEAKY"));
+					row.put("AUOMKY", row.get("TUOMKY"));
+					row.put("QTAPUM", row.get("QTTPUM"));
+					row.put("ADUOKY", row.get("TDUOKY"));
+					row.put("QTADUM", row.get("QTTDUM"));
+					
+					row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+					row.setModuleCommand("WmsTask_COPY", "TASDIEND");
+					commonDao.insert(row);
+						/*  Tasdr 인써트 */
+					row.put("STOKKY", "%");
+					commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", row);
+				}
+				count++;
+			}
+			rowTot.setModuleCommand("WmsTask_COPY", "CALL_BATCH_PKTOT");
+			commonDao.getMap(rowTot);
+		}
+		return count;
+	}
+	
+	@Transactional
+	public int ConfirmPickingPDPK01(DataMap map) throws SQLException {
+		int count = 0;
+		DataMap row = map.getMap("list");
+		if(row.getInt("QTCOMP") > 0){
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK01");
+			commonDao.getMap(row);
+			count ++;
+		}
+		return count;
+	}
+
+	@Transactional
+	public int ConfirmPickingPDPK02(DataMap map) throws SQLException {
+		int count = 0;
+		DataMap row = map.getMap("list");
+		if(row.getInt("QTCOMP") > 0){
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK02");
+			commonDao.getMap(row);
+			count ++;
+		}
+		return count;
+	}
+	
+	@Transactional
+	public int ConfirmPickingPDPKRM01(DataMap map) throws SQLException {
+		int count = 0;
+		int qtcomp = 0;
+		
+		DataMap data = map.getMap("data");
+		
+		// TASDI delete
+		DataMap row = map.getMap("data");
+		row.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDIDEL");
+		commonDao.delete(row);
+		
+		// TASDI insert
+		count = 1;
+		qtcomp = 0;
+		
+		row.put("QTCOMP", row.getString("QTTAOR"));
+		
+		qtcomp = Integer.parseInt(row.getString("QTCOMP"));
+		
+		if(qtcomp > 0) {
+			row.put("STATIT","FPC");
+			row.put("QTTAOR", row.get("QTCOMP"));
+			row.put("LOCAAC", row.get("LOCATG"));
+			row.put("TRNUAC", row.get("TRNUTG"));
+			row.put("SECTAC", row.get("SECTTG"));
+			row.put("PAIDAC", row.get("PAIDTG"));
+			row.put("ATRUTY", row.get("TTRUTY"));
+			row.put("AMEAKY", row.get("TMEAKY"));
+			row.put("AUOMKY", row.get("TUOMKY"));
+			row.put("QTAPUM", row.get("QTTPUM"));
+			row.put("ADUOKY", row.get("TDUOKY"));
+			row.put("QTADUM", row.get("QTTDUM"));
+			
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDIEND");
+			commonDao.insert(row);
+			
+			// TASDR insert
+			row.put("STOKKY", "%");
+			commonDao.getMap("WmsMobileOutboundPicking.DBMSPROC_SZP_INS_TASDR", row);
+		}
+		
+		return count;
+	}
+	
+	@Transactional
+	public DataMap PDPKRM01QTSWRK(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPKRM01_QTSWRK");
+		DataMap row = commonDao.getMap(map);
+		DataMap rsMap = new DataMap();
+		rsMap.put("CNT", row.get("CNT"));
+		rsMap.put("QTSIWH", row.get("QTSIWH"));
+		return rsMap;
+	}
+	
+	@Transactional
+	public DataMap PDPKRM01QTSAVBCNT(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPKRM01_QTSAVB");
+		DataMap rsMap = commonDao.getMap(map);
+		return rsMap;
+	}
+	
+	@Transactional
+	public DataMap PDPKRM01SHPINFO(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPKRM01_SHPINFO");
+		DataMap row = commonDao.getMap(map);
+		
+		DataMap rsMap = new DataMap();
+		rsMap.put("SHPOKY", row.get("SHPOKY"));
+		rsMap.put("SHPOIT", row.get("SHPOIT"));
+		
+		return rsMap;
+	} 
+	
+	@Transactional
+	public int PDPKRM01QTUALOCNT(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPKRM01_QTUALOCNT");
+		DataMap rsMap = commonDao.getMap(map);
+		int result = Integer.parseInt(rsMap.get("QTUALO").toString());
+		return result;
+	} 
+	
+	@Transactional
+	public DataMap PickingInfoPDPKRM01(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PickingInfoPDPKRM01");
+		DataMap rsMap = commonDao.getMap(map);
+		return rsMap;
+	}
+	
+	@Transactional
+	public String SavePDDL05(DataMap map) throws SQLException {
+		String result = "OK";
+		
+		List<DataMap> list = map.getList("head");
+		
+		DataMap row;
+		for(int i=0;i<list.size();i++){
+			row = list.get(i).getMap("map");
+			map.clonSessionData(row);
+			
+			// PPC, FPC일 경우에만 검수되도록
+			if ("PPC".equals(row.getString("STATIT")) || "FPC".equals(row.getString("STATIT"))) {			
+				row.put("STATIT", "FCK"); //검수완료처리
+				commonDao.update("WmsMobileOutboundPicking.PDDL05", row);
+				
+				// 그룹오더인지 체크하여 원출고문서 출하완료 처리
+				row.setModuleCommand("WmsOutbound_COPY", "CNTGRPDOC");
+				int countCHK =  commonDao.getMap(row).getInt("CNT");
+				if(countCHK > 0){				
+					// 총괄SUB검수 호출
+					row.setModuleCommand("WmsOutbound_COPY", "CALL_BATCH_INSPECT_TOT");
+					commonDao.getMap(row);	
+				}else {			
+					if( row.getString("ESHPKY") != null && !row.getString("ESHPKY").equals("")){					
+						//해당 Gropky에 대한 list			
+						commonDao.update("WmsOutbound_COPY.WDL05", row);	
+					}
+				}
+			}
+		}
+		return result;
+	}
+	
+	@Transactional
+	public DataMap PDPK05DETAILCNT(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05DETAILCNT");
+		DataMap rsMap = commonDao.getMap(map);
+		return rsMap;
+	} 
+	
+	@Transactional
+	public DataMap PDPK05DETAIL02HEAD(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05DETAIL02HEAD");
+		DataMap rsMap = commonDao.getMap(map);
+		return rsMap;
+	} 
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap PDPK05SaveEnd(DataMap map) throws SQLException {
+		
+		List<DataMap> headList = map.getList("head");
+		List<DataMap> realList = new ArrayList<DataMap>();
+		
+		List<DataMap> saveItemList = new ArrayList<DataMap>();
+		List saveTaskkyList = new ArrayList<>();
+		List<DataMap> taskkyList = new ArrayList<DataMap>();
+				
+		String stdTaskky = map.getString("TASKKY");
+		String stdTaskit = map.getString("TASKIT");
+		String stdShpoky = map.getString("SHPOKY");
+		String stdShpoit = map.getString("SHPOIT");
+		String stdLocaky = map.getString("LOCAKY");
+		
+		DataMap HeadRowMap = new DataMap();
+
+		int count = 1;
+		String shpmty="";
+		String svbeln = "";
+		String sposnr = "";
+		String stknum = "";
+		String stpnum = "";
+		String ssornu = "";
+		String ssorit = "";
+				
+		DataMap rowTot = new DataMap();
+		
+		DataMap rsRowMap = new DataMap();
+		DataMap rsMap = new DataMap();
+		DataMap rqMap = new DataMap();
+		
+		SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+		String date = fmDate.format(new Date());
+		SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+		String time = fmTime.format(new Date());	
+		
+		boolean insFlag = false;						
+		
+		
+		//SHPDH I/F CHECK 
+		for(int j=0;j<headList.size();j++){
+				rsRowMap = headList.get(j).getMap("map");
+				rsMap.setModuleCommand("WmsTask_COPY", "VALIDATION_SHPDH");
+				rsMap.put("SHPOKY", rsRowMap.get("SHPOKY"));
+				rqMap = commonDao.getMap(rsMap);
+				
+				if(rqMap != null && !rqMap.getString("SHPOKY").equals(" ")) {
+					rsMap.put("SHPOKY", rqMap.getString("SHPOKY"));
+					
+					return rsMap;
+				}
+				
+		}
+		
+		  DataMap rsRowsMap = new DataMap();
+	      DataMap taskRowMap = new DataMap();
+	      
+	      List<DataMap> headsList = map.getList("head");
+	      
+	      //2.TASK 정보 조회
+	      map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+	      List<DataMap> taskList = commonDao.getList(map);
+	      
+	      
+            
+   		 
+	      double pikQty = 0;
+	      double taskPikQty = 0;
+	      
+	      double totalQttoar = Double.valueOf(map.getString("TOTQTTAOR").replace(",", ""));
+	      double totalQtcomp = Double.valueOf(map.getString("TOTQTTAOR").replace(",", ""));
+	      double sumTotalQtcomp = 0;
+	      
+	      boolean delFlag = false;
+	      boolean cancelFlag = false;
+	      	      
+	      
+	      for(int j=0;j<headList.size();j++) {
+	         rsRowMap = headList.get(j).getMap("map");
+	         
+	         pikQty = Double.valueOf(rsRowMap.getString("QTCOMP").replace(",", ""));
+	         double totpikQty = pikQty;
+	         
+	         delFlag = true;
+	         boolean sameTaskkyFlag = false;
+	         
+	         for(int i=0; i<taskList.size(); i++) {
+	            taskRowMap = taskList.get(i).getMap("map");
+	            	            	            	            	   
+	            for(int z=0; z < saveTaskkyList.size(); z++) {
+	            	
+	            	if(taskRowMap.getString("TASKKY").equals(saveTaskkyList.get(z))) {
+	            		sameTaskkyFlag = true;
+	            	}
+	            }	            	            	
+	            
+	            
+	            if( rsRowMap.getString("LOTA14").equals(taskRowMap.getString("LOTA14"))
+	               && rsRowMap.getString("SKUKEY").equals(taskRowMap.getString("SKUKEY"))
+	               && rsRowMap.getString("LOCAKY").equals(taskRowMap.getString("LOCASR"))   
+	               ) {
+	               
+	            	
+	            	
+	               delFlag = false;
+	               
+	               if(sameTaskkyFlag) {
+	            	    sameTaskkyFlag = false;
+	            		continue;
+	            	}	              
+	               
+	               if(totpikQty <= 0) {
+	            	   continue;
+	               }	               	             
+
+	               
+	               if(Double.valueOf(taskRowMap.getString("QTTAOR").replace(",", "")) > 0) {
+	                  if(pikQty > Double.valueOf(taskRowMap.getString("QTTAOR").replace(",", ""))) {
+	                     pikQty = pikQty - Double.valueOf(taskRowMap.getString("QTTAOR").replace(",", ""));
+	                     taskPikQty = Double.valueOf(taskRowMap.getString("QTTAOR").replace(",", ""));
+	                  }else {
+	                     taskPikQty = pikQty;
+	                  }
+	               }else {
+	                  //taskPikQty = pikQty;
+	            	   taskPikQty =  Double.valueOf(taskRowMap.getString("QTCOMP").replace(",", ""));
+	               }
+	               
+	               
+	               totpikQty    -= taskPikQty; 
+	               sumTotalQtcomp += taskPikQty;
+	               
+	               // update task : taskPikQty	            
+	               
+	               if(Double.parseDouble(taskRowMap.getString("QTTAOR").replace(",", "")) <= 0) {
+	            	   
+	            	   //지시외 추가건 피킹수량 변경
+		               if(Double.parseDouble(taskRowMap.getString("QTCOMP").replace(",", "")) != 0) {
+		            	   saveTaskkyList.add(taskRowMap.getString("TASKKY"));	    		            	   
+		            	 //오더건 피킹수량 변경
+//						   taskRowMap.put("QTCOMP", pikQty);
+//			               taskRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+//						   commonDao.update(taskRowMap);
+		            	   
+		            	   //피킹취소
+//		            	   taskRowMap.setModuleCommand("WmsOutbound_COPY", "CALL_PICKING_CANCEL_PROC_DL06");
+//		            	   taskRowMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+//		            	   taskRowMap.put("OLDLOC", "V");
+//						   commonDao.getMap(taskRowMap);
+		            	   			            	  
+						   
+						   
+						// 재고 셀렉트 
+							  map.setModuleCommand("WmsOutbound_COPY","TASK_AVAILABLE_STOCK");
+							  map.put("BARCOD", taskRowMap.get("LOTA14")); 
+							  map.put("OWNRKY", taskRowMap.get("OWNRKY")); 
+							  map.put("WAREKY", taskRowMap.get("WAREKY")); 
+							  map.put("AREAKY", taskRowMap.get("AREAKY"));
+							  map.put("LOCAKY", taskRowMap.get("LOCAKY"));
+							  map.put("SKUKEY", taskRowMap.get("SKUKEY"));
+							  map.put("TRNUID", taskRowMap.get("TRNUID"));
+							  map.put("PACKID", taskRowMap.get("PACKID"));
+							  map.put("LOTNUM", taskRowMap.get("LOTNUM"));
+							  //map.put("STOKKY", taskRowMap.get("STOKKY"));
+							  map.put("SHPMTY", "200");							  			  			  
+							  
+							  map.put("TASKKY", taskRowMap.get("TASKKY"));
+							  map.put("TASKIT", taskRowMap.get("TASKIT"));
+							  
+							  List<DataMap> stockMapList = commonDao.getList(map);
+							  
+							  taskRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+							   commonDao.delete(taskRowMap);   
+							   
+							   taskRowMap.put("QTCOMP", pikQty);
+							   
+							 map.put("TASKKY", taskRowMap.get("TASKKY"));
+							 map.put("SHPOKY", taskRowMap.get("SHPOKY")); 
+							  
+							 map.setModuleCommand("WmsOutbound_COPY", "SEARCHMAXTASDH");
+								
+							 map.put("WAREKY", taskRowMap.get("WAREKY"));
+								
+							 List<DataMap> tasdhList = commonDao.getList(map);
+								
+							  
+//							 int taskit = Integer.parseInt(tasdhList.get(0).getString("TASKIT"));
+//							  
+//							  	 taskit += 10;
+							  
+							  	
+							  	
+							 for(int r = 0; r < stockMapList.size(); r++) {
+								 	
+								 taskRowMap.put("QTCOMP", stockMapList.get(r).get("QTSALO")); 	 
+								 taskRowMap.put("QTTAOR", 0); 
+								  	
+							  map.put("TASKIT", taskRowMap.get("TASKIT"));
+							  map.put("TASKTY", "PK"); 
+							  map.put("RSNCOD", "330"); 
+							  map.put("STATIT", "NEW");
+							  map.put("QTTAOR", 0); 
+							  map.put("QTCOMP", stockMapList.get(r).get("QTSALO")); 
+							  map.put("OWNRKY", stockMapList.get(r).get("OWNRKY")); 
+							  map.put("SKUKEY", stockMapList.get(r).get("SKUKEY")); 
+							  map.put("LOTNUM", stockMapList.get(r).get("LOTNUM"));
+							  map.put("ACTCDT", "000000");
+							  map.put("ACTCTI", "000000");
+							  map.put("QTYUOM", stockMapList.get(r).get("QTSALO"));
+							  map.put("TKFLKY", " "); 
+							  map.put("STEPNO", " ");
+							  map.put("LSTTFL", " ");
+							  
+							  map.put("LOCASR", stockMapList.get(r).get("LOCAKY"));
+							  map.put("SECTSR", stockMapList.get(r).get("SECTID")); 
+							  map.put("PAIDSR", stockMapList.get(r).get("PACKID")); 
+							  map.put("TRNUSR", stockMapList.get(r).get("TRNUID"));
+							  map.put("STRUTY", stockMapList.get(r).get("TRUNTY"));
+							  map.put("SMEAKY", stockMapList.get(r).get("MEASKY"));
+							  map.put("SUOMKY", stockMapList.get(r).get("UOMKEY"));
+							  map.put("QTSPUM", stockMapList.get(r).get("QTPUOM")); 
+							  map.put("SDUOKY", stockMapList.get(r).get("DUOMKY"));
+							  map.put("QTSDUM", stockMapList.get(r).get("QTDUOM"));
+							  
+							  map.put("LOCATG", "SHPLOC");
+								map.put("SECTTG", stockMapList.get(r).get("SECTID"));
+								map.put("PAIDTG", stockMapList.get(r).get("PACKID"));
+								map.put("TRNUTG", stockMapList.get(r).get("TRNUID"));
+								map.put("TTRUTY", stockMapList.get(r).get("TRUNTY"));
+								map.put("TMEAKY", stockMapList.get(r).get("MEASKY"));
+								map.put("TUOMKY", stockMapList.get(r).get("UOMKEY"));
+								map.put("QTTPUM", stockMapList.get(r).get("QTPUOM"));
+								map.put("TDUOKY", stockMapList.get(r).get("DUOMKY"));
+								map.put("QTTDUM", stockMapList.get(r).get("QTDUOM"));
+								
+								map.put("LOCAAC", "SHPLOC");  
+								map.put("SECTAC", stockMapList.get(r).get("SECTID"));  
+								map.put("PAIDAC", stockMapList.get(r).get("PACKID"));  
+								map.put("TRNUAC", stockMapList.get(r).get("TRNUID"));  
+								map.put("ATRUTY", stockMapList.get(r).get("TRUNTY"));  
+								map.put("AMEAKY", stockMapList.get(r).get("MEASKY"));  
+								map.put("AUOMKY", stockMapList.get(r).get("UOMKEY"));  
+								map.put("QTAPUM", stockMapList.get(r).get("QTPUOM"));  
+								map.put("ADUOKY", stockMapList.get(r).get("DUOMKY"));  
+								map.put("QTADUM", stockMapList.get(r).get("QTDUOM"));  
+								map.put("REFDKY", stockMapList.get(r).get("REFDKY"));
+								map.put("REFDIT", stockMapList.get(r).get("REFDIT"));
+								map.put("REFCAT", "200");
+								map.put("REFDAT", date);
+								map.put("PURCKY", stockMapList.get(r).get("PURCKY"));
+								map.put("PURCIT", stockMapList.get(r).get("PURCIT"));
+								map.put("ASNDKY", stockMapList.get(r).get("ASNDKY"));
+								map.put("ASNDIT", stockMapList.get(r).get("ASNDIT"));
+								map.put("RECVKY", stockMapList.get(r).get("RECVKY"));
+								map.put("RECVIT", stockMapList.get(r).get("RECVIT"));
+								map.put("SHPOKY", taskRowMap.get("SHPOKY"));
+								map.put("SHPOIT", taskRowMap.get("SHPOIT"));
+								map.put("GRPOKY", " ");
+								map.put("GRPOIT", " ");
+								map.put("SADJKY", stockMapList.get(r).get("SADJKY"));
+								map.put("SADJIT", stockMapList.get(r).get("SADJIT"));
+								map.put("SDIFKY", " ");
+								map.put("SDIFIT", " ");
+								map.put("PHYIKY", stockMapList.get(r).get("PHYIKY"));
+								map.put("PHYIIT", stockMapList.get(r).get("PHYIIT"));
+								map.put("DROPID", " ");
+								map.put("DESC01", stockMapList.get(r).get("DESC01"));
+								map.put("DESC02", stockMapList.get(r).get("DESC02"));
+								map.put("ASKU01", taskRowMap.get("ASKU01"));
+								map.put("ASKU02", stockMapList.get(r).get("ASKU02"));
+								map.put("ASKU03", stockMapList.get(r).get("ASKU03"));
+								map.put("ASKU04", stockMapList.get(r).get("ASKU04"));
+								map.put("ASKU05", stockMapList.get(r).get("ASKU05"));
+								map.put("EANCOD", stockMapList.get(r).get("EANCOD"));
+								map.put("GTINCD", stockMapList.get(r).get("GTINCD"));
+								map.put("SKUG01", stockMapList.get(r).get("SKUG01"));
+								map.put("SKUG02", stockMapList.get(r).get("SKUG02"));
+								map.put("SKUG03", stockMapList.get(r).get("SKUG03"));
+								map.put("SKUG04", stockMapList.get(r).get("SKUG04"));
+								map.put("SKUG05", stockMapList.get(r).get("SKUG05"));
+								map.put("GRSWGT", stockMapList.get(r).get("GRSWGT"));
+								map.put("NETWGT", stockMapList.get(r).get("NETWGT"));
+								map.put("WGTUNT", stockMapList.get(r).get("WGTUNT"));
+								map.put("LENGTH", stockMapList.get(r).get("LENGTH"));
+								map.put("WIDTHW", stockMapList.get(r).get("WIDTHW"));
+								map.put("HEIGHT", stockMapList.get(r).get("HEIGHT"));
+								map.put("CUBICM", stockMapList.get(r).get("CUBICM"));
+								map.put("CAPACT", stockMapList.get(r).get("CAPACT"));
+								map.put("WORKID", " ");
+								map.put("WORKNM", " ");
+								map.put("HHTTID", " ");
+								map.put("AREAKY", stockMapList.get(r).get("AREAKY"));
+								map.put("LOTA01", stockMapList.get(r).get("LOTA01"));
+								map.put("LOTA02", stockMapList.get(r).get("LOTA02"));
+								map.put("LOTA03", stockMapList.get(r).get("LOTA03"));
+								map.put("LOTA04", stockMapList.get(r).get("LOTA04"));
+								map.put("LOTA05", stockMapList.get(r).get("LOTA05"));
+								map.put("LOTA06", stockMapList.get(r).get("LOTA06"));
+								map.put("LOTA07", stockMapList.get(r).get("LOTA07"));
+								map.put("LOTA08", stockMapList.get(r).get("LOTA08"));
+								map.put("LOTA09", stockMapList.get(r).get("LOTA09"));
+								map.put("LOTA10", stockMapList.get(r).get("LOTA10"));
+								map.put("LOTA11", stockMapList.get(r).get("LOTA11"));
+								map.put("LOTA12", stockMapList.get(r).get("LOTA12"));
+								map.put("LOTA13", stockMapList.get(r).get("LOTA13"));
+								map.put("LOTA14", stockMapList.get(r).get("LOTA14"));
+								map.put("LOTA15", stockMapList.get(r).get("LOTA15"));
+								map.put("LOTA16", stockMapList.get(r).get("LOTA16"));
+								map.put("LOTA17", stockMapList.get(r).get("LOTA17"));
+								map.put("LOTA18", stockMapList.get(r).get("LOTA18"));
+								map.put("LOTA19", stockMapList.get(r).get("LOTA19"));
+								map.put("LOTA20", stockMapList.get(r).get("LOTA20"));
+								map.put("AWMSNO", " ");
+								map.put("AWMSTS", " ");
+								map.put("SMANDT", stockMapList.get(r).get("SMANDT"));
+								map.put("SEBELN", stockMapList.get(r).get("SEBELN"));
+								map.put("SEBELP", stockMapList.get(r).get("SEBELP"));
+								map.put("SZMBLNO",stockMapList.get(r).get("SZMBLNO"));
+								map.put("SZMIPNO",stockMapList.get(r).get("SZMIPNO"));
+								map.put("STRAID", stockMapList.get(r).get("STRAID"));
+								map.put("SVBELN", taskRowMap.get("SVBELN"));
+								map.put("SPOSNR", taskRowMap.get("SPOSNR"));
+								map.put("STPNUM", stpnum);
+								map.put("SWERKS", stockMapList.get(r).get("SWERKS"));
+								map.put("SLGORT", stockMapList.get(r).get("SLGORT"));
+								map.put("SDATBG", stockMapList.get(r).get("SDATBG"));
+								map.put("STDLNR", stockMapList.get(r).get("STDLNR"));
+								map.put("SSORNU", taskRowMap.get("SVBELN")); 
+								map.put("SSORIT", taskRowMap.get("SPOSNR")); 
+								map.put("SMBLNR", stockMapList.get(r).get("SMBLNR"));
+								map.put("SZEILE", stockMapList.get(r).get("SZEILE"));
+								map.put("SMJAHR", stockMapList.get(r).get("SMJAHR"));
+								map.put("SXBLNR", stockMapList.get(r).get("SXBLNR"));
+								map.put("SAPSTS", stockMapList.get(r).get("SAPSTS"));
+								 
+								map.put("DOORKY", " ");
+								map.put("PTLT01", stockMapList.get(r).get("LOTA01"));
+								map.put("PTLT02", stockMapList.get(r).get("LOTA02"));
+								map.put("PTLT03", stockMapList.get(r).get("LOTA03"));
+								map.put("PTLT04", stockMapList.get(r).get("LOTA04"));
+								map.put("PTLT05", stockMapList.get(r).get("LOTA05"));
+								map.put("PTLT06", stockMapList.get(r).get("LOTA06"));
+								map.put("PTLT07", stockMapList.get(r).get("LOTA07"));
+								map.put("PTLT08", stockMapList.get(r).get("LOTA08"));
+								map.put("PTLT09", stockMapList.get(r).get("LOTA09"));
+								map.put("PTLT10", stockMapList.get(r).get("LOTA10"));
+								map.put("PTLT11", stockMapList.get(r).get("LOTA11"));
+								map.put("PTLT12", stockMapList.get(r).get("LOTA12"));
+								map.put("PTLT13", stockMapList.get(r).get("LOTA13"));
+								map.put("PTLT14", stockMapList.get(r).get("LOTA14"));
+								map.put("PTLT15", stockMapList.get(r).get("LOTA15"));
+								map.put("PTLT16", stockMapList.get(r).get("LOTA16"));
+								map.put("PTLT17", stockMapList.get(r).get("LOTA17"));
+								map.put("PTLT18", stockMapList.get(r).get("LOTA18"));
+								map.put("PTLT19", stockMapList.get(r).get("LOTA19"));
+								map.put("PTLT20", stockMapList.get(r).get("LOTA20"));
+								map.put("PASTKY", " ");
+								map.put("ALSTKY", " ");
+								map.put("SBKTXT", " ");
+								map.put("TASRSN", " ");
+								map.put("CREDAT", date);
+								map.put("CRETIM", time);
+								map.put("CREUSR", CommonConfig.SES_USER_ID_KEY);
+								map.put("LMODAT", date);
+								map.put("LMOTIM", time);
+								map.put("LMOUSR", CommonConfig.SES_USER_ID_KEY);
+								map.put("INDBZL", " ");
+								map.put("INDARC", " ");
+								map.put("UPDCHK", "0");
+								map.put("STKNUM", stockMapList.get(r).get("STKNUM"));
+								
+							
+						   map.setModuleCommand("WmsOutbound_COPY", "TASDI");
+						   commonDao.insert(map);
+						   						   
+						   //map.put("STOKKY", stockMapList.get(r).get("STOKKY"));
+						   taskRowMap.put("STOKKY", "%");
+						   commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", taskRowMap);
+						   
+						   pikQty -= Double.parseDouble(taskRowMap.getString("QTCOMP").replace(",", ""));
+							 }
+		               }
+		               
+						 continue;
+						 
+				   }else {
+					   //오더건 피킹수량 변경
+					   taskRowMap.put("QTCOMP", taskPikQty);
+		               taskRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+					   commonDao.update(taskRowMap);
+				   }
+	               	               
+	            }
+	         }
+	         
+	         if(delFlag == true) {
+	        	 cancelFlag = true;
+	         }
+	      }
+	      
+	      
+	      if(totalQttoar == sumTotalQtcomp) {
+	    	    map.put("LOCAKY", stdLocaky);
+       	   		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_PDA_PICKING");
+				commonDao.getMap(map);		
+          }else{
+        	  
+        	  	String Msg = "";
+        	  	
+				TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+				
+				if(cancelFlag == false) {
+					Msg ="OUT_M0236"; //전체 피킹수량과 전체 지시수량이 맞지 않습니다.
+				}else {
+					Msg ="OUT_M0240"; //피킹내역이 취소되어 완료할수 없습니다.
+				}
+				
+				rsMap.put("SEND_MSG", Msg);
+				
+				return rsMap;
+         }
+         
+			
+	      
+			
+		//2.TASK 정보 조회
+//		 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02");
+//		 realList = commonDao.getList(map);
+		 
+//		 boolean chkEtcOrd = false;
+//		 
+//		 for(DataMap chkMap : realList) {
+//			 
+//			 if(!chkMap.getString("ASKU01").equals(" ")) {
+//				 
+//				 chkEtcOrd = true;
+//			 }
+//			 
+//		 }
+//	 
+//	     boolean chkEtcOrd = false;
+//		 if(chkEtcOrd) {
+//			
+//			//2.TASK 정보 조회
+//			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKINFO");
+//			 saveItemList = commonDao.getList(map);
+//			 
+//			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKKY");
+//			 taskkyList = commonDao.getList(map);
+//			 
+//			 for(DataMap saveRow : saveItemList) {
+//			 
+//				DataMap row = new DataMap();
+//				List<DataMap> rowList = new ArrayList<DataMap>();
+//				
+//				row.put("TASKKY", saveRow.get("TASKKY"));
+//				row.put("TASKIT", saveRow.get("TASKIT"));
+//				
+//				row.put("WAREKY", map.get("WAREKY"));
+//				row.put("PLNTKY", map.get("PLNTKY"));				
+//				row.put("STKNUM", map.get("STKNUM"));
+//				row.put("DPTNKY", map.get("DPTNKY"));
+//				row.put("LOCAKY", map.get("LOCAKY"));
+//				row.put("SKUKEY", map.get("SKUKEY"));
+//				
+//				row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+//				rowList = commonDao.getList(row);
+//				
+//				for(DataMap tasdiInfo : rowList) {
+//					
+//					//기존 TASDI 작업 삭제
+//					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+//					commonDao.delete(tasdiInfo);
+//					
+//					tasdiInfo.put("STATIT","FPC"); //적치 컨펌시는  TG값에 AC 값을 넣음  (수량/지번/ID)
+//					tasdiInfo.put("QTCOMP", tasdiInfo.get("QTTAOR"));
+//					tasdiInfo.put("LOCAAC", tasdiInfo.get("LOCATG"));
+//					tasdiInfo.put("TRNUAC", tasdiInfo.get("TRNUTG"));
+//					tasdiInfo.put("SECTAC", tasdiInfo.get("SECTTG"));
+//					tasdiInfo.put("PAIDAC", tasdiInfo.get("PAIDTG"));
+//					tasdiInfo.put("ATRUTY", tasdiInfo.get("TTRUTY"));
+//					tasdiInfo.put("AMEAKY", tasdiInfo.get("TMEAKY"));
+//					tasdiInfo.put("AUOMKY", tasdiInfo.get("TUOMKY"));
+//					tasdiInfo.put("QTAPUM", tasdiInfo.get("QTTPUM"));
+//					tasdiInfo.put("ADUOKY", tasdiInfo.get("TDUOKY"));
+//					tasdiInfo.put("QTADUM", tasdiInfo.get("QTTDUM"));
+//					
+//					tasdiInfo.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+//					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIEND");
+//					commonDao.insert(tasdiInfo);
+//
+//					/*  Tasdr 인써트 */
+//					tasdiInfo.put("STOKKY", "%");
+//					commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", tasdiInfo);
+//							
+//					
+//					
+//					 if(Double.parseDouble(tasdiInfo.getString("QTCOMP")) <= 0 || Double.parseDouble(tasdiInfo.getString("QTTAOR")) <= 0) {
+//						 continue;
+//					 }else {						 						 
+//						 
+//						 tasdiInfo.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+//						 commonDao.update(tasdiInfo);
+//					 }
+//					 				
+//				}
+//				
+//				
+//				
+//			 }
+//			 
+//			 for(DataMap taskkyMap : taskkyList){
+//				 rowTot.put("TASKKY", taskkyMap.get("TASKKY"));
+//				 rowTot.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));	
+//				 rowTot.setModuleCommand("WmsTask_COPY", "CALL_BATCH_PKTOT");
+//				 commonDao.getMap(rowTot);
+//				 
+//			}
+//			 
+//			
+//				 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_PDA_PICKING");
+//				 commonDao.getMap(map);				 						
+//	
+			
+//		 }else {
+//			 
+//			//2.TASK 정보 조회
+//			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKINFO");
+//			 saveItemList = commonDao.getList(map);
+//			 
+//			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKKY");
+//			 taskkyList = commonDao.getList(map);
+//			 
+//			 for(DataMap saveRow : saveItemList) {
+//			 
+//				DataMap row = new DataMap();
+//				List<DataMap> rowList = new ArrayList<DataMap>();
+//				
+//				row.put("TASKKY", saveRow.get("TASKKY"));
+//				row.put("TASKIT", saveRow.get("TASKIT"));
+//				
+//				row.put("WAREKY", map.get("WAREKY"));
+//				row.put("PLNTKY", map.get("PLNTKY"));				
+//				row.put("STKNUM", map.get("STKNUM"));
+//				row.put("DPTNKY", map.get("DPTNKY"));
+//				row.put("LOCAKY", map.get("LOCAKY"));
+//				row.put("SKUKEY", map.get("SKUKEY"));
+//				
+//				row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+//				rowList = commonDao.getList(row);
+//				
+//				for(DataMap tasdiInfo : rowList) {
+//					
+//					//기존 TASDI 작업 삭제
+//					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+//					commonDao.delete(tasdiInfo);
+//					
+//					tasdiInfo.put("STATIT","FPC"); //적치 컨펌시는  TG값에 AC 값을 넣음  (수량/지번/ID)
+//					tasdiInfo.put("QTCOMP", tasdiInfo.get("QTTAOR"));
+//					tasdiInfo.put("LOCAAC", tasdiInfo.get("LOCATG"));
+//					tasdiInfo.put("TRNUAC", tasdiInfo.get("TRNUTG"));
+//					tasdiInfo.put("SECTAC", tasdiInfo.get("SECTTG"));
+//					tasdiInfo.put("PAIDAC", tasdiInfo.get("PAIDTG"));
+//					tasdiInfo.put("ATRUTY", tasdiInfo.get("TTRUTY"));
+//					tasdiInfo.put("AMEAKY", tasdiInfo.get("TMEAKY"));
+//					tasdiInfo.put("AUOMKY", tasdiInfo.get("TUOMKY"));
+//					tasdiInfo.put("QTAPUM", tasdiInfo.get("QTTPUM"));
+//					tasdiInfo.put("ADUOKY", tasdiInfo.get("TDUOKY"));
+//					tasdiInfo.put("QTADUM", tasdiInfo.get("QTTDUM"));
+//					
+//					tasdiInfo.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+//					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIEND");
+//					commonDao.insert(tasdiInfo);
+//
+//					/*  Tasdr 인써트 */
+//					tasdiInfo.put("STOKKY", "%");
+//					commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", tasdiInfo);
+//										
+//					
+//				}
+//				
+//				
+//				
+//			 }
+//		 }
+
+		rsMap.put("CNT", count);
+		
+		return rsMap;
+	} 
+	@Transactional
+	public DataMap PDPK05SaveEnd_TEST(DataMap map) throws SQLException {
+		
+		List<DataMap> headList = map.getList("head");
+		List<DataMap> realList = new ArrayList<DataMap>();
+		
+		List<DataMap> saveItemList = new ArrayList<DataMap>();
+		List<DataMap> taskkyList = new ArrayList<DataMap>();
+				
+		String stdTaskky = map.getString("TASKKY");
+		String stdTaskit = map.getString("TASKIT");
+		String stdShpoky = map.getString("SHPOKY");
+		String stdShpoit = map.getString("SHPOIT");
+		
+		DataMap HeadRowMap = new DataMap();
+
+		int count = 1;
+		String shpmty="";
+		String svbeln = "";
+		String sposnr = "";
+		String stknum = "";
+		String stpnum = "";
+		String ssornu = "";
+		String ssorit = "";
+				
+		DataMap rowTot = new DataMap();
+		
+		DataMap rsRowMap = new DataMap();
+		DataMap rsMap = new DataMap();
+		DataMap rqMap = new DataMap();
+		
+		SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+		String date = fmDate.format(new Date());
+		SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+		String time = fmTime.format(new Date());	
+		
+		boolean insFlag = false;						
+		
+		
+		//SHPDH I/F CHECK 
+		for(int j=0;j<headList.size();j++){
+				rsRowMap = headList.get(j).getMap("map");
+				rsMap.setModuleCommand("WmsTask_COPY", "VALIDATION_SHPDH");
+				rsMap.put("SHPOKY", rsRowMap.get("SHPOKY"));
+				rqMap = commonDao.getMap(rsMap);
+				
+				if(rqMap != null && !rqMap.getString("SHPOKY").equals(" ")) {
+					rsMap.put("SHPOKY", rqMap.getString("SHPOKY"));
+					
+					return rsMap;
+				}
+				
+		}
+			
+		//2.TASK 정보 조회
+		 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02");
+		 realList = commonDao.getList(map);
+		 
+		 if(realList.size() == headList.size()) {
+			
+			//2.TASK 정보 조회
+			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKINFO");
+			 saveItemList = commonDao.getList(map);
+			 
+			 map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL02_TASKKY");
+			 taskkyList = commonDao.getList(map);
+			 
+			 for(DataMap saveRow : saveItemList) {
+			 
+				DataMap row = new DataMap();
+				List<DataMap> rowList = new ArrayList<DataMap>();
+				
+				row.put("TASKKY", saveRow.get("TASKKY"));
+				row.put("TASKIT", saveRow.get("TASKIT"));
+				
+				row.put("WAREKY", map.get("WAREKY"));
+				row.put("PLNTKY", map.get("PLNTKY"));				
+				row.put("STKNUM", map.get("STKNUM"));
+				row.put("DPTNKY", map.get("DPTNKY"));
+				row.put("LOCAKY", map.get("LOCAKY"));
+				row.put("SKUKEY", map.get("SKUKEY"));
+				
+				row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+				rowList = commonDao.getList(row);
+				
+				for(DataMap tasdiInfo : rowList) {
+					
+					//기존 TASDI 작업 삭제
+					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+//					commonDao.delete(tasdiInfo);
+					
+					tasdiInfo.put("STATIT","FPC"); //적치 컨펌시는  TG값에 AC 값을 넣음  (수량/지번/ID)
+					tasdiInfo.put("QTCOMP", tasdiInfo.get("QTTAOR"));
+					tasdiInfo.put("LOCAAC", tasdiInfo.get("LOCATG"));
+					tasdiInfo.put("TRNUAC", tasdiInfo.get("TRNUTG"));
+					tasdiInfo.put("SECTAC", tasdiInfo.get("SECTTG"));
+					tasdiInfo.put("PAIDAC", tasdiInfo.get("PAIDTG"));
+					tasdiInfo.put("ATRUTY", tasdiInfo.get("TTRUTY"));
+					tasdiInfo.put("AMEAKY", tasdiInfo.get("TMEAKY"));
+					tasdiInfo.put("AUOMKY", tasdiInfo.get("TUOMKY"));
+					tasdiInfo.put("QTAPUM", tasdiInfo.get("QTTPUM"));
+					tasdiInfo.put("ADUOKY", tasdiInfo.get("TDUOKY"));
+					tasdiInfo.put("QTADUM", tasdiInfo.get("QTTDUM"));
+					
+					tasdiInfo.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+					tasdiInfo.setModuleCommand("WmsTask_COPY", "TASDIEND");
+//					commonDao.insert(tasdiInfo);
+
+					/*  Tasdr 인써트 */
+					tasdiInfo.put("STOKKY", "%");
+//					commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", tasdiInfo);
+					
+					if(Double.parseDouble(tasdiInfo.getString("QTCOMP")) <= 0) {
+						 continue;
+					 }else {
+						 
+						 tasdiInfo.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+						 commonDao.update(tasdiInfo);
+					 }
+					
+				}
+				
+				
+				
+			 }
+			 
+//			 for(DataMap taskkyMap : taskkyList){
+//				 rowTot.put("TASKKY", taskkyMap.get("TASKKY"));
+//				 rowTot.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));	
+//				 rowTot.setModuleCommand("WmsTask_COPY", "CALL_BATCH_PKTOT");
+//				 commonDao.getMap(rowTot);
+//				 
+//			}
+			 
+//			 for(DataMap realListMap : headList) {
+//				 
+//				 if(Double.parseDouble(realListMap.getString("QTCOMP")) <= 0) {
+//					 continue;
+//				 }else {
+//					 
+//					 realListMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DETAIL");
+//					 commonDao.update(realListMap);
+//				 }
+//			 }
+			 
+			
+		 }
+		 
+		 
+		 
+		 
+		 
+//		for(int m=0; m< headList.size(); m++) {
+//			
+//			
+//			
+//			
+//			
+//			
+//			
+//			 
+//			  
+//			HeadRowMap = headList.get(m).getMap("map");
+//						
+//			
+//			String shpoky = HeadRowMap.getString("SHPOKY");
+//			String shpoit = HeadRowMap.getString("SHPOIT");
+//			String taskkyHead = HeadRowMap.getString("TASKKY");
+//			String taskitHead = HeadRowMap.getString("TASKIT");
+//			Double qty = Double.parseDouble((String)HeadRowMap.get("QTTAOR")); 
+//			Double qttaor = Double.parseDouble((String)HeadRowMap.get("QTTAOR"));
+//			Double qtcomp = Double.parseDouble((String)HeadRowMap.get("QTCOMP"));				
+//			
+//					
+//					if(qtcomp == 0) { continue; }
+//					
+//					
+//					  		
+//			map.put("SHPOKY", shpoky);
+//			map.put("SHPOIT", shpoit);
+//			
+//			
+//				rowTot.put("TASKKY", taskkyHead);
+//				rowTot.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));																							
+//
+//				// 1. SHPDH, SHPDI, TASDI 정보 조회
+//				HeadRowMap.setModuleCommand("WmsOutbound_COPY", "SEARCHSHPDH");
+//				DataMap shpdhMap = commonDao.getMap(HeadRowMap);
+//				HeadRowMap.setModuleCommand("WmsOutbound_COPY", "SEARCHSHPDI");
+//				DataMap shpdiMap = commonDao.getMap(HeadRowMap);
+//				
+//				 svbeln = shpdiMap.getString("SVBELN");
+//				 sposnr = shpdiMap.getString("SPOSNR");
+//				 stknum = shpdiMap.getString("STKNUM");
+//				 stpnum = shpdiMap.getString("STPNUM");
+//				 ssornu = shpdiMap.getString("SSORNU");
+//				 ssorit = shpdiMap.getString("SSORIT");								
+//				
+//				//2.TASK 정보 조회
+//				 HeadRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+//				 saveItemList = commonDao.getList(HeadRowMap);
+//				 
+//				
+//				//3.재고 셀렉트					
+//				map.setModuleCommand("WmsOutbound_COPY", "PICKING_STOCK");			
+//				
+//				map.put("BARCOD", HeadRowMap.getString("LOTA14"));
+//				map.put("OWNRKY", saveItemList.get(0).get("OWNRKY"));
+//				map.put("WAREKY", saveItemList.get(0).get("WAREKY"));
+//				map.put("AREAKY", saveItemList.get(0).get("AREAKY"));
+//				map.put("LOCAKY", HeadRowMap.get("LOCAKY"));
+//				map.put("SKUKEY", saveItemList.get(0).get("SKUKEY"));
+//				map.put("TRNUID", HeadRowMap.get("TRNUID"));
+//				map.put("PACKID", HeadRowMap.get("PACKID"));
+//				map.put("LOTNUM", saveItemList.get(0).get("LOTNUM"));
+//				map.put("SHPMTY", shpdhMap.get("SHPMTY"));
+//				map.put("STOKKY", saveItemList.get(0).get("STOKKY"));
+//				
+//				
+//				
+//				List<DataMap> stockMapList = commonDao.getList(map);
+//				
+//				/*  기존 Tasdi 삭제 */
+//				HeadRowMap.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+//				commonDao.delete(HeadRowMap);
+//				
+//				if(qttaor == qtcomp) {
+//					map.put("STATIT", "FPC");
+//				
+//				}else if(qttaor != qtcomp && qttaor !=0) {
+//					map.put("STATIT", "PPC");
+//					
+//				}else if(qttaor != qtcomp && qttaor ==0) {
+//					map.put("STATIT", "NEW");
+//					
+//				}
+//				
+//				
+//				map.put("TASKKY", HeadRowMap.getString("TASKKY"));
+//				map.put("TASKIT", HeadRowMap.getString("TASKIT"));	
+//				map.put("TASKTY", "PK");										
+//				
+//				map.put("OWNRKY", stockMapList.get(0).get("OWNRKY"));
+//				map.put("SKUKEY", stockMapList.get(0).get("SKUKEY"));
+//				map.put("LOTNUM", stockMapList.get(0).get("LOTNUM"));
+//				map.put("ACTCDT", "000000");
+//				map.put("ACTCTI", "000000");
+//				map.put("QTYUOM", qty);
+//				map.put("TKFLKY", " ");
+//				map.put("STEPNO", " ");
+//				map.put("LSTTFL", " ");
+//				map.put("QTTAOR", qttaor);
+//				map.put("QTCOMP", qtcomp);
+//				map.put("LOCASR", stockMapList.get(0).get("LOCAKY"));
+//				map.put("SECTSR", stockMapList.get(0).get("SECTID"));
+//				map.put("PAIDSR", stockMapList.get(0).get("PACKID"));
+//				map.put("TRNUSR", stockMapList.get(0).get("TRNUID"));
+//				map.put("STRUTY", stockMapList.get(0).get("TRUNTY"));
+//				map.put("SMEAKY", stockMapList.get(0).get("MEASKY"));
+//				map.put("SUOMKY", stockMapList.get(0).get("UOMKEY"));
+//				map.put("QTSPUM", stockMapList.get(0).get("QTPUOM"));
+//				map.put("SDUOKY", stockMapList.get(0).get("DUOMKY"));
+//				map.put("QTSDUM", stockMapList.get(0).get("QTDUOM"));
+//				
+//				map.put("LOCATG", stockMapList.get(0).get("LOCATG"));
+//				map.put("SECTTG", stockMapList.get(0).get("SECTID"));
+//				map.put("PAIDTG", stockMapList.get(0).get("PACKID"));
+//				map.put("TRNUTG", stockMapList.get(0).get("TRNUID"));
+//				map.put("TTRUTY", stockMapList.get(0).get("TRUNTY"));
+//				map.put("TMEAKY", stockMapList.get(0).get("MEASKY"));
+//				map.put("TUOMKY", stockMapList.get(0).get("UOMKEY"));
+//				map.put("QTTPUM", stockMapList.get(0).get("QTPUOM"));
+//				map.put("TDUOKY", stockMapList.get(0).get("DUOMKY"));
+//				map.put("QTTDUM", stockMapList.get(0).get("QTDUOM"));
+//				
+//				map.put("LOCAAC",  stockMapList.get(0).get("LOCATG"));  
+//				map.put("SECTAC",  stockMapList.get(0).get("SECTID"));  
+//				map.put("PAIDAC",  stockMapList.get(0).get("PACKID"));  
+//				map.put("TRNUAC",  stockMapList.get(0).get("TRNUID"));  
+//				map.put("ATRUTY",  stockMapList.get(0).get("TRUNTY"));  
+//				map.put("AMEAKY",  stockMapList.get(0).get("MEASKY"));  
+//				map.put("AUOMKY",  stockMapList.get(0).get("UOMKEY"));  
+//				map.put("QTAPUM",  stockMapList.get(0).get("QTPUOM"));  
+//				map.put("ADUOKY",  stockMapList.get(0).get("DUOMKY"));  
+//				map.put("QTADUM",  stockMapList.get(0).get("QTDUOM"));  
+//				map.put("REFDKY", stockMapList.get(0).get("REFDKY"));
+//				map.put("REFDIT", stockMapList.get(0).get("REFDIT"));
+//				map.put("REFCAT", "200");
+//				map.put("REFDAT", date);
+//				map.put("PURCKY", stockMapList.get(0).get("PURCKY"));
+//				map.put("PURCIT", stockMapList.get(0).get("PURCIT"));
+//				map.put("ASNDKY", stockMapList.get(0).get("ASNDKY"));
+//				map.put("ASNDIT", stockMapList.get(0).get("ASNDIT"));
+//				map.put("RECVKY", stockMapList.get(0).get("RECVKY"));
+//				map.put("RECVIT", stockMapList.get(0).get("RECVIT"));
+//				map.put("SHPOKY", shpoky);
+//				map.put("SHPOIT", shpoit);
+//				map.put("GRPOKY", " ");
+//				map.put("GRPOIT", " ");
+//				map.put("SADJKY", stockMapList.get(0).get("SADJKY"));
+//				map.put("SADJIT", stockMapList.get(0).get("SADJIT"));
+//				map.put("SDIFKY", " ");
+//				map.put("SDIFIT", " ");
+//				map.put("PHYIKY", stockMapList.get(0).get("PHYIKY"));
+//				map.put("PHYIIT", stockMapList.get(0).get("PHYIIT"));
+//				map.put("DROPID", " ");
+//				map.put("DESC01", stockMapList.get(0).get("DESC01"));
+//				map.put("DESC02", stockMapList.get(0).get("DESC02"));
+//				map.put("ASKU01", stockMapList.get(0).get("ASKU01"));
+//				map.put("ASKU02", stockMapList.get(0).get("ASKU02"));
+//				map.put("ASKU03", stockMapList.get(0).get("ASKU03"));
+//				map.put("ASKU04", stockMapList.get(0).get("ASKU04"));
+//				map.put("ASKU05", stockMapList.get(0).get("ASKU05"));
+//				map.put("EANCOD", stockMapList.get(0).get("EANCOD"));
+//				map.put("GTINCD", stockMapList.get(0).get("GTINCD"));
+//				map.put("SKUG01", stockMapList.get(0).get("SKUG01"));
+//				map.put("SKUG02", stockMapList.get(0).get("SKUG02"));
+//				map.put("SKUG03", stockMapList.get(0).get("SKUG03"));
+//				map.put("SKUG04", stockMapList.get(0).get("SKUG04"));
+//				map.put("SKUG05", stockMapList.get(0).get("SKUG05"));
+//				map.put("GRSWGT", stockMapList.get(0).get("GRSWGT"));
+//				map.put("NETWGT", stockMapList.get(0).get("NETWGT"));
+//				map.put("WGTUNT", stockMapList.get(0).get("WGTUNT"));
+//				map.put("LENGTH", stockMapList.get(0).get("LENGTH"));
+//				map.put("WIDTHW", stockMapList.get(0).get("WIDTHW"));
+//				map.put("HEIGHT", stockMapList.get(0).get("HEIGHT"));
+//				map.put("CUBICM", stockMapList.get(0).get("CUBICM"));
+//				map.put("CAPACT", stockMapList.get(0).get("CAPACT"));
+//				map.put("WORKID", " ");
+//				map.put("WORKNM", " ");
+//				map.put("HHTTID", " ");
+//				map.put("AREAKY", stockMapList.get(0).get("AREAKY"));
+//				map.put("LOTA01", stockMapList.get(0).get("LOTA01"));
+//				map.put("LOTA02", stockMapList.get(0).get("LOTA02"));
+//				map.put("LOTA03", stockMapList.get(0).get("LOTA03"));
+//				map.put("LOTA04", stockMapList.get(0).get("LOTA04"));
+//				map.put("LOTA05", stockMapList.get(0).get("LOTA05"));
+//				map.put("LOTA06", stockMapList.get(0).get("LOTA06"));
+//				map.put("LOTA07", stockMapList.get(0).get("LOTA07"));
+//				map.put("LOTA08", stockMapList.get(0).get("LOTA08"));
+//				map.put("LOTA09", stockMapList.get(0).get("LOTA09"));
+//				map.put("LOTA10", stockMapList.get(0).get("LOTA10"));
+//				map.put("LOTA11", stockMapList.get(0).get("LOTA11"));
+//				map.put("LOTA12", stockMapList.get(0).get("LOTA12"));
+//				map.put("LOTA13", stockMapList.get(0).get("LOTA13"));
+//				map.put("LOTA14", stockMapList.get(0).get("LOTA14"));
+//				map.put("LOTA15", stockMapList.get(0).get("LOTA15"));
+//				map.put("LOTA16", stockMapList.get(0).get("LOTA16"));
+//				map.put("LOTA17", stockMapList.get(0).get("LOTA17"));
+//				map.put("LOTA18", stockMapList.get(0).get("LOTA18"));
+//				map.put("LOTA19", stockMapList.get(0).get("LOTA19"));
+//				map.put("LOTA20", stockMapList.get(0).get("LOTA20"));
+//				map.put("AWMSNO", " ");
+//				map.put("AWMSTS", " ");
+//				map.put("SMANDT", stockMapList.get(0).get("SMANDT"));
+//				map.put("SEBELN", stockMapList.get(0).get("SEBELN"));
+//				map.put("SEBELP", stockMapList.get(0).get("SEBELP"));
+//				map.put("SZMBLNO",stockMapList.get(0).get("SZMBLNO"));
+//				map.put("SZMIPNO",stockMapList.get(0).get("SZMIPNO"));
+//				map.put("STRAID", stockMapList.get(0).get("STRAID"));
+//				map.put("SVBELN", svbeln);
+//				map.put("SPOSNR", sposnr);
+//				map.put("STKNUM", stknum);
+//				map.put("STPNUM", stpnum);
+//				map.put("SWERKS", stockMapList.get(0).get("SWERKS"));
+//				map.put("SLGORT", stockMapList.get(0).get("SLGORT"));
+//				map.put("SDATBG", stockMapList.get(0).get("SDATBG"));
+//				map.put("STDLNR", stockMapList.get(0).get("STDLNR"));
+//				map.put("SSORNU", ssornu);
+//				map.put("SSORIT", ssorit);
+//				map.put("SMBLNR", stockMapList.get(0).get("SMBLNR"));
+//				map.put("SZEILE", stockMapList.get(0).get("SZEILE"));
+//				map.put("SMJAHR", stockMapList.get(0).get("SMJAHR"));
+//				map.put("SXBLNR", stockMapList.get(0).get("SXBLNR"));
+//				map.put("SAPSTS", stockMapList.get(0).get("SAPSTS"));
+//				map.put("DOORKY", " ");
+//				map.put("PTLT01", stockMapList.get(0).get("LOTA01"));
+//				map.put("PTLT02", stockMapList.get(0).get("LOTA02"));
+//				map.put("PTLT03", stockMapList.get(0).get("LOTA03"));
+//				map.put("PTLT04", stockMapList.get(0).get("LOTA04"));
+//				map.put("PTLT05", stockMapList.get(0).get("LOTA05"));
+//				map.put("PTLT06", stockMapList.get(0).get("LOTA06"));
+//				map.put("PTLT07", stockMapList.get(0).get("LOTA07"));
+//				map.put("PTLT08", stockMapList.get(0).get("LOTA08"));
+//				map.put("PTLT09", stockMapList.get(0).get("LOTA09"));
+//				map.put("PTLT10", stockMapList.get(0).get("LOTA10"));
+//				map.put("PTLT11", stockMapList.get(0).get("LOTA11"));
+//				map.put("PTLT12", stockMapList.get(0).get("LOTA12"));
+//				map.put("PTLT13", stockMapList.get(0).get("LOTA13"));
+//				map.put("PTLT14", stockMapList.get(0).get("LOTA14"));
+//				map.put("PTLT15", stockMapList.get(0).get("LOTA15"));
+//				map.put("PTLT16", stockMapList.get(0).get("LOTA16"));
+//				map.put("PTLT17", stockMapList.get(0).get("LOTA17"));
+//				map.put("PTLT18", stockMapList.get(0).get("LOTA18"));
+//				map.put("PTLT19", stockMapList.get(0).get("LOTA19"));
+//				map.put("PTLT20", stockMapList.get(0).get("LOTA20"));
+//				map.put("PASTKY", " ");
+//				map.put("ALSTKY", " ");
+//				map.put("SBKTXT", " ");
+//				map.put("TASRSN", " ");
+//				map.put("CREDAT", date);
+//				map.put("CRETIM", time);
+//				map.put("CREUSR", CommonConfig.SES_USER_ID_KEY);
+//				map.put("LMODAT", date);
+//				map.put("LMOTIM", time);
+//				map.put("LMOUSR", CommonConfig.SES_USER_ID_KEY);
+//				map.put("INDBZL", " ");
+//				map.put("INDARC", " ");
+//				map.put("UPDCHK", "0");
+//									
+//				
+//				map.setModuleCommand("WmsOutbound_COPY", "TASDI");
+//				commonDao.insert(map);
+//				
+//				map.put("STOKKY", stockMapList.get(0).get("STOKKY"));
+//				map.setModuleCommand("WmsTask_COPY", "DBMSPROC_SZP_INS_TASDR");
+//				commonDao.getMap(map);
+//				commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", map);																		
+//				
+//		   }
+		
+		//rowTot.put("TASKKY", map.get("TASKKY"));
+		
+//		rowTot.setModuleCommand("WmsTask_COPY", "CALL_BATCH_PKTOT");
+//		commonDao.getMap(rowTot);
+//		
+		rsMap.put("CNT", count);
+		
+		return rsMap;
+	} 
+	
+	@Transactional
+	public DataMap PDPK05SaveEnd2(DataMap map) throws SQLException {
+		
+		List<DataMap> headList = map.getList("head");
+		List<DataMap> saveItemList = new ArrayList<DataMap>();
+				
+		String stdTaskky = map.getString("TASKKY");
+		String stdTaskit = map.getString("TASKIT");
+		String stdShpoky = map.getString("SHPOKY");
+		String stdShpoit = map.getString("SHPOIT");
+		
+		DataMap HeadRowMap = new DataMap();
+
+		int count = 1;
+		String shpmty="";
+		String svbeln = "";
+		String sposnr = "";
+		String stknum = "";
+		String stpnum = "";
+		String ssornu = "";
+		String ssorit = "";
+		
+		DataMap row;
+		DataMap rowTot = new DataMap();
+		
+		DataMap rsRowMap = new DataMap();
+		DataMap rsMap = new DataMap();
+		DataMap rqMap = new DataMap();
+		
+		SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+		String date = fmDate.format(new Date());
+		SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+		String time = fmTime.format(new Date());	
+		
+		boolean insFlag = false;						
+		
+		
+		//SHPDH I/F CHECK 
+		for(int j=0;j<headList.size();j++){
+				rsRowMap = headList.get(j).getMap("map");
+				rsMap.setModuleCommand("WmsTask_COPY", "VALIDATION_SHPDH");
+				rsMap.put("SHPOKY", rsRowMap.get("SHPOKY"));
+				rqMap = commonDao.getMap(rsMap);
+				
+				if(rqMap != null && !rqMap.getString("SHPOKY").equals(" ")) {
+					rsMap.put("SHPOKY", rqMap.getString("SHPOKY"));
+					
+					return rsMap;
+				}
+				
+		}
+			
+		
+		
+		for(int m=0; m< headList.size(); m++) {
+			
+									 
+			 
+			  
+			HeadRowMap = headList.get(m).getMap("map");
+						
+			
+			String shpoky = HeadRowMap.getString("SHPOKY");
+			String shpoit = HeadRowMap.getString("SHPOIT");
+			String taskkyHead = HeadRowMap.getString("TASKKY");
+			String taskitHead = HeadRowMap.getString("TASKIT");
+			Double qty = Double.parseDouble((String)HeadRowMap.get("QTTAOR")); 
+			Double qttaor = Double.parseDouble((String)HeadRowMap.get("QTTAOR"));
+			Double qtcomp = Double.parseDouble((String)HeadRowMap.get("QTCOMP"));				
+			
+					
+					if(qtcomp == 0) { continue; }
+					
+					
+					  		
+			map.put("SHPOKY", shpoky);
+			map.put("SHPOIT", shpoit);
+			
+			
+				rowTot.put("TASKKY", taskkyHead);
+				rowTot.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));																							
+
+				// 1. SHPDH, SHPDI, TASDI 정보 조회
+				HeadRowMap.setModuleCommand("WmsOutbound_COPY", "SEARCHSHPDH");
+				DataMap shpdhMap = commonDao.getMap(HeadRowMap);
+				HeadRowMap.setModuleCommand("WmsOutbound_COPY", "SEARCHSHPDI");
+				DataMap shpdiMap = commonDao.getMap(HeadRowMap);
+				
+				 svbeln = shpdiMap.getString("SVBELN");
+				 sposnr = shpdiMap.getString("SPOSNR");
+				 stknum = shpdiMap.getString("STKNUM");
+				 stpnum = shpdiMap.getString("STPNUM");
+				 ssornu = shpdiMap.getString("SSORNU");
+				 ssorit = shpdiMap.getString("SSORIT");								
+				
+				//2.TASK 정보 조회
+				 HeadRowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_SAVE");
+				 saveItemList = commonDao.getList(HeadRowMap);
+				 
+				
+				//3.재고 셀렉트					
+				map.setModuleCommand("WmsOutbound_COPY", "PICKING_STOCK");			
+				
+				map.put("BARCOD", HeadRowMap.getString("LOTA14"));
+				map.put("OWNRKY", saveItemList.get(0).get("OWNRKY"));
+				map.put("WAREKY", saveItemList.get(0).get("WAREKY"));
+				map.put("AREAKY", saveItemList.get(0).get("AREAKY"));
+				map.put("LOCAKY", HeadRowMap.get("LOCAKY"));
+				map.put("SKUKEY", saveItemList.get(0).get("SKUKEY"));
+				map.put("TRNUID", HeadRowMap.get("TRNUID"));
+				map.put("PACKID", HeadRowMap.get("PACKID"));
+				map.put("LOTNUM", saveItemList.get(0).get("LOTNUM"));
+				map.put("SHPMTY", shpdhMap.get("SHPMTY"));
+				map.put("STOKKY", saveItemList.get(0).get("STOKKY"));
+				
+				
+				
+				List<DataMap> stockMapList = commonDao.getList(map);
+				
+				/*  기존 Tasdi 삭제 */
+				HeadRowMap.setModuleCommand("WmsTask_COPY", "TASDIDEL");
+				commonDao.delete(HeadRowMap);
+				
+				if(qttaor == qtcomp) {
+					map.put("STATIT", "FPC");
+				
+				}else if(qttaor != qtcomp && qttaor !=0) {
+					map.put("STATIT", "PPC");
+					
+				}else if(qttaor != qtcomp && qttaor ==0) {
+					map.put("STATIT", "NEW");
+					
+				}
+				
+				
+				map.put("TASKKY", HeadRowMap.getString("TASKKY"));
+				map.put("TASKIT", HeadRowMap.getString("TASKIT"));	
+				map.put("TASKTY", "PK");										
+				
+				map.put("OWNRKY", stockMapList.get(0).get("OWNRKY"));
+				map.put("SKUKEY", stockMapList.get(0).get("SKUKEY"));
+				map.put("LOTNUM", stockMapList.get(0).get("LOTNUM"));
+				map.put("ACTCDT", "000000");
+				map.put("ACTCTI", "000000");
+				map.put("QTYUOM", qty);
+				map.put("TKFLKY", " ");
+				map.put("STEPNO", " ");
+				map.put("LSTTFL", " ");
+				map.put("QTTAOR", qttaor);
+				map.put("QTCOMP", qtcomp);
+				map.put("LOCASR", stockMapList.get(0).get("LOCAKY"));
+				map.put("SECTSR", stockMapList.get(0).get("SECTID"));
+				map.put("PAIDSR", stockMapList.get(0).get("PACKID"));
+				map.put("TRNUSR", stockMapList.get(0).get("TRNUID"));
+				map.put("STRUTY", stockMapList.get(0).get("TRUNTY"));
+				map.put("SMEAKY", stockMapList.get(0).get("MEASKY"));
+				map.put("SUOMKY", stockMapList.get(0).get("UOMKEY"));
+				map.put("QTSPUM", stockMapList.get(0).get("QTPUOM"));
+				map.put("SDUOKY", stockMapList.get(0).get("DUOMKY"));
+				map.put("QTSDUM", stockMapList.get(0).get("QTDUOM"));
+				
+				map.put("LOCATG", stockMapList.get(0).get("LOCATG"));
+				map.put("SECTTG", stockMapList.get(0).get("SECTID"));
+				map.put("PAIDTG", stockMapList.get(0).get("PACKID"));
+				map.put("TRNUTG", stockMapList.get(0).get("TRNUID"));
+				map.put("TTRUTY", stockMapList.get(0).get("TRUNTY"));
+				map.put("TMEAKY", stockMapList.get(0).get("MEASKY"));
+				map.put("TUOMKY", stockMapList.get(0).get("UOMKEY"));
+				map.put("QTTPUM", stockMapList.get(0).get("QTPUOM"));
+				map.put("TDUOKY", stockMapList.get(0).get("DUOMKY"));
+				map.put("QTTDUM", stockMapList.get(0).get("QTDUOM"));
+				
+				map.put("LOCAAC",  stockMapList.get(0).get("LOCATG"));  
+				map.put("SECTAC",  stockMapList.get(0).get("SECTID"));  
+				map.put("PAIDAC",  stockMapList.get(0).get("PACKID"));  
+				map.put("TRNUAC",  stockMapList.get(0).get("TRNUID"));  
+				map.put("ATRUTY",  stockMapList.get(0).get("TRUNTY"));  
+				map.put("AMEAKY",  stockMapList.get(0).get("MEASKY"));  
+				map.put("AUOMKY",  stockMapList.get(0).get("UOMKEY"));  
+				map.put("QTAPUM",  stockMapList.get(0).get("QTPUOM"));  
+				map.put("ADUOKY",  stockMapList.get(0).get("DUOMKY"));  
+				map.put("QTADUM",  stockMapList.get(0).get("QTDUOM"));  
+				map.put("REFDKY", stockMapList.get(0).get("REFDKY"));
+				map.put("REFDIT", stockMapList.get(0).get("REFDIT"));
+				map.put("REFCAT", "200");
+				map.put("REFDAT", date);
+				map.put("PURCKY", stockMapList.get(0).get("PURCKY"));
+				map.put("PURCIT", stockMapList.get(0).get("PURCIT"));
+				map.put("ASNDKY", stockMapList.get(0).get("ASNDKY"));
+				map.put("ASNDIT", stockMapList.get(0).get("ASNDIT"));
+				map.put("RECVKY", stockMapList.get(0).get("RECVKY"));
+				map.put("RECVIT", stockMapList.get(0).get("RECVIT"));
+				map.put("SHPOKY", shpoky);
+				map.put("SHPOIT", shpoit);
+				map.put("GRPOKY", " ");
+				map.put("GRPOIT", " ");
+				map.put("SADJKY", stockMapList.get(0).get("SADJKY"));
+				map.put("SADJIT", stockMapList.get(0).get("SADJIT"));
+				map.put("SDIFKY", " ");
+				map.put("SDIFIT", " ");
+				map.put("PHYIKY", stockMapList.get(0).get("PHYIKY"));
+				map.put("PHYIIT", stockMapList.get(0).get("PHYIIT"));
+				map.put("DROPID", " ");
+				map.put("DESC01", stockMapList.get(0).get("DESC01"));
+				map.put("DESC02", stockMapList.get(0).get("DESC02"));
+				map.put("ASKU01", stockMapList.get(0).get("ASKU01"));
+				map.put("ASKU02", stockMapList.get(0).get("ASKU02"));
+				map.put("ASKU03", stockMapList.get(0).get("ASKU03"));
+				map.put("ASKU04", stockMapList.get(0).get("ASKU04"));
+				map.put("ASKU05", stockMapList.get(0).get("ASKU05"));
+				map.put("EANCOD", stockMapList.get(0).get("EANCOD"));
+				map.put("GTINCD", stockMapList.get(0).get("GTINCD"));
+				map.put("SKUG01", stockMapList.get(0).get("SKUG01"));
+				map.put("SKUG02", stockMapList.get(0).get("SKUG02"));
+				map.put("SKUG03", stockMapList.get(0).get("SKUG03"));
+				map.put("SKUG04", stockMapList.get(0).get("SKUG04"));
+				map.put("SKUG05", stockMapList.get(0).get("SKUG05"));
+				map.put("GRSWGT", stockMapList.get(0).get("GRSWGT"));
+				map.put("NETWGT", stockMapList.get(0).get("NETWGT"));
+				map.put("WGTUNT", stockMapList.get(0).get("WGTUNT"));
+				map.put("LENGTH", stockMapList.get(0).get("LENGTH"));
+				map.put("WIDTHW", stockMapList.get(0).get("WIDTHW"));
+				map.put("HEIGHT", stockMapList.get(0).get("HEIGHT"));
+				map.put("CUBICM", stockMapList.get(0).get("CUBICM"));
+				map.put("CAPACT", stockMapList.get(0).get("CAPACT"));
+				map.put("WORKID", " ");
+				map.put("WORKNM", " ");
+				map.put("HHTTID", " ");
+				map.put("AREAKY", stockMapList.get(0).get("AREAKY"));
+				map.put("LOTA01", stockMapList.get(0).get("LOTA01"));
+				map.put("LOTA02", stockMapList.get(0).get("LOTA02"));
+				map.put("LOTA03", stockMapList.get(0).get("LOTA03"));
+				map.put("LOTA04", stockMapList.get(0).get("LOTA04"));
+				map.put("LOTA05", stockMapList.get(0).get("LOTA05"));
+				map.put("LOTA06", stockMapList.get(0).get("LOTA06"));
+				map.put("LOTA07", stockMapList.get(0).get("LOTA07"));
+				map.put("LOTA08", stockMapList.get(0).get("LOTA08"));
+				map.put("LOTA09", stockMapList.get(0).get("LOTA09"));
+				map.put("LOTA10", stockMapList.get(0).get("LOTA10"));
+				map.put("LOTA11", stockMapList.get(0).get("LOTA11"));
+				map.put("LOTA12", stockMapList.get(0).get("LOTA12"));
+				map.put("LOTA13", stockMapList.get(0).get("LOTA13"));
+				map.put("LOTA14", stockMapList.get(0).get("LOTA14"));
+				map.put("LOTA15", stockMapList.get(0).get("LOTA15"));
+				map.put("LOTA16", stockMapList.get(0).get("LOTA16"));
+				map.put("LOTA17", stockMapList.get(0).get("LOTA17"));
+				map.put("LOTA18", stockMapList.get(0).get("LOTA18"));
+				map.put("LOTA19", stockMapList.get(0).get("LOTA19"));
+				map.put("LOTA20", stockMapList.get(0).get("LOTA20"));
+				map.put("AWMSNO", " ");
+				map.put("AWMSTS", " ");
+				map.put("SMANDT", stockMapList.get(0).get("SMANDT"));
+				map.put("SEBELN", stockMapList.get(0).get("SEBELN"));
+				map.put("SEBELP", stockMapList.get(0).get("SEBELP"));
+				map.put("SZMBLNO",stockMapList.get(0).get("SZMBLNO"));
+				map.put("SZMIPNO",stockMapList.get(0).get("SZMIPNO"));
+				map.put("STRAID", stockMapList.get(0).get("STRAID"));
+				map.put("SVBELN", svbeln);
+				map.put("SPOSNR", sposnr);
+				map.put("STKNUM", stknum);
+				map.put("STPNUM", stpnum);
+				map.put("SWERKS", stockMapList.get(0).get("SWERKS"));
+				map.put("SLGORT", stockMapList.get(0).get("SLGORT"));
+				map.put("SDATBG", stockMapList.get(0).get("SDATBG"));
+				map.put("STDLNR", stockMapList.get(0).get("STDLNR"));
+				map.put("SSORNU", ssornu);
+				map.put("SSORIT", ssorit);
+				map.put("SMBLNR", stockMapList.get(0).get("SMBLNR"));
+				map.put("SZEILE", stockMapList.get(0).get("SZEILE"));
+				map.put("SMJAHR", stockMapList.get(0).get("SMJAHR"));
+				map.put("SXBLNR", stockMapList.get(0).get("SXBLNR"));
+				map.put("SAPSTS", stockMapList.get(0).get("SAPSTS"));
+				map.put("DOORKY", " ");
+				map.put("PTLT01", stockMapList.get(0).get("LOTA01"));
+				map.put("PTLT02", stockMapList.get(0).get("LOTA02"));
+				map.put("PTLT03", stockMapList.get(0).get("LOTA03"));
+				map.put("PTLT04", stockMapList.get(0).get("LOTA04"));
+				map.put("PTLT05", stockMapList.get(0).get("LOTA05"));
+				map.put("PTLT06", stockMapList.get(0).get("LOTA06"));
+				map.put("PTLT07", stockMapList.get(0).get("LOTA07"));
+				map.put("PTLT08", stockMapList.get(0).get("LOTA08"));
+				map.put("PTLT09", stockMapList.get(0).get("LOTA09"));
+				map.put("PTLT10", stockMapList.get(0).get("LOTA10"));
+				map.put("PTLT11", stockMapList.get(0).get("LOTA11"));
+				map.put("PTLT12", stockMapList.get(0).get("LOTA12"));
+				map.put("PTLT13", stockMapList.get(0).get("LOTA13"));
+				map.put("PTLT14", stockMapList.get(0).get("LOTA14"));
+				map.put("PTLT15", stockMapList.get(0).get("LOTA15"));
+				map.put("PTLT16", stockMapList.get(0).get("LOTA16"));
+				map.put("PTLT17", stockMapList.get(0).get("LOTA17"));
+				map.put("PTLT18", stockMapList.get(0).get("LOTA18"));
+				map.put("PTLT19", stockMapList.get(0).get("LOTA19"));
+				map.put("PTLT20", stockMapList.get(0).get("LOTA20"));
+				map.put("PASTKY", " ");
+				map.put("ALSTKY", " ");
+				map.put("SBKTXT", " ");
+				map.put("TASRSN", " ");
+				map.put("CREDAT", date);
+				map.put("CRETIM", time);
+				map.put("CREUSR", CommonConfig.SES_USER_ID_KEY);
+				map.put("LMODAT", date);
+				map.put("LMOTIM", time);
+				map.put("LMOUSR", CommonConfig.SES_USER_ID_KEY);
+				map.put("INDBZL", " ");
+				map.put("INDARC", " ");
+				map.put("UPDCHK", "0");
+									
+				
+				map.setModuleCommand("WmsOutbound_COPY", "TASDI");
+				commonDao.insert(map);
+				
+				//map.put("STOKKY", stockMapList.get(0).get("STOKKY"));
+				map.put("STOKKY", "%");
+				map.setModuleCommand("WmsTask_COPY", "DBMSPROC_SZP_INS_TASDR");
+				commonDao.getMap(map);
+				//commonDao.getMap("WmsTask_COPY.DBMSPROC_SZP_INS_TASDR", map);																		
+				
+		   }
+		
+		rowTot.put("TASKKY", map.get("TASKKY"));
+		
+		rowTot.setModuleCommand("WmsTask_COPY", "CALL_BATCH_PKTOT");
+		commonDao.getMap(rowTot);
+		
+		rsMap.put("CNT", count);
+		
+		return rsMap;
+	} 
+	
+
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap mtoChangeData(DataMap map) throws Exception {	
+		DataMap rsMap = new DataMap();
+		
+		int successCnt = 0;
+		List<DataMap> sapResList = new ArrayList<>();
+		List<DataMap> stkList = new ArrayList<>();
+		String docSeq = "";
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+
+		String ifmsg = "";
+		boolean commitFlag = true;
+		try {
+			
+			// 재고조정(MTO&MTS 변경) 헤더 생성
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "ADJDH");
+			commonDao.insert(map);
+
+			String lota07 = "";
+			String lota15 = "";
+			int itemCount = 0;
+			int sadjit = 0;
+			double changeQty = Double.valueOf(map.getString("CHGQTY"));
+			double stokkyQty = 0;
+			double totalQty = 0;
+			List<DataMap> ifList = new ArrayList<>();
+			DataMap ifMap = null;
+			DataMap logMap = null;
+			
+			
+			String logseqno = "";
+			boolean ifsendFlag = false;
+			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "selectMtoMtsStkky");
+			stkList = commonDao.getList(map);
+			for(DataMap dataMap : stkList) {
+				if(changeQty <= 0) {
+					continue;
+				}
+				
+				// mto정보 또는 lot번호가 달라지면 인터페이 처리
+				if( !lota07.contentEquals(dataMap.getString("LOTA07")) ||
+					!lota15.contentEquals(dataMap.getString("LOTA15"))	){
+					
+					if(!lota07.contentEquals("")) {
+						commitFlag = false;
+						ifMap.put("IFID","WMS_IF_402");
+						ifMap.put("RETRYYN", "Y");
+						ifmsg = ifservice.sendIF(ifMap);
+						
+						if(!ifmsg.equals("SUCCESS")) {
+							
+							ifmsg = "SAP : " + ifmsg;
+							
+							throw new Exception();
+						}
+						ifsendFlag = false;
+					}
+					
+					transactionSavepoint = transactionStatus.createSavepoint();
+					
+					lota07 = dataMap.getString("LOTA07");
+					lota15 = dataMap.getString("LOTA15");
+					
+					map.setModuleCommand("WmsMobileOutboundPicking_COPY", "selectLogseqno");
+					logMap = commonDao.getMap(map);
+					
+					logseqno = logMap.getString("LOGSEQNO");
+					ifsendFlag = true;
+				}
+				
+				stokkyQty = Double.valueOf(dataMap.getString("QTSIWH"));
+				
+				if( changeQty >= stokkyQty) {
+					dataMap.put("MTOQTY", stokkyQty);
+					changeQty -= stokkyQty;
+					totalQty += stokkyQty;
+				}else {
+					totalQty += changeQty;
+					dataMap.put("MTOQTY", changeQty);
+					changeQty = 0;
+				}
+				
+				dataMap.put("SADJKY", map.getString("SADJKY") );
+				dataMap.put("SADJIT", sadjit);
+				dataMap.put("LOTA07_TO", map.getString("LOTA07") );
+				
+				
+				//System.out.println(dataMap.getString("STOKKY") + "[ "+totalQty+" ] : " + dataMap.get("MTOQTY"));
+				map.clonSessionData(dataMap);
+				dataMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "insertMtoMtsChange");
+				commonDao.insert(dataMap);
+				
+				ifMap = dataMap;
+				ifMap.put("SADJKY", map.getString("SADJKY") );
+				ifMap.put("WMSDN", map.getString("SADJKY") );
+				ifMap.put("LOGSEQNO", logseqno);
+				ifMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "insertMtoMts_IFWMS223");
+				commonDao.insert(ifMap);
+				
+				
+				sadjit += 20;
+			}
+			
+			if(ifsendFlag) {
+				commitFlag = false;
+				ifMap.put("IFID","WMS_IF_402");
+				ifMap.put("RETRYYN", "Y");
+				ifmsg = ifservice.sendIF(ifMap);
+				
+				if(!ifmsg.equals("SUCCESS")) {
+					
+					ifmsg = "SAP : " + ifmsg;
+					
+					throw new Exception();
+				}
+			}
+		} catch (Exception e) {
+			transactionStatus.rollbackToSavepoint(transactionSavepoint);
+			commitFlag = true;
+			e.printStackTrace();
+		}
+		finally {
+			if(commitFlag == false) {
+				transactionManager.commit(transactionStatus);
+			}
+			rsMap.put("O_MSG", ifmsg);
+		}
+		return rsMap;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap PDPK05DETAIL02_SAVECNT(DataMap map) throws Exception {				
+			
+			DataMap rsMap = new DataMap();
+			
+			SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+			String date = fmDate.format(new Date());
+			SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+			String time = fmTime.format(new Date());
+			
+			map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+			
+			String MSG = "FAIL";
+			String USER = map.getString(CommonConfig.SES_USER_ID_KEY);
+						
+			String STKNUM = map.getString("STKNUM");
+			String SKUKEY = map.getString("SKUKEY");
+			String WAREKY = map.getString("WAREKY");
+			String LOCAKY = map.getString("LOCAKY");
+			String DPTNKY = map.getString("DPTNKY");
+			String BARCOD = map.getString("BARCOD");
+			String QTSPUT = map.getString("QTSPUT");
+			String LOTA07 = map.getString("LOTA07");
+			String ROW_QTCOMP = map.getString("ROW_QTCOMP");
+			
+			List<DataMap> taskinfo; 
+			List<DataMap> taskAllinfo;
+			List<DataMap> shpdiInfoList;
+			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_TASDI_INFO");
+			
+			taskinfo = commonDao.getList(map);
+			
+			double TOT_USEQTY = Double.parseDouble(QTSPUT.replace(",", ""));
+			
+			
+			
+			for(DataMap tasdiMap : taskinfo) {				
+				
+				tasdiMap.put("OLDLOC", "V");					
+				tasdiMap.put(CommonConfig.SES_USER_ID_KEY, USER);
+				tasdiMap.put("STKNUM", STKNUM);
+				tasdiMap.put("SKUKEY", SKUKEY);
+				tasdiMap.put("LOCAKY", LOCAKY);
+				tasdiMap.put("BARCOD", BARCOD);
+				tasdiMap.put("WAREKY", WAREKY);
+				tasdiMap.put("DPTNKY", DPTNKY);
+				tasdiMap.put("LOTA07", LOTA07);
+				
+				if(!tasdiMap.getString("STATIT").equals("NEW")) {
+					
+					commonDao.getMap("WmsOutbound.CALL_PICKING_CANCEL_PROC_DL06", tasdiMap);
+				}
+				
+				
+				tasdiMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_ALL_TASDI_INFO");
+				
+				taskAllinfo = commonDao.getList(tasdiMap);
+				
+				for(DataMap tasdiAllMap : taskAllinfo) {
+					
+					if(tasdiAllMap.getString("STATIT").equals("NEW")) {
+//					commonDao.delete("WmsMobileOutboundPicking_COPY.PDPK05_TASDRDEL", tasdiAllMap);
+					commonDao.delete("WmsMobileOutboundPicking_COPY.PDPK05_TASDIDEL", tasdiAllMap);
+					}
+					
+					
+					
+				}
+			}
+			
+			// 재고 셀렉트 
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY","MANUALALLOCATE_AVAILABLE_STOCK2");
+			List<DataMap> stockMapList = commonDao.getList(map);
+			
+			if(stockMapList != null) {
+				
+				
+				
+				
+				for(int i=0; i<stockMapList.size(); i++) {
+					
+					double menuQTCOMP=0;
+					
+					double STKKY_USEQTY = Double.parseDouble(stockMapList.get(i).getString("USEQTY").replace(",", ""));					
+					double TASDI_QTCOMP = 0;
+					
+					
+					if(STKKY_USEQTY <= 0) {continue;}
+					if(TOT_USEQTY <= 0) {continue;}
+					
+					//할당할 출하정보 조회 
+				    map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_COPY_SHPDI_INFO");
+					shpdiInfoList = commonDao.getList(map);
+									
+					for(int j=0; j<shpdiInfoList.size(); j++) {															
+												
+						if(!stockMapList.get(i).getString("LOTA01").equals(shpdiInfoList.get(j).getString("LOTA01")) ||   
+						   !stockMapList.get(i).getString("LOTA02").equals(shpdiInfoList.get(j).getString("LOTA02")) ||
+						   !stockMapList.get(i).getString("LOTA07").equals(shpdiInfoList.get(j).getString("LOTA07"))) {  	
+							continue;
+						}
+							
+						
+						double SHPDI_NEED = Double.parseDouble(shpdiInfoList.get(j).getString("NEEDQTY").replace(",", ""));															
+						
+						if(TOT_USEQTY <= 0 && j != 0 || SHPDI_NEED == 0) {continue;}
+						
+						if(STKKY_USEQTY < SHPDI_NEED && TOT_USEQTY == STKKY_USEQTY) {
+							
+							TASDI_QTCOMP = STKKY_USEQTY;
+							
+						}else if(STKKY_USEQTY > SHPDI_NEED) {
+							
+							TASDI_QTCOMP = SHPDI_NEED;
+						}else if(STKKY_USEQTY < TOT_USEQTY){
+							TASDI_QTCOMP = STKKY_USEQTY;
+						}else {
+							TASDI_QTCOMP = TOT_USEQTY;
+						}
+						
+						TOT_USEQTY -= TASDI_QTCOMP;
+						TOT_USEQTY = Math.round(TOT_USEQTY * 1000) / 1000.0;
+						STKKY_USEQTY -= TASDI_QTCOMP;
+						
+						menuQTCOMP += TASDI_QTCOMP;
+						
+						
+						if(TASDI_QTCOMP <= 0) {continue;}
+						
+						DataMap shpdiRow = shpdiInfoList.get(j);
+						
+						
+						
+						//기존 TASDH 있나 확인
+						shpdiRow.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDH_INFO"); 
+						List<DataMap> taskList = commonDao.getList(shpdiRow); 
+						
+						String taskky;
+						String taskit;
+						
+						
+							  taskky = 	taskList.get(0).getString("TASKKY");
+							  
+							  DataMap taskkyMap = new DataMap();
+							  //기존 TASDH 있나 확인
+							  taskkyMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDR_MAXINFO");
+							  taskkyMap.put("TASKKY", taskky);
+							  List<DataMap> taskList2 = commonDao.getList(taskkyMap); 
+							  
+							  taskit = leftPad((Integer.parseInt(taskList2.get(0).getString("TASKIT"))+10)+"", "0", 6);
+							  
+							  
+						
+						
+						DataMap tasdiRow = new DataMap();										  				  			  			 					 
+						  
+						  tasdiRow.put("TASKKY", taskky); 
+						  tasdiRow.put("TASKIT", taskit); 
+						  tasdiRow.put("TASKTY", "PK"); 
+						  tasdiRow.put("RSNCOD", "330"); 
+						  tasdiRow.put("STATIT", "FPC");
+						  tasdiRow.put("QTTAOR", TASDI_QTCOMP); 
+						  tasdiRow.put("QTCOMP", TASDI_QTCOMP); 
+						  tasdiRow.put("OWNRKY", stockMapList.get(i).get("OWNRKY")); 
+						  tasdiRow.put("SKUKEY", stockMapList.get(i).get("SKUKEY")); 
+						  tasdiRow.put("LOTNUM", stockMapList.get(i).get("LOTNUM"));
+						  tasdiRow.put("ACTCDT", "000000");
+						  tasdiRow.put("ACTCTI", "000000");
+						  tasdiRow.put("QTYUOM", stockMapList.get(i).get("QTYUOM"));
+						  tasdiRow.put("TKFLKY", " "); 
+						  tasdiRow.put("STEPNO", " ");
+						  tasdiRow.put("LSTTFL", " ");
+						  
+						  tasdiRow.put("LOCASR", stockMapList.get(i).get("LOCAKY"));
+						  tasdiRow.put("SECTSR", stockMapList.get(i).get("SECTID")); 
+						  tasdiRow.put("PAIDSR", stockMapList.get(i).get("PACKID")); 
+						  tasdiRow.put("TRNUSR", stockMapList.get(i).get("TRNUID"));
+						  tasdiRow.put("STRUTY", stockMapList.get(i).get("TRUNTY"));
+						  tasdiRow.put("SMEAKY", stockMapList.get(i).get("MEASKY"));
+						  tasdiRow.put("SUOMKY", stockMapList.get(i).get("UOMKEY"));
+						  tasdiRow.put("QTSPUM", stockMapList.get(i).get("QTPUOM")); 
+						  tasdiRow.put("SDUOKY", stockMapList.get(i).get("DUOMKY"));
+						  tasdiRow.put("QTSDUM", stockMapList.get(i).get("QTDUOM"));
+						                                          
+						  tasdiRow.put("LOCATG", "SHPLOC");
+						  tasdiRow.put("SECTTG", stockMapList.get(i).get("SECTID"));
+					      tasdiRow.put("PAIDTG", stockMapList.get(i).get("PACKID"));
+					      tasdiRow.put("TRNUTG", stockMapList.get(i).get("TRNUID"));
+					      tasdiRow.put("TTRUTY", stockMapList.get(i).get("TRUNTY"));
+					      tasdiRow.put("TMEAKY", stockMapList.get(i).get("MEASKY"));
+					      tasdiRow.put("TUOMKY", stockMapList.get(i).get("UOMKEY"));
+					      tasdiRow.put("QTTPUM", stockMapList.get(i).get("QTPUOM"));
+					      tasdiRow.put("TDUOKY", stockMapList.get(i).get("DUOMKY"));
+					      tasdiRow.put("QTTDUM", stockMapList.get(i).get("QTDUOM"));
+					      
+						  tasdiRow.put("LOCAAC", "SHPLOC");  
+						  tasdiRow.put("SECTAC", stockMapList.get(i).get("SECTID"));  
+						  tasdiRow.put("PAIDAC", stockMapList.get(i).get("PACKID"));  
+						  tasdiRow.put("TRNUAC", stockMapList.get(i).get("TRNUID"));  
+						  tasdiRow.put("ATRUTY", stockMapList.get(i).get("TRUNTY"));  
+						  tasdiRow.put("AMEAKY", stockMapList.get(i).get("MEASKY"));  
+						  tasdiRow.put("AUOMKY", stockMapList.get(i).get("UOMKEY"));  
+						  tasdiRow.put("QTAPUM", stockMapList.get(i).get("QTPUOM"));  
+						  tasdiRow.put("ADUOKY", stockMapList.get(i).get("DUOMKY"));  
+						  tasdiRow.put("QTADUM", stockMapList.get(i).get("QTDUOM"));  
+						  tasdiRow.put("REFDKY", stockMapList.get(i).get("REFDKY"));
+						  tasdiRow.put("REFDIT", stockMapList.get(i).get("REFDIT"));
+						  tasdiRow.put("REFCAT", "200");
+						  tasdiRow.put("REFDAT", date);
+						  tasdiRow.put("PURCKY", stockMapList.get(i).get("PURCKY"));
+						  tasdiRow.put("PURCIT", stockMapList.get(i).get("PURCIT"));
+						  tasdiRow.put("ASNDKY", stockMapList.get(i).get("ASNDKY"));
+						  tasdiRow.put("ASNDIT", stockMapList.get(i).get("ASNDIT"));
+						  tasdiRow.put("RECVKY", stockMapList.get(i).get("RECVKY"));
+						  tasdiRow.put("RECVIT", stockMapList.get(i).get("RECVIT"));
+						  tasdiRow.put("SHPOKY", shpdiRow.getString("SHPOKY"));
+						  tasdiRow.put("SHPOIT", shpdiRow.getString("SHPOIT"));
+						  tasdiRow.put("GRPOKY", " ");
+						  tasdiRow.put("GRPOIT", " ");
+						  tasdiRow.put("SADJKY", stockMapList.get(i).get("SADJKY"));
+						  tasdiRow.put("SADJIT", stockMapList.get(i).get("SADJIT"));
+						  tasdiRow.put("SDIFKY", " ");
+						  tasdiRow.put("SDIFIT", " ");
+						  tasdiRow.put("PHYIKY", stockMapList.get(i).get("PHYIKY"));
+						  tasdiRow.put("PHYIIT", stockMapList.get(i).get("PHYIIT"));
+						  tasdiRow.put("DROPID", " ");
+						  tasdiRow.put("DESC01", stockMapList.get(i).get("DESC01"));
+						  tasdiRow.put("DESC02", stockMapList.get(i).get("DESC02"));
+						  tasdiRow.put("ASKU01", stockMapList.get(i).get("ASKU01"));
+						  tasdiRow.put("ASKU02", stockMapList.get(i).get("ASKU02"));
+						  tasdiRow.put("ASKU03", stockMapList.get(i).get("ASKU03"));
+						  tasdiRow.put("ASKU04", stockMapList.get(i).get("ASKU04"));
+						  tasdiRow.put("ASKU05", stockMapList.get(i).get("ASKU05"));
+						  tasdiRow.put("EANCOD", stockMapList.get(i).get("EANCOD"));
+						  tasdiRow.put("GTINCD", stockMapList.get(i).get("GTINCD"));
+						  tasdiRow.put("SKUG01", stockMapList.get(i).get("SKUG01"));
+						  tasdiRow.put("SKUG02", stockMapList.get(i).get("SKUG02"));
+						  tasdiRow.put("SKUG03", stockMapList.get(i).get("SKUG03"));
+						  tasdiRow.put("SKUG04", stockMapList.get(i).get("SKUG04"));
+						  tasdiRow.put("SKUG05", stockMapList.get(i).get("SKUG05"));
+						  tasdiRow.put("GRSWGT", stockMapList.get(i).get("GRSWGT"));
+						  tasdiRow.put("NETWGT", stockMapList.get(i).get("NETWGT"));
+						  tasdiRow.put("WGTUNT", stockMapList.get(i).get("WGTUNT"));
+						  tasdiRow.put("LENGTH", stockMapList.get(i).get("LENGTH"));
+						  tasdiRow.put("WIDTHW", stockMapList.get(i).get("WIDTHW"));
+						  tasdiRow.put("HEIGHT", stockMapList.get(i).get("HEIGHT"));
+						  tasdiRow.put("CUBICM", stockMapList.get(i).get("CUBICM"));
+						  tasdiRow.put("CAPACT", stockMapList.get(i).get("CAPACT"));
+						  tasdiRow.put("WORKID", " ");
+						  tasdiRow.put("WORKNM", " ");
+						  tasdiRow.put("HHTTID", " ");
+						  tasdiRow.put("AREAKY", stockMapList.get(i).get("AREAKY"));
+						  tasdiRow.put("LOTA01", stockMapList.get(i).get("LOTA01"));
+						  tasdiRow.put("LOTA02", stockMapList.get(i).get("LOTA02"));
+						  tasdiRow.put("LOTA03", stockMapList.get(i).get("LOTA03"));
+						  tasdiRow.put("LOTA04", stockMapList.get(i).get("LOTA04"));
+						  tasdiRow.put("LOTA05", stockMapList.get(i).get("LOTA05"));
+						  tasdiRow.put("LOTA06", stockMapList.get(i).get("LOTA06"));
+						  tasdiRow.put("LOTA07", stockMapList.get(i).get("LOTA07"));
+						  tasdiRow.put("LOTA08", stockMapList.get(i).get("LOTA08"));
+						  tasdiRow.put("LOTA09", stockMapList.get(i).get("LOTA09"));
+						  tasdiRow.put("LOTA10", stockMapList.get(i).get("LOTA10"));
+						  tasdiRow.put("LOTA11", stockMapList.get(i).get("LOTA11"));
+						  tasdiRow.put("LOTA12", stockMapList.get(i).get("LOTA12"));
+						  tasdiRow.put("LOTA13", stockMapList.get(i).get("LOTA13"));
+						  tasdiRow.put("LOTA14", stockMapList.get(i).get("LOTA14"));
+						  tasdiRow.put("LOTA15", stockMapList.get(i).get("LOTA15"));
+						  tasdiRow.put("LOTA16", stockMapList.get(i).get("LOTA16"));
+						  tasdiRow.put("LOTA17", stockMapList.get(i).get("LOTA17"));
+						  tasdiRow.put("LOTA18", stockMapList.get(i).get("LOTA18"));
+						  tasdiRow.put("LOTA19", stockMapList.get(i).get("LOTA19"));
+						  tasdiRow.put("LOTA20", stockMapList.get(i).get("LOTA20"));
+						  tasdiRow.put("AWMSNO", " ");
+						  tasdiRow.put("AWMSTS", " ");
+						  tasdiRow.put("SMANDT", stockMapList.get(i).get("SMANDT"));
+						  tasdiRow.put("SEBELN", stockMapList.get(i).get("SEBELN"));
+						  tasdiRow.put("SEBELP", stockMapList.get(i).get("SEBELP"));
+						  tasdiRow.put("SZMBLNO",stockMapList.get(i).get("SZMBLNO"));
+						  tasdiRow.put("SZMIPNO",stockMapList.get(i).get("SZMIPNO"));
+						  tasdiRow.put("STRAID", stockMapList.get(i).get("STRAID"));
+						  tasdiRow.put("SVBELN", shpdiRow.getString("SVBELN"));
+						  tasdiRow.put("SPOSNR", shpdiRow.getString("SPOSNR"));
+						  tasdiRow.put("STKNUM", shpdiRow.getString("STKNUM"));
+						  tasdiRow.put("STPNUM", shpdiRow.getString("STPNUM"));
+						  tasdiRow.put("SWERKS", stockMapList.get(i).get("SWERKS"));
+						  tasdiRow.put("SLGORT", stockMapList.get(i).get("SLGORT"));
+						  tasdiRow.put("SDATBG", stockMapList.get(i).get("SDATBG"));
+						  tasdiRow.put("STDLNR", stockMapList.get(i).get("STDLNR"));
+						  tasdiRow.put("SSORNU", shpdiRow.getString("SSORNU"));
+						  tasdiRow.put("SSORIT", shpdiRow.getString("SSORIT"));
+						  tasdiRow.put("SMBLNR", stockMapList.get(i).get("SMBLNR"));
+						  tasdiRow.put("SZEILE", stockMapList.get(i).get("SZEILE"));
+						  tasdiRow.put("SMJAHR", stockMapList.get(i).get("SMJAHR"));
+						  tasdiRow.put("SXBLNR", stockMapList.get(i).get("SXBLNR"));
+						  tasdiRow.put("SAPSTS", stockMapList.get(i).get("SAPSTS"));
+					 
+						  tasdiRow.put("DOORKY", " ");
+						  tasdiRow.put("PTLT01", stockMapList.get(i).get("LOTA01"));
+						  tasdiRow.put("PTLT02", stockMapList.get(i).get("LOTA02"));
+						  tasdiRow.put("PTLT03", stockMapList.get(i).get("LOTA03"));
+						  tasdiRow.put("PTLT04", stockMapList.get(i).get("LOTA04"));
+						  tasdiRow.put("PTLT05", stockMapList.get(i).get("LOTA05"));
+						  tasdiRow.put("PTLT06", stockMapList.get(i).get("LOTA06"));
+						  tasdiRow.put("PTLT07", stockMapList.get(i).get("LOTA07"));
+						  tasdiRow.put("PTLT08", stockMapList.get(i).get("LOTA08"));
+						  tasdiRow.put("PTLT09", stockMapList.get(i).get("LOTA09"));
+						  tasdiRow.put("PTLT10", stockMapList.get(i).get("LOTA10"));
+						  tasdiRow.put("PTLT11", stockMapList.get(i).get("LOTA11"));
+						  tasdiRow.put("PTLT12", stockMapList.get(i).get("LOTA12"));
+						  tasdiRow.put("PTLT13", stockMapList.get(i).get("LOTA13"));
+						  tasdiRow.put("PTLT14", stockMapList.get(i).get("LOTA14"));
+						  tasdiRow.put("PTLT15", stockMapList.get(i).get("LOTA15"));
+						  tasdiRow.put("PTLT16", stockMapList.get(i).get("LOTA16"));
+						  tasdiRow.put("PTLT17", stockMapList.get(i).get("LOTA17"));
+						  tasdiRow.put("PTLT18", stockMapList.get(i).get("LOTA18"));
+						  tasdiRow.put("PTLT19", stockMapList.get(i).get("LOTA19"));
+						  tasdiRow.put("PTLT20", stockMapList.get(i).get("LOTA20"));
+						  tasdiRow.put("PASTKY", " ");
+						  tasdiRow.put("ALSTKY", " ");
+						  tasdiRow.put("SBKTXT", " ");
+						  tasdiRow.put("TASRSN", " ");
+						  tasdiRow.put("CREDAT", date);
+						  tasdiRow.put("CRETIM", time);
+						  tasdiRow.put("CREUSR", map.get(CommonConfig.SES_USER_ID_KEY));
+						  tasdiRow.put("LMODAT", date);
+						  tasdiRow.put("LMOTIM", time);
+						  tasdiRow.put("LMOUSR", map.get(CommonConfig.SES_USER_ID_KEY));
+						  tasdiRow.put("INDBZL", " ");
+						  tasdiRow.put("INDARC", " ");
+						  tasdiRow.put("UPDCHK", "0");
+						  
+						  tasdiRow.put("SES_USER_ID", map.get(CommonConfig.SES_USER_ID_KEY));
+						//TASDI 생성
+						tasdiRow.setModuleCommand("WmsOutbound", "TASDI"); 
+						commonDao.insert(tasdiRow);
+						
+
+						//TASDR 생성
+						tasdiRow.put("STOKKY", stockMapList.get(i).getString("STOKKY"));				
+						commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", tasdiRow);		
+						
+						
+						//지정피킹 FLAG
+						DataMap appointMap = new DataMap();
+						appointMap.put("SHPOKY", shpdiInfoList.get(j).getString("SHPOKY"));
+						appointMap.put("SHPOIT", shpdiInfoList.get(j).getString("SHPOIT"));
+						appointMap.put("SKUKEY", shpdiInfoList.get(j).getString("SKUKEY"));
+						commonDao.update("WmsMobileOutboundPicking_COPY.APPOINTPICKINGFLAG", appointMap);
+						
+						MSG = "OK";
+		
+					}
+				}	
+							
+		}
+		
+			
+			if(!MSG.equals("OK")) {MSG = "OUT_M0252";}
+			if(MSG.equals("OK") && TOT_USEQTY > 0) {MSG = "OUT_M0254";}
+					
+			rsMap.put("MSG", MSG);
+			
+		return rsMap;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap PDPK05DETAIL02_DELETE(DataMap map) throws Exception {				
+			
+			DataMap rsMap = new DataMap();
+			
+			SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+			String date = fmDate.format(new Date());
+			SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+			String time = fmTime.format(new Date());
+			
+			map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+			
+			String MSG = "FAIL";
+			String USER = map.getString(CommonConfig.SES_USER_ID_KEY);
+						
+			String STKNUM = map.getString("STKNUM");
+			String SKUKEY = map.getString("SKUKEY");
+			String WAREKY = map.getString("WAREKY");
+			String DPTNKY = map.getString("DPTNKY");
+			String LOCAKY = map.getString("LOCAKY");
+			String BARCOD = map.getString("BARCOD");
+			String LOTA07 = map.getString("LOTA07");
+			
+			int SUCESS_CCOUNT = 0;
+			
+			List<DataMap> taskinfo; 
+			List<DataMap> taskAllinfo;
+			List<DataMap> shpdiInfoList;
+			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_DELETE_TASDI_INFO");
+			
+			taskinfo = commonDao.getList(map);
+						
+			
+			
+			for(DataMap tasdiMap : taskinfo) {				
+				
+				tasdiMap.put("OLDLOC", "V");					
+				tasdiMap.put(CommonConfig.SES_USER_ID_KEY, USER);
+				tasdiMap.put("STKNUM", STKNUM);
+				tasdiMap.put("SKUKEY", SKUKEY);
+				tasdiMap.put("LOCAKY", LOCAKY);
+				tasdiMap.put("BARCOD", BARCOD);
+				tasdiMap.put("WAREKY", WAREKY);
+				tasdiMap.put("DPTNKY", DPTNKY);
+				tasdiMap.put("LOTA07", LOTA07);
+				
+				if(!tasdiMap.getString("STATIT").equals("NEW")) {
+					
+					commonDao.getMap("WmsOutbound.CALL_PICKING_CANCEL_PROC_DL06", tasdiMap);
+				}
+				
+				
+				tasdiMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_ALL_TASDI_INFO");
+				
+				taskAllinfo = commonDao.getList(tasdiMap);
+				
+				for(DataMap tasdiAllMap : taskAllinfo) {
+					
+					if(tasdiAllMap.getString("STATIT").equals("NEW") || tasdiAllMap.getString("STATIT").equals("FCN")) {
+//					commonDao.delete("WmsMobileOutboundPicking_COPY.PDPK05_TASDRDEL", tasdiAllMap);
+					commonDao.delete("WmsMobileOutboundPicking_COPY.PDPK05_TASDIDEL", tasdiAllMap);
+					
+						SUCESS_CCOUNT++;
+					}
+					
+					if(taskAllinfo.size() == SUCESS_CCOUNT) {
+						MSG = "OK";
+					}
+				}
+				
+				
+			}
+			
+					
+			
+			if(!MSG.equals("OK")) {MSG = "OUT_M0255";}
+					
+			rsMap.put("MSG", MSG);
+			
+		return rsMap;
+	}
+	
+	@Transactional
+	public DataMap PDPK05StockValidation(DataMap map) throws SQLException {
+
+		List<DataMap> head = map.getList("head");		
+		List<DataMap> saveItemList = new ArrayList<DataMap>();
+		List<DataMap> shpdiInfoList = new ArrayList<DataMap>();
+		List<DataMap> addStkkyList = new ArrayList<DataMap>();
+		DataMap rsMap = new DataMap();				
+		String MSG = "FAIL";
+		int diffCnt = 0;
+		int ingCnt = 0;
+		
+		SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+		String date = fmDate.format(new Date());
+		SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+		String time = fmTime.format(new Date());
+		
+		String USER = map.getString(CommonConfig.SES_USER_ID_KEY);
+		
+		// 개별바코드 할당유무 체크 
+		// -> 할당된 바코드 입니다. (처리 불가)
+		// -> 미할당 바코드인 경우 재고수량 체크 > 선적의 품목 부분피킹취소 > 할당+피킹 프로세스 호출
+		
+		// System.out.println("지정피킹 MAP: " + map.toString());
+		// 지정피킹 MAP: {SES_WARENMKY=, WAREKY=1100, SES_USER_IP=0:0:0:0:0:0:0:1, LOCAKY=T1-01, OWNRKY=KN, SKUKEY=FRT-ADO0013A, SES_USER_ID=kyh, SES_USER_INFO_ID=, SES_WAREKY=1100, DPTNKY=P1200, SES_MTYPE=%, SES_OWNER=KN, SES_USER_COMPANY=KN, SES_DEVICE_TYPE=W, SES_SCHEMA=kn, STKNUM=1001541932, menuId=PDPK05_DETAIL02_COPY, isMobile=true, SES_USER_TYPE_ID=, SES_LANGUAGE=KR, SES_USER_EMPL_ID=, BARCOD=H20240206R60208}
+	
+		// 재고 셀렉트 
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY","MANUALALLOCATE_AVAILABLE_STOCK");
+		List<DataMap> stockMapList = commonDao.getList(map);
+		
+		if(stockMapList != null) {
+			
+			// 부분할당 취소 (선적번호 + 품목코드 + 납품처코드) 
+			if (true) {
+				map.setModuleCommand("WmsMobileOutboundPicking_COPY", "UNALLOCATE_TARGET");
+				List<DataMap> unlocateTarketList = commonDao.getList(map);
+				//System.out.println("지정피킹 할당취소 대상: " + unlocateTarketList);
+
+				if(unlocateTarketList.size() > 0 && unlocateTarketList.get(0) != null) {
+					DataMap rowSub;
+					rowSub = map;
+					
+					// 선적 + 품목 + 납품처 코드의 부분할당취소처리 
+					for(int i=0; i<unlocateTarketList.size(); i++) {
+						rowSub.put("SHPOKY", unlocateTarketList.get(i).getString("SHPOKY"));
+						rowSub.put("SHPOIT", unlocateTarketList.get(i).getString("SHPOIT"));
+						rowSub.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						
+						commonDao.delete("WmsOutbound.DL04REMOVE1", rowSub); // TASDI 부분 삭제 DELTEE
+						commonDao.update("WmsOutbound.DL04SHPDI", rowSub); // SHPDI 수정 정보 UPDATE
+						commonDao.update("WmsOutbound.DL04SHPDH", rowSub); // SHPDH 수정 정보 UPDATE
+						
+					}
+				}
+			}
+			
+			for(int i=0; i<stockMapList.size(); i++) {
+				double menuQTCOMP=0;
+				double STKKY_USEQTY = Double.parseDouble(stockMapList.get(i).getString("USEQTY").replace(",", ""));
+				double TOT_USEQTY = Double.parseDouble(stockMapList.get(i).getString("USEQTY").replace(",", ""));
+				double TASDI_QTCOMP = 0;
+
+				if(STKKY_USEQTY <= 0) {
+					continue;
+				}
+
+				//할당할 출하정보 조회 
+			    map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDPK05_COPY_SHPDI_INFO");
+				shpdiInfoList = commonDao.getList(map);
+								
+				//지정피킹 2457 stockMapList: {DUOMKY=BAG, LOTA01=3000, TKZONE=T1, LOTA02=P200, LOTA03= , STRAID= , GRPOIT= , LOTA04=RT6, LOTA05= , LOTA06=00, CREUSR=khl43, LOTA07= , LOTA08= , LOTA09= , QTSALO=0, ZONEKY=T1, RECVKY=10000000000001422333, SECTID= , SSORNU=2100021209, SMBLNR= , LSTTFL= , SADJIT= , SMANDT= , QTDUOM=1, ASNDIT= , TKFLKY= , AREAKY=220, SHPOKY= , CUBICM=0.05, LENGTH=374, RECVIT=000010, SAPSTS=311, STOKKY=20000000000015055831, QTSBLK=0, STDLNR= , WGTUNT=KG, GTINCD=18801260114037, SDIFIT= , TRUNTY= , LOTA20=0, TRNUID= , LOTA11=20240206, TASKIT=000020, LOTA12=20240206, LOTA13= , LOTA14=H20240206R60208, LOTA15=FR24206601, LOTA16=0, LOCAKY=T1-01, LOTA17=3000, LOTA18=0, LOTA19=0, GRSWGT=5, USEQTY=48, SZMIPNO= , ASNDKY= , STKNUM= , LOCATG= , LOTA10= , ASKU03= , SHPOIT= , ASKU02= , SKUG01=FERT, ASKU01= , WAREKY=1100, SKUG04= , REFDKY=3002739038, SKUG05=20, SKUG02= , SKUG03= , CAPACT=0, PHYIIT= , EANCOD=8801260114030, STPNUM= , SBKTXT=3003002739038, SADJKY= , SVBELN= , QTYUOM=48, QTSPMO=0, SDIFKY= , TASKKY=3002739038, QTSPMI=0, LOTNUM=20000000000002672101, OWNRKY=KN, SPOSNR= , DESC01=깨끗한나라 촉앤감케어 와이드 30m 30롤(P), DESC02= , SZEILE= , PURCKY= , QTSIWH=48, SWERKS= , REFCAT=300, QTPUOM=1, ASKU05= , ASKU04=0, PACKID= , AWMSNO= , SZMBLNO= , REFDIT=000020, SKUKEY=FRT-ADO0013A, GRPOKY= , UOMDOC=BAG, NUPDPS= , SEBELP=1, LMOUSR=khl43, PHYIKY= , LMOTIM=211357, SEBELN=MIF40224020621137279, SMJAHR= , LMODAT=20240206, UOMKEY=BAG, MEASKY=FRT-ADO0013A, NETWGT=5, SXBLNR= , WIDTHW=250, HEIGHT=537, STEPNO= , SLGORT= , CNTBSK=0, PURCIT= , SDATBG= , SSORIT=1, SRCSKY= , CREDAT=20240206, CRETIM=211357, REFDAT=20240206}
+				//지정피킹 2457 shpdiInfoList: {SHPOIT=000010, LOTA01=3000, LOTA02=P200, WAREKY=1100, PTNRTY=CT, QTJCMP=0, LOTA07= , SKUKEY=FRT-ADO0013A, QTSHPO=864, NEEDQTY=0, STPNUM= , QTSHPD=0, SSORNU=0061560646, QTALOC=864, QTSHPC=0, SVBELN=0061560646, QTYUOM=864, NAME01=청주물류 - 생활, STATIT=FAL, SHPMTY=221, SPOSNR=000010, DPTNKY=P1200, QTYORG=288, SSORIT=000010, STKNUM=1001541932, SHPOKY=2001580892, PTNRKY=P1200}
+				//System.out.println("지정피킹 2457 stockMapList: " + stockMapList.get(i));
+				
+				for(int j=0; j<shpdiInfoList.size(); j++) {															
+					ingCnt++;
+					//System.out.println("지정피킹 2457 shpdiInfoList: " + shpdiInfoList.get(j));
+					
+					if(shpdiInfoList.get(j).getString("SHPMTY").equals("205")) {
+						if(!stockMapList.get(i).getString("LOTA02").equals(shpdiInfoList.get(j).getString("LOTA02"))) {
+							
+							diffCnt++;
+							continue;
+						}
+					}else {
+						if(!stockMapList.get(i).getString("LOTA01").equals(shpdiInfoList.get(j).getString("LOTA01")) ||   
+						   !stockMapList.get(i).getString("LOTA02").equals(shpdiInfoList.get(j).getString("LOTA02")) ) {
+								diffCnt++;
+								continue;
+						}
+					}
+
+					double SHPDI_NEED = Double.parseDouble(shpdiInfoList.get(j).getString("NEEDQTY").replace(",", ""));															
+					
+					if(TOT_USEQTY <= 0 && j != 0 || SHPDI_NEED == 0) {
+						continue;
+					}
+					
+					if(STKKY_USEQTY < SHPDI_NEED && TOT_USEQTY == STKKY_USEQTY) {
+						TASDI_QTCOMP = STKKY_USEQTY;
+					}else if(STKKY_USEQTY > SHPDI_NEED) {
+						TASDI_QTCOMP = SHPDI_NEED;
+					}else {
+						TASDI_QTCOMP = TOT_USEQTY;
+					}
+					
+					TOT_USEQTY -= TASDI_QTCOMP; 
+					STKKY_USEQTY -= TASDI_QTCOMP;
+					menuQTCOMP += TASDI_QTCOMP;
+					
+					DataMap shpdiRow = shpdiInfoList.get(j);
+
+					//기존 TASDH 있나 확인
+					shpdiRow.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDH_INFO"); 
+					List<DataMap> taskList = commonDao.getList(shpdiRow); 
+					
+					String taskky;
+					String taskit;
+
+					if(taskList.size() > 0 && taskList.get(0) != null) {
+						  taskky = 	taskList.get(0).getString("TASKKY");
+						  
+						  DataMap taskkyMap = new DataMap();
+						  //기존 TASDH 있나 확인
+						  taskkyMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDR_MAXINFO");
+						  taskkyMap.put("TASKKY", taskky);
+						  List<DataMap> taskList2 = commonDao.getList(taskkyMap); 
+						
+						  taskit = leftPad((Integer.parseInt(taskList2.get(0).getString("TASKIT"))+10)+"", "0", 6); 
+					}else {
+						  DataMap tasdhRow = new DataMap();
+
+						  tasdhRow.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASKKY");
+						  tasdhRow = commonDao.getMap(tasdhRow);
+						  
+						  taskky = tasdhRow.getString("TASKKY");
+	
+						  tasdhRow.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDHEND");
+						  tasdhRow.put("TASKKY", taskky);
+						  tasdhRow.put("WAREKY", shpdiRow.getString("WAREKY"));						  
+						  tasdhRow.put("QTTAOR", shpdiRow.getString("QTSHPO"));
+						  tasdhRow.put("PTNRKY", shpdiRow.getString("PTNRKY"));
+						  tasdhRow.put(CommonConfig.SES_USER_ID_KEY,	map.get(CommonConfig.SES_USER_ID_KEY));
+	                      
+						  commonDao.insert(tasdhRow); 						  						  
+						  
+						  taskit = leftPad((10)+"", "0", 6);						  
+					}
+
+					DataMap tasdiRow = new DataMap();										  				  			  			 					 
+					  
+					tasdiRow.put("TASKKY", taskky);
+					tasdiRow.put("TASKIT", leftPad((taskit) + "", "0", 6));
+					tasdiRow.put("TASKTY", "PK");
+					tasdiRow.put("RSNCOD", "330");
+					tasdiRow.put("STATIT", "FPC");
+					tasdiRow.put("QTTAOR", TASDI_QTCOMP);
+					tasdiRow.put("QTCOMP", TASDI_QTCOMP);
+					tasdiRow.put("OWNRKY", stockMapList.get(i).get("OWNRKY"));
+					tasdiRow.put("SKUKEY", stockMapList.get(i).get("SKUKEY"));
+					tasdiRow.put("LOTNUM", stockMapList.get(i).get("LOTNUM"));
+					tasdiRow.put("ACTCDT", "000000");
+					tasdiRow.put("ACTCTI", "000000");
+					tasdiRow.put("QTYUOM", stockMapList.get(i).get("QTYUOM"));
+					tasdiRow.put("TKFLKY", " ");
+					tasdiRow.put("STEPNO", " ");
+					tasdiRow.put("LSTTFL", " ");
+
+					tasdiRow.put("LOCASR", stockMapList.get(i).get("LOCAKY"));
+					tasdiRow.put("SECTSR", stockMapList.get(i).get("SECTID"));
+					tasdiRow.put("PAIDSR", stockMapList.get(i).get("PACKID"));
+					tasdiRow.put("TRNUSR", stockMapList.get(i).get("TRNUID"));
+					tasdiRow.put("STRUTY", stockMapList.get(i).get("TRUNTY"));
+					tasdiRow.put("SMEAKY", stockMapList.get(i).get("MEASKY"));
+					tasdiRow.put("SUOMKY", stockMapList.get(i).get("UOMKEY"));
+					tasdiRow.put("QTSPUM", stockMapList.get(i).get("QTPUOM"));
+					tasdiRow.put("SDUOKY", stockMapList.get(i).get("DUOMKY"));
+					tasdiRow.put("QTSDUM", stockMapList.get(i).get("QTDUOM"));
+
+					tasdiRow.put("LOCATG", "SHPLOC");
+					tasdiRow.put("SECTTG", stockMapList.get(i).get("SECTID"));
+					tasdiRow.put("PAIDTG", stockMapList.get(i).get("PACKID"));
+					tasdiRow.put("TRNUTG", stockMapList.get(i).get("TRNUID"));
+					tasdiRow.put("TTRUTY", stockMapList.get(i).get("TRUNTY"));
+					tasdiRow.put("TMEAKY", stockMapList.get(i).get("MEASKY"));
+					tasdiRow.put("TUOMKY", stockMapList.get(i).get("UOMKEY"));
+					tasdiRow.put("QTTPUM", stockMapList.get(i).get("QTPUOM"));
+					tasdiRow.put("TDUOKY", stockMapList.get(i).get("DUOMKY"));
+					tasdiRow.put("QTTDUM", stockMapList.get(i).get("QTDUOM"));
+
+					tasdiRow.put("LOCAAC", "SHPLOC");
+					tasdiRow.put("SECTAC", stockMapList.get(i).get("SECTID"));
+					tasdiRow.put("PAIDAC", stockMapList.get(i).get("PACKID"));
+					tasdiRow.put("TRNUAC", stockMapList.get(i).get("TRNUID"));
+					tasdiRow.put("ATRUTY", stockMapList.get(i).get("TRUNTY"));
+					tasdiRow.put("AMEAKY", stockMapList.get(i).get("MEASKY"));
+					tasdiRow.put("AUOMKY", stockMapList.get(i).get("UOMKEY"));
+					tasdiRow.put("QTAPUM", stockMapList.get(i).get("QTPUOM"));
+					tasdiRow.put("ADUOKY", stockMapList.get(i).get("DUOMKY"));
+					tasdiRow.put("QTADUM", stockMapList.get(i).get("QTDUOM"));
+					tasdiRow.put("REFDKY", stockMapList.get(i).get("REFDKY"));
+					tasdiRow.put("REFDIT", stockMapList.get(i).get("REFDIT"));
+					tasdiRow.put("REFCAT", "200");
+					tasdiRow.put("REFDAT", date);
+					tasdiRow.put("PURCKY", stockMapList.get(i).get("PURCKY"));
+					tasdiRow.put("PURCIT", stockMapList.get(i).get("PURCIT"));
+					tasdiRow.put("ASNDKY", stockMapList.get(i).get("ASNDKY"));
+					tasdiRow.put("ASNDIT", stockMapList.get(i).get("ASNDIT"));
+					tasdiRow.put("RECVKY", stockMapList.get(i).get("RECVKY"));
+					tasdiRow.put("RECVIT", stockMapList.get(i).get("RECVIT"));
+					tasdiRow.put("SHPOKY", shpdiRow.getString("SHPOKY"));
+					tasdiRow.put("SHPOIT", shpdiRow.getString("SHPOIT"));
+					tasdiRow.put("GRPOKY", " ");
+					tasdiRow.put("GRPOIT", " ");
+					tasdiRow.put("SADJKY", stockMapList.get(i).get("SADJKY"));
+					tasdiRow.put("SADJIT", stockMapList.get(i).get("SADJIT"));
+					tasdiRow.put("SDIFKY", " ");
+					tasdiRow.put("SDIFIT", " ");
+					tasdiRow.put("PHYIKY", stockMapList.get(i).get("PHYIKY"));
+					tasdiRow.put("PHYIIT", stockMapList.get(i).get("PHYIIT"));
+					tasdiRow.put("DROPID", " ");
+					tasdiRow.put("DESC01", stockMapList.get(i).get("DESC01"));
+					tasdiRow.put("DESC02", stockMapList.get(i).get("DESC02"));
+					tasdiRow.put("ASKU01", stockMapList.get(i).get("ASKU01"));
+					tasdiRow.put("ASKU02", stockMapList.get(i).get("ASKU02"));
+					tasdiRow.put("ASKU03", stockMapList.get(i).get("ASKU03"));
+					tasdiRow.put("ASKU04", stockMapList.get(i).get("ASKU04"));
+					tasdiRow.put("ASKU05", stockMapList.get(i).get("ASKU05"));
+					tasdiRow.put("EANCOD", stockMapList.get(i).get("EANCOD"));
+					tasdiRow.put("GTINCD", stockMapList.get(i).get("GTINCD"));
+					tasdiRow.put("SKUG01", stockMapList.get(i).get("SKUG01"));
+					tasdiRow.put("SKUG02", stockMapList.get(i).get("SKUG02"));
+					tasdiRow.put("SKUG03", stockMapList.get(i).get("SKUG03"));
+					tasdiRow.put("SKUG04", stockMapList.get(i).get("SKUG04"));
+					tasdiRow.put("SKUG05", stockMapList.get(i).get("SKUG05"));
+					tasdiRow.put("GRSWGT", stockMapList.get(i).get("GRSWGT"));
+					tasdiRow.put("NETWGT", stockMapList.get(i).get("NETWGT"));
+					tasdiRow.put("WGTUNT", stockMapList.get(i).get("WGTUNT"));
+					tasdiRow.put("LENGTH", stockMapList.get(i).get("LENGTH"));
+					tasdiRow.put("WIDTHW", stockMapList.get(i).get("WIDTHW"));
+					tasdiRow.put("HEIGHT", stockMapList.get(i).get("HEIGHT"));
+					tasdiRow.put("CUBICM", stockMapList.get(i).get("CUBICM"));
+					tasdiRow.put("CAPACT", stockMapList.get(i).get("CAPACT"));
+					tasdiRow.put("WORKID", " ");
+					tasdiRow.put("WORKNM", " ");
+					tasdiRow.put("HHTTID", " ");
+					tasdiRow.put("AREAKY", stockMapList.get(i).get("AREAKY"));
+					tasdiRow.put("LOTA01", stockMapList.get(i).get("LOTA01"));
+					tasdiRow.put("LOTA02", stockMapList.get(i).get("LOTA02"));
+					tasdiRow.put("LOTA03", stockMapList.get(i).get("LOTA03"));
+					tasdiRow.put("LOTA04", stockMapList.get(i).get("LOTA04"));
+					tasdiRow.put("LOTA05", stockMapList.get(i).get("LOTA05"));
+					tasdiRow.put("LOTA06", stockMapList.get(i).get("LOTA06"));
+					tasdiRow.put("LOTA07", stockMapList.get(i).get("LOTA07"));
+					tasdiRow.put("LOTA08", stockMapList.get(i).get("LOTA08"));
+					tasdiRow.put("LOTA09", stockMapList.get(i).get("LOTA09"));
+					tasdiRow.put("LOTA10", stockMapList.get(i).get("LOTA10"));
+					tasdiRow.put("LOTA11", stockMapList.get(i).get("LOTA11"));
+					tasdiRow.put("LOTA12", stockMapList.get(i).get("LOTA12"));
+					tasdiRow.put("LOTA13", stockMapList.get(i).get("LOTA13"));
+					tasdiRow.put("LOTA14", stockMapList.get(i).get("LOTA14"));
+					tasdiRow.put("LOTA15", stockMapList.get(i).get("LOTA15"));
+					tasdiRow.put("LOTA16", stockMapList.get(i).get("LOTA16"));
+					tasdiRow.put("LOTA17", stockMapList.get(i).get("LOTA17"));
+					tasdiRow.put("LOTA18", stockMapList.get(i).get("LOTA18"));
+					tasdiRow.put("LOTA19", stockMapList.get(i).get("LOTA19"));
+					tasdiRow.put("LOTA20", stockMapList.get(i).get("LOTA20"));
+					tasdiRow.put("AWMSNO", " ");
+					tasdiRow.put("AWMSTS", " ");
+					tasdiRow.put("SMANDT", stockMapList.get(i).get("SMANDT"));
+					tasdiRow.put("SEBELN", stockMapList.get(i).get("SEBELN"));
+					tasdiRow.put("SEBELP", stockMapList.get(i).get("SEBELP"));
+					tasdiRow.put("SZMBLNO", stockMapList.get(i).get("SZMBLNO"));
+					tasdiRow.put("SZMIPNO", stockMapList.get(i).get("SZMIPNO"));
+					tasdiRow.put("STRAID", stockMapList.get(i).get("STRAID"));
+					tasdiRow.put("SVBELN", shpdiRow.getString("SVBELN"));
+					tasdiRow.put("SPOSNR", shpdiRow.getString("SPOSNR"));
+					tasdiRow.put("STKNUM", shpdiRow.getString("STKNUM"));
+					tasdiRow.put("STPNUM", shpdiRow.getString("STPNUM"));
+					tasdiRow.put("SWERKS", stockMapList.get(i).get("SWERKS"));
+					tasdiRow.put("SLGORT", stockMapList.get(i).get("SLGORT"));
+					tasdiRow.put("SDATBG", stockMapList.get(i).get("SDATBG"));
+					tasdiRow.put("STDLNR", stockMapList.get(i).get("STDLNR"));
+					tasdiRow.put("SSORNU", shpdiRow.getString("SSORNU"));
+					tasdiRow.put("SSORIT", shpdiRow.getString("SSORIT"));
+					tasdiRow.put("SMBLNR", stockMapList.get(i).get("SMBLNR"));
+					tasdiRow.put("SZEILE", stockMapList.get(i).get("SZEILE"));
+					tasdiRow.put("SMJAHR", stockMapList.get(i).get("SMJAHR"));
+					tasdiRow.put("SXBLNR", stockMapList.get(i).get("SXBLNR"));
+					tasdiRow.put("SAPSTS", stockMapList.get(i).get("SAPSTS"));
+
+					tasdiRow.put("DOORKY", " ");
+					tasdiRow.put("PTLT01", stockMapList.get(i).get("LOTA01"));
+					tasdiRow.put("PTLT02", stockMapList.get(i).get("LOTA02"));
+					tasdiRow.put("PTLT03", stockMapList.get(i).get("LOTA03"));
+					tasdiRow.put("PTLT04", stockMapList.get(i).get("LOTA04"));
+					tasdiRow.put("PTLT05", stockMapList.get(i).get("LOTA05"));
+					tasdiRow.put("PTLT06", stockMapList.get(i).get("LOTA06"));
+					tasdiRow.put("PTLT07", stockMapList.get(i).get("LOTA07"));
+					tasdiRow.put("PTLT08", stockMapList.get(i).get("LOTA08"));
+					tasdiRow.put("PTLT09", stockMapList.get(i).get("LOTA09"));
+					tasdiRow.put("PTLT10", stockMapList.get(i).get("LOTA10"));
+					tasdiRow.put("PTLT11", stockMapList.get(i).get("LOTA11"));
+					tasdiRow.put("PTLT12", stockMapList.get(i).get("LOTA12"));
+					tasdiRow.put("PTLT13", stockMapList.get(i).get("LOTA13"));
+					tasdiRow.put("PTLT14", stockMapList.get(i).get("LOTA14"));
+					tasdiRow.put("PTLT15", stockMapList.get(i).get("LOTA15"));
+					tasdiRow.put("PTLT16", stockMapList.get(i).get("LOTA16"));
+					tasdiRow.put("PTLT17", stockMapList.get(i).get("LOTA17"));
+					tasdiRow.put("PTLT18", stockMapList.get(i).get("LOTA18"));
+					tasdiRow.put("PTLT19", stockMapList.get(i).get("LOTA19"));
+					tasdiRow.put("PTLT20", stockMapList.get(i).get("LOTA20"));
+					tasdiRow.put("PASTKY", " ");
+					tasdiRow.put("ALSTKY", " ");
+					tasdiRow.put("SBKTXT", " ");
+					tasdiRow.put("TASRSN", " ");
+					tasdiRow.put("CREDAT", date);
+					tasdiRow.put("CRETIM", time);
+					tasdiRow.put("CREUSR", USER);
+					tasdiRow.put("LMODAT", date);
+					tasdiRow.put("LMOTIM", time);
+					tasdiRow.put("LMOUSR", USER);
+					tasdiRow.put("INDBZL", " ");
+					tasdiRow.put("INDARC", " ");
+					tasdiRow.put("UPDCHK", "0");
+					tasdiRow.put(CommonConfig.SES_USER_ID_KEY, USER);
+	
+					//TASDI 생성
+					tasdiRow.setModuleCommand("WmsOutbound", "TASDI"); 
+					commonDao.insert(tasdiRow);
+					
+					//TASDR 생성
+					tasdiRow.put("STOKKY", stockMapList.get(i).get("STOKKY"));				
+					commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", tasdiRow);		
+
+					//지정피킹 FLAG
+					DataMap appointMap = new DataMap();
+					appointMap.put("SHPOKY", shpdiInfoList.get(j).getString("SHPOKY"));
+					appointMap.put("SHPOIT", shpdiInfoList.get(j).getString("SHPOIT"));
+					appointMap.put("SKUKEY", shpdiInfoList.get(j).getString("SKUKEY"));
+					commonDao.update("WmsMobileOutboundPicking_COPY.APPOINTPICKINGFLAG", appointMap);	
+				}
+				
+				if(menuQTCOMP > 0) {
+					stockMapList.get(i).put("QTCOMP", menuQTCOMP);
+					
+					DataMap snedMap = new DataMap(); 
+					snedMap.put("QTCOMP", stockMapList.get(i).get("QTCOMP"));
+					snedMap.put("LOCAKY", stockMapList.get(i).get("LOCAKY"));
+					snedMap.put("LOTA01", stockMapList.get(i).get("LOTA01"));
+					snedMap.put("LOTA02", stockMapList.get(i).get("LOTA02"));
+					snedMap.put("LOTA07", stockMapList.get(i).get("LOTA07"));
+					snedMap.put("LOTA14", stockMapList.get(i).get("LOTA14"));
+					snedMap.put("SKUKEY", stockMapList.get(i).get("SKUKEY"));
+					snedMap.put("DUOMKY", stockMapList.get(i).get("DUOMKY"));
+					snedMap.put("QTJCMPBOX", stockMapList.get(i).get("QTJCMPBOX"));
+					
+					addStkkyList.add(snedMap);
+					
+					MSG = "OK";
+				}
+			}
+		}
+
+		if(addStkkyList.size() > 1) {
+			for(int j=addStkkyList.size()-1; j >= 0; j--) {
+				if(j != 0) {
+					if(!addStkkyList.get(j).getString("LOCAKY").equals(addStkkyList.get(j-1).getString("LOCAKY")) ||
+					   !addStkkyList.get(j).getString("LOTA01").equals(addStkkyList.get(j-1).getString("LOTA01")) ||
+					   !addStkkyList.get(j).getString("LOTA02").equals(addStkkyList.get(j-1).getString("LOTA02")) ||
+					   !addStkkyList.get(j).getString("LOTA14").equals(addStkkyList.get(j-1).getString("LOTA14"))) {
+					
+					}else {
+						addStkkyList.get(j-1).put("QTCOMP", Double.parseDouble(addStkkyList.get(j).getString("QTCOMP")) + Double.parseDouble(addStkkyList.get(j-1).getString("QTCOMP")));
+						addStkkyList.get(j-1).put("QTJCMPBOX", Integer.parseInt(addStkkyList.get(j).getString("QTJCMPBOX")) + Integer.parseInt(addStkkyList.get(j-1).getString("QTJCMPBOX")));
+						addStkkyList.remove(j);
+					}
+				}
+			}
+		}
+		
+		// 할당정보와 다른 바코드입니다.
+		if((stockMapList.size() <= 0 && diffCnt == 0) || (diffCnt > 0 && diffCnt == ingCnt)) {
+			MSG="OK";
+			//MSG="MOBILE_M0046";
+		}
+
+		// 이미 피킹완료된 데이터입니다. 
+		if(stockMapList.size() > 0 && !MSG.equals("OK") && diffCnt == 0) {
+			MSG = "OUT_M0175";
+		}
+				
+		rsMap.put("MSG", MSG);
+		rsMap.put("StkkyList", addStkkyList);
+		
+		return rsMap ;
+	}
+	
+	@Transactional
+	public DataMap PDLD21DETAILCNT(DataMap map) throws SQLException {
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDLD21DETAILCNT");
+		DataMap rsMap = commonDao.getMap(map);
+		return rsMap;
+	} 
+	
+	@Transactional
+	public DataMap PDLD21LISTValidation(DataMap map) throws SQLException {
+		
+		List<DataMap> list = map.getList("list");	//그리드 데이터
+		List<DataMap> addListMap = new ArrayList<DataMap>(); //DB데이터
+		
+		DataMap rsMap = new DataMap();
+
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDLD21LISTValidation");
+		addListMap = commonDao.getList(map);	
+		
+		
+		/*
+		 * 001
+		 * 
+		 * 001 v 002 v 004 001 v
+		 * 
+		 * 0 001 1 1 11:20 1 001 1 2 11:21 2 001 1 3 11:22
+		 * 
+		 * index
+		 * 
+		 * for (int i = 0; i < list.size(); i++) {
+		 * 
+		 * 001 == 14 //for (int j = 0; j < addListMap.size(); j++) { index++; //conti
+		 * 
+		 * //}
+		 * 
+		 * 
+		 * } addListMap.get(index);
+		 * 
+		 * 
+		 * for (int j = 0; j < addListMap.size(); j++) {
+		 * 
+		 * }
+		 */
+		 
+		//String LOTA14 = map.getString("BARCOD");
+	      
+	      //List<DataMap> dataList = new ArrayList<>(); // 화면에서 넘어온 list
+	      //List<DataMap> dbList   = new ArrayList<>(); // db 조회 list
+	      
+			/*
+			 * addListMap.stream().forEach(data -> {
+			 * 
+			 * String TASKKY = data.getString("TASKKY"); String TASKIT =
+			 * data.getString("TASKIT");
+			 * 
+			 * Predicate<DataMap> test = x -> { return
+			 * !data.getString("LOTA14").equals(LOTA14) &&
+			 * data.getString("TASKKY").equals(TASKKY) &&
+			 * data.getString("TASKIT").equals(TASKIT); };
+			 * 
+			 * List<DataMap> filteredList =
+			 * list.stream().filter(test).collect(Collectors.toList());
+			 * 
+			 * dataList.addAll(filteredList); });
+			 * 
+			 */
+		 
+		 
+		
+	      
+	      
+		return rsMap;
+	}
+	
+			
+	@Transactional
+	public DataMap PDLD21SaveEnd(DataMap map) throws SQLException {
+		List<DataMap> head = map.getList("head");
+		DataMap itemRow;
+		DataMap row;		
+		List shpokyList = new ArrayList();
+		DataMap validMap = new DataMap();		
+		DataMap totalQtyMap = new DataMap();
+		int validationCount = 0;
+		
+		DataMap rsRowMap = new DataMap();
+		DataMap rsMap = new DataMap();
+		DataMap rqMap = new DataMap();
+		
+		int count=0;
+		
+		for(int i = 0 ; i < head.size() ; i ++){
+			itemRow = head.get(i).getMap("map");
+			
+			itemRow.put("WAREKY", map.getString("WAREKY"));
+			itemRow.put("OWNRKY", map.getString("OWNRKY"));
+			itemRow.put("PLNTKY", map.getString("PLNTKY"));
+			
+			if(itemRow.get("FCKCOM").equals("V")){
+				continue;
+			}
+			
+			String shpokyNum = head.get(i).getMap("map").getString("SHPOKY");			
+			
+			if( !shpokyNum.isEmpty() && !shpokyNum.equals("")) {
+					
+					//SHPDH I/F CHECK 
+					for(int j=0;j<head.size();j++){
+							rsRowMap = head.get(j).getMap("map");
+							rsRowMap.put("SHOPKY", shpokyNum);
+							
+							rsMap.setModuleCommand("WmsTask_COPY", "VALIDATION_SHPDH");
+							rsMap.put("SHPOKY", rsRowMap.get("SHPOKY"));
+							rqMap = commonDao.getMap(rsMap);
+							
+							if(rsRowMap.get("FCKCOM").equals("V")){
+								continue;
+							}
+							
+							if(rqMap != null && !rqMap.getString("SHPOKY").equals(" ")) {
+								rsMap.put("SHPOKY", rqMap.getString("SHPOKY"));
+								
+								return rsMap;
+							}
+							
+					}
+					
+					//validation					
+					validMap = commonDao.getMap("WmsMobileOutboundPicking.PDLD21Validation1", itemRow);
+					
+					String validMsg = validMap.getString("MSG");
+					
+					if("OK".equals(validMsg)){
+						
+						itemRow.put("QTSHPC", Double.parseDouble((String)itemRow.get("QTCOMP")));
+						itemRow.put("LSTTFL", "V");
+						itemRow.put(CommonConfig.SES_USER_ID_KEY,	map.get(CommonConfig.SES_USER_ID_KEY));
+						itemRow.put("PLNTKY",	map.getString("PLNTKY"));
+						itemRow.put("SES_MTYPE",	map.getString("SES_MTYPE"));
+								
+						commonDao.update("WmsMobileOutboundPicking.PDLD21Sub", itemRow);
+														
+						totalQtyMap = commonDao.getMap("WmsMobileOutboundPicking.TOTAL_QTCOMP", itemRow);
+						itemRow.put("QTSHPC", totalQtyMap.get("QTCOMP"));
+						commonDao.update("WmsOutbound_COPY.DL05Sub", itemRow);
+						
+						rsMap.put("MSG", validMsg);
+						
+						count++;
+						
+					}else{
+						rsMap.put("MSG", validMsg);
+						validationCount++;
+						break;
+					}
+			
+			
+			}else {
+				
+				List<DataMap> selectList = new ArrayList<>();
+				itemRow.put("SES_MTYPE",	map.getString("SES_MTYPE"));
+				//SHPDH, SHPDI SELECT				
+				itemRow.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDLD21SUB");
+				selectList = commonDao.getList(itemRow);
+				
+				//SHPDH I/F CHECK 
+				for(int j=0;j<selectList.size();j++){
+						rsRowMap = selectList.get(j).getMap("map");
+						rsMap.setModuleCommand("WmsTask_COPY", "VALIDATION_SHPDH");
+						rsMap.put("SHPOKY", rsRowMap.get("SHPOKY"));
+						rqMap = commonDao.getMap(rsMap);
+						
+						if(rsRowMap.get("FCKCOM").equals("V")){
+							continue;
+						}
+						
+						if(rqMap != null && !rqMap.getString("SHPOKY").equals(" ")) {
+							rsMap.put("SHPOKY", rqMap.getString("SHPOKY"));
+							
+							return rsMap;
+						}
+						
+				}
+					
+				
+				for(int j=0; j < selectList.size(); j++){
+					
+					row =selectList.get(j);
+					
+					//validation
+					row.put("WAREKY", map.getString("WAREKY"));
+					row.put("OWNRKY", map.getString("OWNRKY"));
+					row.put("PLNTKY", map.getString("PLNTKY"));
+					validMap = commonDao.getMap("WmsMobileOutboundPicking.PDLD21Validation1", itemRow);
+					
+					String validMsg = validMap.getString("MSG");
+					
+					if("OK".equals(validMsg)) {
+												
+						row.put("LSTTFL", "V");
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_ID_KEY, 		  map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put("SES_MTYPE",	map.getString("SES_MTYPE"));
+
+						commonDao.update("WmsMobileOutboundPicking.PDLD21Sub", row);
+						
+						totalQtyMap = commonDao.getMap("WmsMobileOutboundPicking.TOTAL_QTCOMP", row);
+						row.put("QTSHPC", Double.parseDouble((String)totalQtyMap.get("QTCOMP")));
+						
+						commonDao.update("WmsOutbound_COPY.DL05Sub", row);
+						
+						count++;
+						
+					}else{
+						rsMap.put("MSG", validMsg);
+						validationCount++;
+						break;
+					}
+				
+				}
+				
+			}
+					
+			StringBuilder sb = new StringBuilder();
+			
+			for(int k = 0 ; k < shpokyList.size() ; k ++){
+				if(k != 0){
+					sb.append(",");
+				}
+				sb.append("'").append(shpokyList.get(k)).append("'");
+			}
+			
+			rsMap.put("SHPOKY", sb.toString());
+			rsMap.put("CNT", count);
+			
+		}
+		
+		
+		if(!map.getString("TOTALCNT").isEmpty() && !map.getString("TOTALCNT").equals("") && !map.getString("TOTALCNT").equals(" ")) {
+		
+		map.put("checkFck", "V");
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDLD21_DETAIL");		
+		
+		rsMap.put("CNT", commonDao.getList(map).size());
+		}
+		
+		return rsMap;
+	}
+	
+	//@Transactional(rollbackFor = Exception.class)
+	public DataMap savePDTK10(DataMap map) throws SQLException {	
+		
+		
+        
+		List<DataMap> list = map.getList("list");
+		
+		DataMap rsMap = new DataMap();		
+		DataMap head = new DataMap();
+		DataMap ptnMap = new DataMap();
+		
+		String MSG = "OK";
+		int count = 1;
+		
+		DataMap row;
+		DataMap headRow;
+		
+		String snum;
+		String inum;
+		
+		SimpleDateFormat fmDate = new SimpleDateFormat("yyyyMMdd", Locale.KOREA);
+		String date = fmDate.format(new Date());
+		SimpleDateFormat fmTime = new SimpleDateFormat("HHmmss", Locale.KOREA);
+		String time = fmTime.format(new Date());	
+		
+				
+		
+		List<DataMap> selectList = new ArrayList<>();
+		
+		
+		List gridRowNumList = new ArrayList<>();
+		
+		head.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDTK10");		
+		head.put("PROGID", map.getString("PROGID"));
+		head.put("WAREKY", map.getString("WAREKY"));
+		head.put("OWNRKY", map.getString("OWNRKY"));
+		head.put("LANGKY", map.getString("LANGKY"));
+		
+		
+		selectList = commonDao.getList(head);		//헤더문서 조회
+		headRow = selectList.get(0).getMap("map");
+		
+		
+		
+		for(int i=0;i<list.size();i++){
+			
+			TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+	        TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+	        
+			int itemCount = 0;
+			
+			row = list.get(i).getMap("map");
+			
+			int gridRowNum = row.getInt("GRowNum");
+			
+			if(row.getString("GRowState").equals("D")) {
+				continue;
+			}
+			
+			head.setModuleCommand("WmsTask_COPY", "NUMOBJ");		
+			head.put("DOCUTY", headRow.get("DOCUTY"));
+			String numobj = commonDao.getMap(head).getString("NUMOBJ");
+			
+			head.setModuleCommand("WmsTask_COPY", "FN_NROBJ");
+			head.put("NUMOBJ", numobj);
+			String seq = (String)commonDao.getObj(head); // taskky 만들기	
+			
+			
+			row.setModuleCommand("WmsTask_COPY", "TK36_PTNRKY");	
+			row.put("PTNRTY", "CT");
+			row.put("PTNRKY", row.getString("LOTA02").concat(row.getString("TOWAREKY")));
+			ptnMap = commonDao.getMap(row); 
+			
+					
+			//새로운 taskky 번호 채번
+			headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			headRow.put("TASKKY", seq);
+			headRow.put("WARETG", headRow.get("WAREKY"));
+			headRow.put("TASOTY", headRow.get("DOCUTY"));
+			headRow.put("PTNRKY", ptnMap.get("PTNRKY"));		
+			headRow.put("PTNRNM", ptnMap.get("NAME01"));
+			headRow.put("PTNRTY", "CT");
+			headRow.put("STATDO", "FSH");
+			
+			
+			headRow.setModuleCommand("WmsTask_COPY", "TASDH");
+			commonDao.insert(headRow);
+			
+			
+			row.put("TASOTY", head.get("DOCUTY"));
+			
+			row.setModuleCommand("WmsMobileOutboundPicking_COPY", "PDTK10_AVAILABLE_STOCK");
+			List<DataMap> stockMapList = commonDao.getList(row);
+			
+			double totalShpqty = Utils.parseDouble(row.getString("SHPQTY"));
+			
+			for(int j=0; j < stockMapList.size(); j++) {
+				
+			itemCount += 10;
+			totalShpqty -= Utils.parseDouble(stockMapList.get(j).getString("QTSIWH"));
+			
+			double shpqty = Utils.parseDouble(stockMapList.get(j).getString("QTSIWH"));
+			
+			if(totalShpqty <= 0) {
+				
+				shpqty = totalShpqty + shpqty;
+				
+			}
+			
+			row.put("TASKKY", seq);
+			row.setModuleCommand("WmsTask_COPY", "TASDIEND");
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			
+			snum = String.valueOf(itemCount);
+			inum = String.valueOf("000000").substring(0,(6-snum.length()))+snum;
+			
+			row.put("TASKTY", "356"); //생산직불출 출고
+			
+			row.put("TASKIT", inum);
+			row.put("STATIT", "FSH");
+			row.put("QTTAOR", shpqty);
+			row.put("QTCOMP", shpqty);			
+			row.put("QTSTKM", shpqty);
+			row.put("QTSTKC", shpqty);
+			row.put("TASRSN", row.getString("RSNTXT"));
+			row.put("RSNCD", "999");
+			
+			row.put("OWNRKY", stockMapList.get(j).get("OWNRKY"));
+			row.put("SKUKEY", stockMapList.get(j).get("SKUKEY"));
+			row.put("LOTNUM", stockMapList.get(j).get("LOTNUM"));
+			row.put("ACTCDT", "000000");
+			row.put("ACTCTI", "000000");
+			row.put("QTYUOM", shpqty);
+			row.put("TKFLKY", " ");
+			row.put("STEPNO", " ");
+			row.put("LSTTFL", "V");
+			
+			row.put("LOCASR", stockMapList.get(j).get("LOCAKY"));
+			row.put("SECTSR", stockMapList.get(j).get("SECTID"));
+			row.put("PAIDSR", stockMapList.get(j).get("PACKID"));
+			row.put("TRNUSR", stockMapList.get(j).get("TRNUID"));
+			row.put("STRUTY", stockMapList.get(j).get("TRUNTY"));
+			row.put("SMEAKY", stockMapList.get(j).get("MEASKY"));
+			row.put("SUOMKY", stockMapList.get(j).get("UOMKEY"));
+			row.put("QTSPUM", stockMapList.get(j).get("QTPUOM"));
+			row.put("SDUOKY", stockMapList.get(j).get("DUOMKY"));
+			row.put("QTSDUM", stockMapList.get(j).get("QTDUOM"));
+			row.put("LOCATG", stockMapList.get(j).get("LOCATG"));
+			row.put("SECTTG", stockMapList.get(j).get("SECTID"));
+			row.put("PAIDTG", stockMapList.get(j).get("PACKID"));
+			row.put("TRNUTG", stockMapList.get(j).get("TRNUID"));
+			row.put("TTRUTY", stockMapList.get(j).get("TRUNTY"));
+			row.put("TMEAKY", stockMapList.get(j).get("MEASKY"));
+			row.put("TUOMKY", stockMapList.get(j).get("UOMKEY"));
+			row.put("QTTPUM", stockMapList.get(j).get("QTPUOM"));
+			row.put("TDUOKY", stockMapList.get(j).get("DUOMKY"));
+			row.put("QTTDUM", stockMapList.get(j).get("QTDUOM"));
+			
+			row.put("LOCAAC",  stockMapList.get(j).get("LOCATG"));  
+			row.put("SECTAC",  stockMapList.get(j).get("SECTID"));  
+			row.put("PAIDAC",  stockMapList.get(j).get("PACKID"));  
+			row.put("TRNUAC",  stockMapList.get(j).get("TRNUID"));  
+			row.put("ATRUTY",  stockMapList.get(j).get("TRUNTY"));  
+			row.put("AMEAKY",  stockMapList.get(j).get("MEASKY"));  
+			row.put("AUOMKY",  stockMapList.get(j).get("UOMKEY"));  
+			row.put("QTAPUM",  stockMapList.get(j).get("QTPUOM"));  
+			row.put("ADUOKY",  stockMapList.get(j).get("DUOMKY"));  
+			row.put("QTADUM",  stockMapList.get(j).get("QTDUOM"));  
+			row.put("REFDKY", stockMapList.get(j).get("REFDKY"));
+			row.put("REFDIT", stockMapList.get(j).get("REFDIT"));
+			row.put("REFCAT", "200");
+			row.put("REFDAT", date);
+			row.put("PURCKY", stockMapList.get(j).get("PURCKY"));
+			row.put("PURCIT", stockMapList.get(j).get("PURCIT"));
+			row.put("ASNDKY", stockMapList.get(j).get("ASNDKY"));
+			row.put("ASNDIT", stockMapList.get(j).get("ASNDIT"));
+			row.put("RECVKY", stockMapList.get(j).get("RECVKY"));
+			row.put("RECVIT", stockMapList.get(j).get("RECVIT"));
+			row.put("SHPOKY", " ");
+			row.put("SHPOIT", " ");
+			row.put("GRPOKY", " ");
+			row.put("GRPOIT", " ");
+			row.put("SADJKY", stockMapList.get(j).get("SADJKY"));
+			row.put("SADJIT", stockMapList.get(j).get("SADJIT"));
+			row.put("SDIFKY", " ");
+			row.put("SDIFIT", " ");
+			row.put("PHYIKY", stockMapList.get(j).get("PHYIKY"));
+			row.put("PHYIIT", stockMapList.get(j).get("PHYIIT"));
+			row.put("DROPID", " ");
+			row.put("DESC01", stockMapList.get(j).get("DESC01"));
+			row.put("DESC02", stockMapList.get(j).get("DESC02"));
+			row.put("ASKU01", stockMapList.get(j).get("ASKU01"));
+			row.put("ASKU02", stockMapList.get(j).get("ASKU02"));
+			row.put("ASKU03", stockMapList.get(j).get("ASKU03"));
+			row.put("ASKU04", stockMapList.get(j).get("ASKU04"));
+			row.put("ASKU05", stockMapList.get(j).get("ASKU05"));
+			row.put("EANCOD", stockMapList.get(j).get("EANCOD"));
+			row.put("GTINCD", stockMapList.get(j).get("GTINCD"));
+			row.put("SKUG01", stockMapList.get(j).get("SKUG01"));
+			row.put("SKUG02", stockMapList.get(j).get("SKUG02"));
+			row.put("SKUG03", stockMapList.get(j).get("SKUG03"));
+			row.put("SKUG04", stockMapList.get(j).get("SKUG04"));
+			row.put("SKUG05", stockMapList.get(j).get("SKUG05"));
+			row.put("GRSWGT", stockMapList.get(j).get("GRSWGT"));
+			row.put("NETWGT", stockMapList.get(j).get("NETWGT"));
+			row.put("WGTUNT", stockMapList.get(j).get("WGTUNT"));
+			row.put("LENGTH", stockMapList.get(j).get("LENGTH"));
+			row.put("WIDTHW", stockMapList.get(j).get("WIDTHW"));
+			row.put("HEIGHT", stockMapList.get(j).get("HEIGHT"));
+			row.put("CUBICM", stockMapList.get(j).get("CUBICM"));
+			row.put("CAPACT", stockMapList.get(j).get("CAPACT"));
+			row.put("WORKID", " ");
+			row.put("WORKNM", " ");
+			row.put("HHTTID", " ");
+			row.put("AREAKY", stockMapList.get(j).get("AREAKY"));
+			row.put("LOTA01", stockMapList.get(j).get("LOTA01"));
+			row.put("LOTA02", stockMapList.get(j).get("LOTA02"));
+			row.put("LOTA03", stockMapList.get(j).get("LOTA03"));
+			row.put("LOTA04", stockMapList.get(j).get("LOTA04"));
+			row.put("LOTA05", stockMapList.get(j).get("LOTA05"));
+			row.put("LOTA06", stockMapList.get(j).get("LOTA06"));
+			row.put("LOTA07", stockMapList.get(j).get("LOTA07"));
+			row.put("LOTA08", stockMapList.get(j).get("LOTA08"));
+			row.put("LOTA09", stockMapList.get(j).get("LOTA09"));
+			row.put("LOTA10", stockMapList.get(j).get("LOTA10"));
+			row.put("LOTA11", stockMapList.get(j).get("LOTA11"));
+			row.put("LOTA12", stockMapList.get(j).get("LOTA12"));
+			row.put("LOTA13", stockMapList.get(j).get("LOTA13"));
+			row.put("LOTA14", stockMapList.get(j).get("LOTA14"));
+			row.put("LOTA15", stockMapList.get(j).get("LOTA15"));
+			row.put("LOTA16", stockMapList.get(j).get("LOTA16"));
+			row.put("LOTA17", stockMapList.get(j).get("LOTA17"));
+			row.put("LOTA18", stockMapList.get(j).get("LOTA18"));
+			row.put("LOTA19", stockMapList.get(j).get("LOTA19"));
+			row.put("LOTA20", stockMapList.get(j).get("LOTA20"));
+			row.put("AWMSNO", " ");
+			row.put("AWMSTS", " ");
+			row.put("SMANDT", stockMapList.get(j).get("SMANDT"));
+			row.put("SEBELN", stockMapList.get(j).get("SEBELN"));
+			row.put("SEBELP", stockMapList.get(j).get("SEBELP"));
+			row.put("SZMBLNO",stockMapList.get(j).get("SZMBLNO"));
+			row.put("SZMIPNO",stockMapList.get(j).get("SZMIPNO"));
+			row.put("STRAID", stockMapList.get(j).get("STRAID"));
+			row.put("SVBELN", stockMapList.get(j).get("SVBELN"));
+			row.put("SPOSNR", stockMapList.get(j).get("SPOSNR"));
+			row.put("STKNUM", stockMapList.get(j).get("STKNUM"));
+			row.put("STPNUM", stockMapList.get(j).get("STPNUM"));
+			row.put("SWERKS", stockMapList.get(j).get("SWERKS"));
+			row.put("SLGORT", stockMapList.get(j).get("SLGORT"));
+			row.put("SDATBG", stockMapList.get(j).get("SDATBG"));
+			row.put("STDLNR", stockMapList.get(j).get("STDLNR"));
+			row.put("SSORNU", stockMapList.get(j).get("STDLNR"));
+			row.put("SSORIT", stockMapList.get(j).get("SSORIT"));
+			row.put("SMBLNR", stockMapList.get(j).get("SMBLNR"));
+			row.put("SZEILE", stockMapList.get(j).get("SZEILE"));
+			row.put("SMJAHR", stockMapList.get(j).get("SMJAHR"));
+			row.put("SXBLNR", stockMapList.get(j).get("SXBLNR"));
+			row.put("SAPSTS", stockMapList.get(j).get("SAPSTS"));
+			row.put("DOORKY", " ");
+			row.put("PTLT01", stockMapList.get(j).get("LOTA01"));
+			row.put("PTLT02", stockMapList.get(j).get("LOTA02"));
+			row.put("PTLT03", stockMapList.get(j).get("LOTA03"));
+			row.put("PTLT04", stockMapList.get(j).get("LOTA04"));
+			row.put("PTLT05", stockMapList.get(j).get("LOTA05"));
+			row.put("PTLT06", stockMapList.get(j).get("LOTA06"));
+			row.put("PTLT07", stockMapList.get(j).get("LOTA07"));
+			row.put("PTLT08", stockMapList.get(j).get("LOTA08"));
+			row.put("PTLT09", stockMapList.get(j).get("LOTA09"));
+			row.put("PTLT10", stockMapList.get(j).get("LOTA10"));
+			row.put("PTLT11", stockMapList.get(j).get("LOTA11"));
+			row.put("PTLT12", stockMapList.get(j).get("LOTA12"));
+			row.put("PTLT13", stockMapList.get(j).get("LOTA13"));
+			row.put("PTLT14", stockMapList.get(j).get("LOTA14"));
+			row.put("PTLT15", stockMapList.get(j).get("LOTA15"));
+			row.put("PTLT16", stockMapList.get(j).get("LOTA16"));
+			row.put("PTLT17", stockMapList.get(j).get("LOTA17"));
+			row.put("PTLT18", stockMapList.get(j).get("LOTA18"));
+			row.put("PTLT19", stockMapList.get(j).get("LOTA19"));
+			row.put("PTLT20", stockMapList.get(j).get("LOTA20"));
+			row.put("PASTKY", " ");
+			row.put("ALSTKY", " ");
+			row.put("SBKTXT", " ");
+			row.put("CREDAT", date);
+			row.put("CRETIM", time);
+			row.put("CREUSR", CommonConfig.SES_USER_ID_KEY);
+			row.put("LMODAT", date);
+			row.put("LMOTIM", time);
+			row.put("LMOUSR", CommonConfig.SES_USER_ID_KEY);
+			row.put("INDBZL", " ");
+			row.put("INDARC", " ");
+			row.put("UPDCHK", "0");
+			
+			row.put("DROPID", "V");
+			
+			row.put("IFID", headRow.getString("IFID")); //IFID 추가
+			
+			commonDao.insert(row);
+
+			/*  Tasdr 인써트 */
+			//row.put("STOKKY", "%");
+			row.put("STOKKY", stockMapList.get(j).get("STOKKY"));
+			commonDao.getMap("WmsTask_COPY.SAVETK_SZP_INS_TASDR", row);						
+			
+			}
+			
+			
+			String firstSkukey    =  row.getString("SKUKEY").substring(0, 2);
+			String stkkyLota01    = row.getString("LOTA01");
+			String stkkyLOTA02    = row.getString("LOTA02");
+			String sendLota01     = row.getString("TOWAREKY");			
+			
+			if((firstSkukey.equals("S0") || firstSkukey.equals("S9")) && stkkyLota01.equals("2400") && stkkyLOTA02.equals("P100") && sendLota01.equals("2400")) {
+				row.put("IFID", row.getString("IFID").split(",", 0)[1]);
+			}
+			// 입고 취소시 실적 IF 데이터 추출
+			String I_RCPTTY = row.getString("TASKTY");
+			String I_IFID   = row.getString("IFID");
+			String I_OWNRKY = row.getString("OWNRKY");
+			String I_RECVKY = row.getString("TASKKY");
+			
+			List<String> rcpttyList = new ArrayList<String>();     // IF 실적 : 작업유형
+			List<DataMap> ifidList = new ArrayList<DataMap>();     // IFID : 인터페이스 전송 목록
+			
+			DataMap rcpttyMap = new DataMap();                     // IF 실적 : 작업유형별 TASK헤더키
+			
+			// IF 실적 입고유형별 입고키 넣기
+			if(!rcpttyList.contains(I_RCPTTY)) {
+				rcpttyList.add(I_RCPTTY);
+				rcpttyMap.put(I_RCPTTY,""+I_RECVKY+"");
+				rcpttyMap.put(I_RCPTTY+"_IFID",I_IFID);
+				rcpttyMap.put(I_RCPTTY+"_OWNRKY",I_OWNRKY);
+			} else {
+				String docNums = rcpttyMap.getString(I_RCPTTY);
+				if(docNums!=null && !"".contentEquals(docNums.trim())) {
+					docNums += ","+I_RECVKY+"";
+				} else {
+					docNums += ""+I_RECVKY+"";
+				}
+				rcpttyMap.put(I_RCPTTY,docNums);
+			}
+			count ++;
+			
+			
+			String SAPIFYN= headRow.getString("SAPIFYN");
+			
+			if(SAPIFYN.equals("V")) {
+				// 실적 인터페이스 저장
+							outboundService.dataInsertIF(map, rcpttyList, rcpttyMap, ifidList, false);
+							try {
+								DataMap resultMap;
+								// 인터페이스 전송
+								for(DataMap item : ifidList) {
+									item.put("ownrky", map.getString("OWNRKY"));
+									item.put("IFID", item.getString("IFID"));
+									item.put("RCPTTY", item.getString("RCPTTY"));
+									item.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+									resultMap = outboundService.sendIf(item);
+									
+									if(item.getString("RFCTYPE").equals("SAP") && ("S".equals(resultMap.getString("sendMsg")) || "SUCCESS".equals(resultMap.getString("sendMsg")))){
+										
+									    transactionManager.commit(transactionStatus);							    
+									    
+									}else if(1 == ifidList.size() && item.getString("RFCTYPE").equals("MES")){
+										
+											transactionManager.commit(transactionStatus);	
+											
+									}else if(!"S".equals(resultMap.getString("sendMsg")) && !"SUCCESS".equals(resultMap.getString("sendMsg"))){
+										String RFCTYPE; 
+										
+										if(item.getString("RFCTYPE").equals("SAP")) {
+											
+											transactionManager.rollback(transactionStatus);
+											
+											RFCTYPE ="SAP : ";							
+											MSG = RFCTYPE+resultMap.getString("sendMsg");
+											rsMap.put("MSG", MSG);											
+											rsMap.put("ERRTXT", resultMap.getString("sendMsg"));
+											rsMap.put("ZDOCNO", seq);										
+											rsMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+											rsMap.put("PROGID", map.getString("menuId"));
+											rsMap.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+											
+											gridRowNumList.add(gridRowNum);
+											break;
+										}else {
+																		
+											RFCTYPE = "MES";
+							                MSG = resultMap.getString("sendMsg");
+							                
+							                rsMap.put("MSG", MSG);
+							                rsMap.put("MSG_TYPE", RFCTYPE);
+							                rsMap.put("MSG_DOC_NO", seq);
+											
+										}
+									}
+									
+								}//SEND FOR
+							}catch (Exception e) {
+								throw new SQLException(e.getMessage());
+							}
+			}
+			
+		}//list for
+		
+		
+		
+		// 실적 인터페이스 전송 목록
+		rsMap.put("GROWNUM_LIST", gridRowNumList);
+		//rsMap.put("ifidList",ifidList);				
+		//rsMap.put("TASKKY", seq);		
+		
+		return rsMap;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap barcodCheck(DataMap map) throws SQLException {	
+			
+			DataMap rsMap = new DataMap();		
+			List<DataMap> addShpokyList = new ArrayList<DataMap>();
+	        			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "BARCOD_CHECK");
+			
+			
+			map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+			map.put("PLNTKY", map.get(CommonConfig.SES_USER_PLANT_KEY));
+			
+			DataMap row = commonDao.getMap(map);
+					
+			rsMap.put("MSG", row.getString("MSG"));
+			rsMap.put("LOCCNT", row.getString("LOCCNT"));
+			
+			// 스캔된 개별바코드 부분할당취소 처리 (선적번호, 개별바코드, 품목코드)
+			// MOBILE_M0052 존재하지 않거나 가용수량이 없는 바코드입니다. (할당된 개별바코드 할당취소 처리)
+			if ((Integer.parseInt(row.getString("LOCCNT")) > 0 && " ".equals(row.getString("MSG"))) || "MOBILE_M0052".equals(row.getString("MSG"))) {
+				//System.out.println("3477: " + map.toString());
+				map.setModuleCommand("WmsMobileOutboundPicking_COPY", "UNALLOCATE_TARGET");
+				List<DataMap> unlocateTarketList = commonDao.getList(map);
+				//System.out.println("지정피킹 할당취소 대상3480: " + unlocateTarketList);
+				
+				if(unlocateTarketList.size() > 0 && unlocateTarketList.get(0) != null) {
+					DataMap rowSub;
+					rowSub = map;
+					
+					// 선적 + 품목 + 납품처 + 개별바코드 대상 부분할당취소처리 
+					for(int i=0; i<unlocateTarketList.size(); i++) {
+						rowSub.put("SHPOKY", unlocateTarketList.get(i).getString("SHPOKY"));
+						rowSub.put("SHPOIT", unlocateTarketList.get(i).getString("SHPOIT"));
+						rowSub.put("LOTA14", unlocateTarketList.get(i).getString("LOTA14"));
+						rowSub.put("UPDCHK", 1);	// 지정피킹을 통해 할당 취소된 경우 SHPDI.UPDCHK=1 값 설정, 할당목록 노출시 노출
+						rowSub.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						
+						commonDao.delete("WmsOutbound.DL04REMOVE1", rowSub); // TASDI 부분 삭제 DELTEE
+						commonDao.update("WmsOutbound.DL04SHPDI", rowSub); // SHPDI 수정 정보 UPDATE
+						commonDao.update("WmsOutbound.DL04SHPDH", rowSub); // SHPDH 수정 정보 UPDATE
+						// UPDCHK 컬럼 1으로 처리 (할당 뺃긴 선적)
+						
+						// 개별바코드의 출하문서번호 조회하여 할당 뺻은 후 할당프로세스 호출처리
+						DataMap alloRow = new DataMap();
+
+						if (i==0) {
+							alloRow.put("SHPOKY", unlocateTarketList.get(i).getString("SHPOKY"));
+							alloRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+							alloRow.put("LOTA14", unlocateTarketList.get(i).getString("LOTA14"));
+							commonDao.getMap("WmsOutbound.CALL_ALLO", alloRow);
+						}else {
+							if (!unlocateTarketList.get(i).getString("SHPOKY").equals(unlocateTarketList.get(i-1).getString("SHPOKY"))) {
+								alloRow.put("SHPOKY", unlocateTarketList.get(i).getString("SHPOKY"));
+								alloRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+								alloRow.put("LOTA14", unlocateTarketList.get(i).getString("LOTA14"));
+								commonDao.getMap("WmsOutbound.CALL_ALLO", alloRow);
+							}
+						}
+					}
+				}
+			}
+	
+			rsMap.put("shpokyList", addShpokyList);
+			return rsMap;
+	}
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap barcodCheckHL(DataMap map) throws SQLException {	
+		
+		DataMap rsMap = new DataMap();		
+		
+		map.setModuleCommand("WmsMobileOutboundPicking_COPY", "SKUKEY_CHECK_HL");
+		
+		
+		map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+		map.put("PLNTKY", map.get(CommonConfig.SES_USER_PLANT_KEY));
+		
+		
+		DataMap row = commonDao.getMap(map);
+
+		if (!"MOBILE_M0054".equals(row.getString("MSG"))) {
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "BARCOD_CHECK_HL");
+			
+			row = commonDao.getMap(map);
+		}
+
+		rsMap.put("MSG", row.getString("MSG"));
+		rsMap.put("LOCCNT", row.getString("LOCCNT"));
+		
+		return rsMap;
+	}
+		
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap taskLockCheck(DataMap map) throws SQLException {	
+			
+
+			DataMap dataMap = map.getMap("data");
+
+		
+			DataMap rsMap = new DataMap();
+			DataMap rowMap = new DataMap();
+			DataMap rowsubMap = new DataMap();
+			List<DataMap> taskkyList;
+			
+			String DPTNKY = map.getString("DPTNKY");
+			
+			
+			rowMap = dataMap;
+			
+			rowMap.put("DPTNKY", DPTNKY);
+			rowMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			rowMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			rowMap.put("SES_MTYPE", map.getString("SES_MTYPE"));
+			
+			rowMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDI_LOCK_INFO");
+			
+			taskkyList = commonDao.getList(rowMap);
+			
+			for(int j=0; j < taskkyList.size(); j++) {
+				
+				rowsubMap = taskkyList.get(j).getMap("map");
+				
+				if(!rowsubMap.getString("PAIDSR").equals(" ")) {
+					
+					rsMap.put("PAIDSR", rowsubMap.getString("PAIDSR"));
+					
+					return rsMap;
+				}
+			}
+
+			
+			return rsMap;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap taskLockUpdate(DataMap map) throws SQLException {	
+
+		
+			DataMap rsMap = new DataMap();
+			DataMap rowsubMap = new DataMap();
+			List<DataMap> taskkyList;
+			
+			String DPTNKY = map.getString("DPTNKY");
+			String STKNUM = map.getString("STKNUM");
+			String LOCAKY = map.getString("LOCAKY");
+			String SKUKEY = map.getString("SKUKEY");
+			
+			
+			String INOUTCHK = map.getString("INOUTCHK");
+			
+			int count = 0;
+			
+			map.put("DPTNKY", DPTNKY);
+			map.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			//map.put("SES_MTYPE", map.getString("SES_MTYPE"));
+			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDI_LOCK_INFO");
+			
+			taskkyList = commonDao.getList(map);
+			
+			for(int j=0; j < taskkyList.size(); j++) {
+				
+				rowsubMap = taskkyList.get(j).getMap("map");
+				
+				rowsubMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				rowsubMap.put("INOUTCHK", INOUTCHK);
+				
+				rowsubMap.setModuleCommand("WmsMobileOutboundPicking_COPY", "TASDI_LOCK_INFO");
+				commonDao.update(rowsubMap);
+				
+				count++;
+			}
+
+			rsMap.put("CNT", count);
+			
+			return rsMap;
+	}
+	
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap OrderCheck(DataMap map) throws SQLException {
+		
+			DataMap rsMap = new DataMap();
+			List<DataMap> rsList;
+		
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "STKNUM_ORDER_INFO");
+			map.put("OWNRKY", map.get(CommonConfig.SES_USER_OWNER_KEY));
+			
+			rsList = commonDao.getList(map);
+			
+			
+				rsMap.put("CNT", rsList.size());
+			
+			if(rsList.size() > 0) {
+				DataMap valid = rsList.get(0);
+							
+				rsMap.put("MSG", valid.getString("MSGRESULT"));
+				
+			}
+			
+			
+			
+			return rsMap;
+	}
+	
+	/**
+	* @methodName   sendStknumInfo
+	* @param map 선적번호
+	* @return DataMap {"MSG":"SUCCESS"} or {"MSG" : "SAP : " + resultMsg}
+	* @throws Exception
+	* @description  선적번호(STKNUM)값을 선적통제(IFWMS333) 등록, RFC SEND (Z_WMS_SHIPMENT_INFO) 등록
+	* @history
+	* __DATE_______AUTHOR__NOTE__________________________________<br>
+	* * 2023.10.20 KYH if(CheckCount > 0) 조건 추가<br>
+	*/
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap sendStknumInfo(DataMap map) throws Exception {				
+			
+			DataMap rsMap = new DataMap();
+			DataMap ifMap = new DataMap();
+			List<DataMap> stknumInfoList = null;
+			
+			String DPTNKY = map.getString("DPTNKY");
+			String STKNUM = map.getString("STKNUM");
+			String LOCAKY = map.getString("LOCAKY");
+			String SKUKEY = map.getString("SKUKEY");
+
+			int count = 0;
+			String MSG = "SUCCESS";
+
+			map.put("STATUS", "C");
+			map.put("DPTNKY", DPTNKY);
+			map.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			//map.put("SES_MTYPE", map.getString("SES_MTYPE"));
+			
+			map.setModuleCommand("WmsMobileOutboundPicking_COPY", "SHPDI_STKNUM_INFO");
+			
+			stknumInfoList = commonDao.getList(map);
+			
+ 			if(stknumInfoList.size() > 0) {
+			
+ 				// 선적번호기준 선적통제 이력존재 체크 
+ 				List<DataMap> checkList = map.getList("list");
+ 				DataMap checkRow = new DataMap();
+ 				checkRow.setModuleCommand("Erpif", "IFWMS333_CHECK");
+ 				checkRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+ 				checkRow.put("TKNUM", stknumInfoList.get(0).getString("TKNUM"));
+
+ 				if (commonDao.getCount(checkRow) > 0) {
+ 					rsMap.put("MSG", "SUCCESS");
+ 					
+ 				} else {
+ 					ifMap.put("list", stknumInfoList);
+ 					ifMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+
+ 					try {			
+
+ 						String resultMsg = ifservice.send_TK_CONTROL(ifMap);
+ 						
+ 						if(!"SUCCESS".equals(resultMsg)){
+ 							rsMap.put("MSG", "SAP : " + resultMsg);			
+ 						}else {
+ 							rsMap.put("MSG", resultMsg);
+ 						}
+ 									
+ 					}catch (Exception e) {
+ 						throw new SQLException(e.getMessage());
+ 					}
+ 				}
+			}
+			
+		return rsMap;
+	}
+	
+	public static boolean isNull(String value) {
+		return (value == null);
+	}
+	
+	public static String leftPad(String stringToPad, String padder, int size) {
+		StringBuffer strb;
+		StringCharacterIterator sci;
+
+		if (padder.length() == 0)
+			return stringToPad;
+
+		if (isNull(stringToPad)) {
+			char[] t = new char[size];
+			for (int i = 0; i < t.length; i++)
+				t[i] = padder.charAt(0);
+
+			stringToPad = String.valueOf(t);
+		}
+
+		strb = new StringBuffer(size);
+		sci = new StringCharacterIterator(padder);
+
+		while (strb.length() < (size - stringToPad.length()))
+			for (char ch = sci.first(); ch != CharacterIterator.DONE; ch = sci.next())
+				if (strb.length() < size - stringToPad.length())
+					strb.insert(strb.length(), String.valueOf(ch));
+		return strb.append(stringToPad).toString();
+	}
+}

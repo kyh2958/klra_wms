@@ -1,0 +1,742 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {float: right; }
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:DISABLED {
+	background-color: #e2e2e2;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script type="text/javascript" src="/wms/js/wms.js"></script>
+<script>
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			editable : false,
+			module : "WmsInventory",
+			command : "PDMV01",
+			gridMobileType : true
+		});
+		
+		$('#BARCOD').focus();
+	});
+	
+	function initTargetLocation() {
+		$('#LOC_TEMP').val(""); // To 지번 초기화
+		$('#RECLOC').val(""); // 추천로케이션
+	}
+	
+	function onReadBarcode() {
+		initTargetLocation();
+		searchData();
+	}
+	
+	function searchData() {
+		if (!validate.check("searchArea")){
+			return;
+		}
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("OWNRKY", "<%=ownrky%>");
+		
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command : "VALIDATE_BARCOD_PDMV01",
+			param : param
+		});
+		
+		var checkMsg = "";
+		if (json &&
+			json.data &&
+			json.data.length > 0
+		) {
+			var data = json.data.filter(x => x.QTSIWH > 0);
+			var msg = "";
+			if (data.length > 0) {
+				if (data.filter(x => {return x.LOCAKY != 'SYSLOC'}).length == 0) { // 수량이 존재하는 재고가 SYSLOC만 존재하는 경우
+					msg = '사용 불가능한 재고입니다.';
+				} else if (data.filter(x => x.QTSPMO == 0).length == 0) {
+					msg = '이미 할당이 완료된 바코드입니다.';
+				} else if (data.filter(x => x.LOCAKY != 'SHPLOC').length == 0) { // 수량이 존재하는 재고가 SHPLOC만 존재하는 경우
+					msg = '출고중인 재고입니다.';
+				}
+			} else {
+				if (json.data.filter(x => x.LOCAKY != 'SHPLOC').length == 0) {  // 수량이 존재하지 않는 재고가 SHPLOC만 존재하는 경우
+					msg = '출고 완료된 재고입니다.';
+				}
+			}
+			
+			if (msg) {
+				commonUtil.msgBox(msg, null, null, function() {
+					$('#BARCOD').focus();
+				});
+				return false;
+			}
+		}
+		
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command : "PDMV01",
+			param : param
+		});
+		
+		var existList = gridList.getGridData('gridList');
+		json.data = json.data.filter(
+			x => !existList.find(y => x.STOKKY == y.get('STOKKY'))
+		)
+		
+		if (!json || !json.data || json.data.length == 0) {
+			var exist = existList.find(
+				x => x.get('LOTA14') == param.get('BARCOD')
+			)
+			
+			var msg = exist ? '스캔이 완료된 바코드입니다.' : 'VALID_M0005';
+			commonUtil.msgBox(msg, null, null, function() { // 조회된 데이터가 없습니다.
+				$('#BARCOD').focus();
+			});
+			return;
+		} else if (json.data.length == 1) {
+			StkLotaPopCallback(json);
+			
+		} else {
+			param.put("json", json);
+			mobile.linkPopOpen('/mobile/PDSTK_LOTA_POP.page?isMV=V', param);
+		}
+	}
+	
+	function StkLotaPopCallback(jsonObj) {
+
+		for (var i in jsonObj.data) {
+			jsonObj.data[i]['DESC01'] = jsonObj.data[i]['DESC01'].replace(/깨끗한나라|보솜이|프레미뇽|디어스킨|메디프렌즈/g, "");
+		}
+		
+		gridList.appendJson('gridList', jsonObj); // append grid
+
+		// 추천로케이션이 없는 경우 세팅
+		var RECLOC = $('#RECLOC').val();
+		if (!RECLOC) {
+			for (var i in jsonObj.data) {
+				var rowData = gridList.getRowData("gridList", i);
+
+				// PS 추천로케이션 제한 
+				if (rowData.map.LOTA02.length && rowData.map.LOTA02 != 'P100') {
+					
+					$("#RECLOC_TR").css('visibility','visible');
+					
+					RECLOC = recommendLocation(rowData);
+					if (RECLOC && RECLOC.trim()) {
+						$('#RECLOC').val(RECLOC);
+						break;
+					}
+				}	
+			}
+		}
+		
+		focusOnGridLast();
+		$('#BARCOD').focus();
+	}
+	
+	// 마지막 row focus
+	function focusOnGridLast () {
+		var rowNumList = gridList.getRowNumList('gridList');
+		var maxRowNum = Math.max(...rowNumList);
+		gridList.setColFocus('gridList', maxRowNum, 'LOTA14');
+		
+		// 조호된 바코드의 작업수량(QTTAOR_TEMP), 단위(UOMKEY_TEMP) 적용 
+		var QTTAOR = gridList.getColData('gridList', maxRowNum, 'QTTAOR');
+		var UOMKEY = gridList.getColData('gridList', maxRowNum, 'UOMKEY');
+		
+		$("#QTTAOR_TEMP").val(QTTAOR)
+		$("#UOMKEY_TEMP").val(UOMKEY)
+	}
+	
+	// 로케이션 추천
+	function recommendLocation(rowData){
+		var list = new Array();
+		list.push(rowData);
+		
+		var param = new DataMap();
+		param.put("list", list);
+		
+		var json = netUtil.sendData({
+			url : "/wms/inventory/json/RecommendLocation.data",
+			param : param
+		});
+		
+		if (json && json.data) {
+			var dataList = json.data.list;
+			dataList.forEach(data => {
+				recLocObj = new DataMap();
+				recLocObj.put('LOTNUM', data.LOTNUM);
+				recLocObj.put('RECLOC', data.O_LOCAKY);
+				recLoc = data.O_LOCAKY;
+			});
+		}
+		return recLoc;
+	}
+	
+	// To 지번 찾기
+	function searchLocMstList () {
+		var rowNumList = gridList.getRowNumList('gridList');
+		if (rowNumList.length == 0) {
+			return;
+		}
+		
+		var param = new DataMap();
+		var rowNum  = gridList.getFocusRowNum("gridList");
+		var rowData = gridList.getRowData('gridList', rowNum);
+		param.put('WAREKY', '<%=wareky%>');
+		param.put("OWNRKY", "<%=ownrky%>");
+		param.put("LOTA02", rowData.get("LOTA02"));
+		param.put("SKUG05", rowData.get("SKUG05"));
+		
+		param.put("AREAKY", rowData.get("AREAKY"));
+		param.put("ZONEKY", rowData.get("ZONEKY"));
+		
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command: "PDMV01LOCMA",
+			param  : param
+		});
+		
+		var data = json.data;
+		
+		// 1건 조회 시
+		if (data && data.length == 1) {
+			LocPopCallback(data);
+		// 다건 조회 시
+		} else if (data && data.length > 1) {
+			param.put("json", json);
+			mobile.linkPopOpen('/mobile/PDLOC_POP.page?showPlntky=true&showStlky=true', param);
+		// 미조회 시
+		} else {
+			commonUtil.msgBox("VALID_M0005", null, null, function() { // 조회된 데이터가 없습니다.
+				$('#LOC_TEMP').focus();
+			});
+			return;
+		}
+	}
+	
+	function LocPopCallback(data) {
+		// LOC_TEMP 태그에 값 셋팅
+		$('#LOC_TEMP').val(data.get('LOCAKY'));
+		$('#LOC_TEMP').focus();
+		onReadTargetLocation(data.get('LOCAKY'));
+	}
+	
+	function onReadTargetLocation(targetLoc) {
+		if (!targetLoc || gridList.getGridDataCount('gridList') < 1) {
+			return;
+		}
+		var param = new DataMap();
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("ALOCAKY", targetLoc);
+		
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command : "LOCAKYval2",
+			sendType : "map",
+			param : param
+		});
+		
+		var rowNumList = gridList.getRowNumList('gridList');
+		
+		if (!json.data) {
+			commonUtil.msgBox("TASK_M0011", targetLoc, null, function() { //* 이동대상 로케이션 {0} 이 유효하지 않습니다.
+				$('#LOC_TEMP').focus();
+				$('#LOC_TEMP').select();
+			});
+			
+			for (var i in rowNumList) {
+				gridList.setColValue('gridList', rowNumList[i], 'LOCATG', '');
+			}
+			return false;
+		} else {
+			var lota01 = json.data.STLKY;
+			
+			var LOCAKY = json.data.LOCAKY;
+			
+			$('#LOC_TEMP').val(LOCAKY);
+			for (var i in rowNumList) {
+				var alota01 = gridList.getColData('gridList', rowNumList[i], 'LOTA01');
+				if((alota01==3000&&lota01==3500) ||(alota01==3500&&lota01==3000)){
+					commonUtil.msgBox("TASK_M0011", lota01);	//* 이동대상 로케이션 {0} 이 유효하지 않습니다.
+					gridList.setColValue('gridList', rowNumList[i], 'LOCATG', '');	
+				}else{
+					gridList.setColValue('gridList', rowNumList[i], 'LOCATG', LOCAKY);
+					
+				}
+			}
+		}
+	}
+	
+	// 그리드 값 변경 이벤트
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue) {
+		if (gridId == "gridList") {
+			//지번 VALIDATION
+			if (colName == "LOCATG" && colValue != "") {
+				checkLOCATG (gridId, rowNum, colName, colValue);
+			}
+			
+			// 가용수량 체크
+			if(colName == "QTTAOR") {
+				var rowData = gridList.getRowData(gridId, rowNum);
+				var QTSIWH = Number(gridList.getColData(gridId, rowNum, "QTSIWH")); // 재고수량
+				var QTTAOR = Number(gridList.getColData(gridId, rowNum, "QTTAOR")); // 작업수량
+				
+				if (QTTAOR <= 0) {
+					commonUtil.msgBox("TASK_M0021", '0'); // 작업수량은 {0}보다 커야 됩니다.
+					gridList.setColValue("gridList", rowNum, "QTTAOR", QTSIWH);
+					gridList.setColFocus(gridId, rowNum, colName);
+					return;
+				}
+				
+				if (QTSIWH < QTTAOR) {
+					commonUtil.msgBox("TASK_M0023", [rowData.get('DESC01'), QTTAOR, QTSIWH]); //* 상품[{0}]는 작업수량[{1}] 이 가용재고 수량[{2}]을 초과하였습니다.
+					gridList.setColValue("gridList", rowNum, "QTTAOR", QTSIWH);
+					gridList.setColFocus(gridId, rowNum, colName);
+					return;
+				}
+			}
+		}
+	}
+	
+	function checkLOCATG (gridId, rowNum, colName, colValue) {
+		colValue = colValue.toUpperCase();
+		gridList.setColValue(gridId, rowNum, colName, colValue);
+		
+		var param = new DataMap();
+		param.put("WAREKY", "<%=wareky%>");
+		param.put("ALOCAKY", colValue);
+		
+		var json = netUtil.sendData({
+			module : "WmsInventory",
+			command : "LOCAKYval2",
+			sendType : "map",
+			param : param
+		});
+		
+		if (!json.data) {
+			commonUtil.msgBox("TASK_M0011", colValue);	//* 이동대상 로케이션 {0} 이 유효하지 않습니다.
+			gridList.setColValue(gridId, rowNum, colName, "");
+			gridList.setColFocus(gridId, rowNum, colName);
+			return false;
+		}
+		
+		gridList.setColValue(gridId, rowNum, colName, json.data.LOCAKY);
+		
+		//2023.02.14 3000>3500 / 3500 > 3000 제한
+		var lota01 = json.data.STLKY;
+		var alota01 = gridList.getColData('gridList',rowNum, 'LOTA01');
+		if((alota01==3000&&lota01==3500) ||(alota01==3500&&lota01==3000)){
+			commonUtil.msgBox("TASK_M0011", lota01);	//* 이동대상 로케이션 {0} 이 유효하지 않습니다.
+			gridList.setColValue('gridList', rowNum, 'LOCATG', '');	
+			return false;
+		}
+		
+		var LOCASR = gridList.getColData(gridId, rowNum, "LOCASR");
+		if (colValue == LOCASR) {
+			commonUtil.msgBox("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+			gridList.setColValue(gridId, rowNum, colName, "");
+			gridList.setColFocus(gridId, rowNum, colName);
+			return false;
+		}
+		
+		var STATUS = json.data["STATUS"];
+		
+		if (STATUS != '00') {
+			commonUtil.msgBox("TASK_M0011", colValue);	//* 이동대상 로케이션 {0} 이 유효하지 않습니다.
+			gridList.setColValue(gridId, rowNum, colName, "");
+			gridList.setColFocus(gridId, rowNum, colName);
+			return false;
+		}
+		
+		var LOTA02 = gridList.getColData(gridId, rowNum, "LOTA02")
+		var PLNTKY = json.data["PLNTKY"];
+		
+		// 2022.09.22 P200 => P300이거나 P300 => P200인 경우 혼적 가능하도록 변경
+		var similarPlnt = (LOTA02 == 'P200' && PLNTKY == 'P300') ||
+						  (LOTA02 == 'P300' && PLNTKY == 'P200');
+		
+		if (PLNTKY.trim() &&
+			PLNTKY != LOTA02 &&
+			similarPlnt == false
+		) {
+			commonUtil.msgBox("TASK_M0701"); // 동일한 플랜트 내 지번만 변경 가능합니다.
+			gridList.setColValue(gridId, rowNum, colName, "");
+			gridList.setColFocus(gridId, rowNum, colName);
+			return false;
+		}
+		
+// 		/* 2022.08.05 MTO재고면서 청주공장 재고인 경우 TO지번에 동일품목, 다른 MTO가 존재하는지 확인 */
+// 		param = gridList.getRowData(gridId, rowNum);
+		
+// 		if (param.get("LOTA07").trim() &&
+// 			param.get("WAREKY") == '1100'
+// 		) {
+// 			var json = netUtil.sendData({
+// 				module : "WmsInventory",
+// 				command : "LOTA07_VALIDATE",
+// 				sendType : "map",
+// 				param : param
+// 			});
+			
+// 			if (json && json.data && json.data.RESULT == 'FAIL') {
+// 				commonUtil.msgBox("VALID_M2112", colValue); // 해당지번[{0}]에 다른 MTO 재고가 존재합니다.
+// 				gridList.setColValue(gridId, rowNum, colName, "");
+// 				gridList.setColFocus(gridId, rowNum, colName);
+// 				return false;
+// 			}
+// 		}
+		return true;
+	}
+	
+	function validateList () {
+		// 1. required validate
+		var gridDataList = gridList.getGridData('gridList');
+		
+		var validate = false;
+		for (var i in gridDataList) {
+			validate = false;
+			var rowData = gridDataList[i];
+			
+			var rowNum = rowData.get('GRowNum');
+			var QTSIWH = Number(rowData.get("QTSIWH"));
+			var QTTAOR = Number(rowData.get("QTTAOR"));
+			
+			var LOCASR = rowData.get("LOCASR");
+			var LOCATG = rowData.get("LOCATG");
+			var RECLOC = $('#RECLOC').val();
+			
+			if(!LOCATG.trim()) {
+				LOCATG = RECLOC;
+				rowData.put("LOCATG", RECLOC);
+				gridList.setColValue("gridList", rowNum, "LOCATG", RECLOC);
+			}
+			
+			if (LOCASR == LOCATG) {
+				commonUtil.msgBox("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+				gridList.setColFocus("gridList", rowNum, 'LOCATG');
+				return false;
+			}
+			
+			// 작업수량 == 0
+			if (QTTAOR == 0) {
+				gridList.setColFocus("gridList", rowNum, 'QTTAOR');
+				commonUtil.msgBox("TASK_M0021", "0");
+				return false;
+			}
+			
+			// 재고수량 < 작업수량
+			if (QTSIWH < QTTAOR){
+				gridList.setColFocus("gridList", rowNum, 'QTTAOR');
+				commonUtil.msgBox("TASK_M0023", [rowData.get('DESC01'), QTTAOR, QTSIWH]); //* 상품[{0}]는 작업수량[{1}] 이 가용재고 수량[{2}]을 초과하였습니다.
+				return false;
+			}
+			
+			// 로케이션 체크
+			if(!checkLOCATG ("gridList", rowNum, "LOCATG", LOCATG)) {
+				return false;
+			}
+			validate = true;
+		}
+		return validate;
+	}
+	
+	function saveData(){
+		if (!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+			return false;
+		}
+		
+		if (!validateList()) {
+			return false;
+		}
+		
+		// set param head info
+		var headParam = new DataMap();
+		headParam.put("WAREKY", "<%=wareky%>");
+		headParam.put("TASOTY", "320"); // STEP1
+		
+		var head = netUtil.sendData({
+			module : "WmsInventory",
+			param  : headParam,
+			command : "MV01HEAD"
+		});
+		
+		head = head.data[0];
+		
+		var list = gridList.getGridData('gridList');
+		
+		var param = new DataMap();
+		param.put("LANGKY", "<%=langky%>");
+		param.put("head", head);
+		param.put("list", list);
+
+		var json = netUtil.sendData({
+			url : "/wms/inventory/json/MV01CreatTaskOrder.data",
+			param : param
+		});
+		
+		var sapResList = json.sapResList;
+		var successCnt = json.successCnt
+		
+		if (sapResList && sapResList.length > 0) {
+			for (var i in sapResList) {
+				var SAPRES = sapResList[i].SAPRES;
+				if (SAPRES != 'SUCCESS') {
+					commonUtil.msgBox(successCnt + "건 성공 후 SAP 에러 발생\nSAP : " + SAPRES);
+					return;
+				}
+			}
+		}
+		
+		var TASKKY = json.TASKKY;
+		if(!TASKKY){
+			return false;
+		}
+		
+		commonUtil.msgBox("COMMON_M0007", TASKKY, null, function() { // {0}이 저장이 완료되었습니다.
+			gridList.resetGrid('gridList'); // 그리드 초기화
+			initTargetLocation();
+			
+			$('#BARCOD').val(""); // 바코드 초기화
+			$('#BARCOD').focus(); // 바코드 포커스
+		});
+		
+	}
+	
+	function gridListEventRowClick(gridId, rowNum, colName){
+		$("#QTTAOR_TEMP").val(gridList.getColData(gridId, rowNum, 'USEQTY'))
+	}
+	
+	function setQTTAOR(value) {
+
+		value = value.replace(/[^-\.0-9]/g,'')
+		
+		var rowNum = gridList.getSelectIndex('gridList');
+		
+		gridList.setColValue('gridList', rowNum, 'QTTAOR', value);
+	}
+	
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="75%" />
+<!-- 						<col width="25%" /> -->
+<!-- 						<col width="25%" /> -->
+					</colgroup>
+					<tbody>
+						<tr>
+							<th  CL='STD_BARCOD'>바코드</th>
+							<td colspan="2">
+								<input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')" validate="required"/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section" style="margin-bottom: 0px;">
+				<div class="tableHeader">
+					<table> 
+						<colgroup>
+							<col width="20px" />
+							<col width="130px" />
+							<col width="60px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="30px" />
+							<col width="120px" />
+							<col width="120px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="120px" />
+							<col width="100px" />
+							<col width="80px" />
+							<col width="100px" />
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO"			>No.</th>
+								<th CL="STD_DESC01"		>품목명</th>
+								<th CL="STD_LOCASR"		>From 로케이션</th>
+								<th CL="STD_BOXQT"		>BAG/BOX</th>
+								<th CL="STD_QTSIWH"		>재고수량</th>
+								<th CL="STD_UOMKEY"		>단위</th>
+								<th CL="STD_LOTA14"		>제조LOT</th>
+								<th CL="STD_SKUKEY"		>품목코드</th>
+								<th CL="STD_LOTA06"		>재고상태</th>
+								<th CL="STD_USEQTY"		>가용수량</th>
+								<th CL="STD_QTTAOR"		>작업수량</th>
+								<th CL="STD_LOCATG"		>To 로케이션</th>
+								<th CL="STD_TOTWG"		>총중량</th>
+								<th CL="STD_BAGQT"		>EA/BAG</th>
+								<th CL="STD_PLTQT"		>BOX/Pallet</th>
+								<th CL="STD_SOKQT"		>속(개/BALE)</th>
+								<th CL="STD_EAQTY"		>매(sheet/속)</th>
+								<th CL="STD_SKUL01"		>품목구분</th>
+								<th CL="STD_LOTA01"		>저장위치</th>
+								<th CL="STD_LOTA08"		>국가코드</th>
+								<th CL="STD_LOTA09"		>거래처코드MTO</th>
+								<th CL="STD_LOTA11"		>제조일자</th>
+								<th CL="STD_LOTA12"		>입고일자</th>
+								<th CL="STD_LOTA13"		>유통기한</th>
+								<th CL="STD_LOTA15"		>SAP 배치번호</th>
+								<th CL="STD_LOTA02"		>플랜트</th>
+								<th CL="STD_WAREKY"		>거점</th>
+								<th CL="STD_WAREKYNM"	>거점명</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table>
+						<colgroup>
+							<col width="20px" />
+							<col width="130px" />
+							<col width="60px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="30px" />
+							<col width="120px" />
+							<col width="120px" />
+							<col width="50px" />
+							<col width="60px" />
+							<col width="60px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="50px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="80px" />
+							<col width="120px" />
+							<col width="100px" />
+							<col width="80px" />
+							<col width="100px" />
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum"		>No.</td>
+								<td GCol="text,DESC01"	>품목명</td>
+								<td GCol="text,LOCASR"	>From 로케이션</td>
+								<td Gcol="text,BOXQT"	>BAG/BOX</td>
+								<td GCol="text,QTSIWH"	GF="N 20,2">재고수량</td>
+								<td GCol="text,UOMKEY"	>단위</td>
+								<td GCol="text,LOTA14"	>제조LOT</td>
+								<td GCol="text,SKUKEY"	>품목코드</td>
+								<td GCol="text,LOTA06NM">재고상태</td>
+								<td GCol="text,USEQTY"	GF="N 20,2">가용수량</td>
+								<td GCol="input,QTTAOR" GF="N 20,2">작업수량</td>
+								<td GCol="input,LOCATG"	>To 로케이션</td>
+								<td Gcol="text,TOTWG"	GF="N 20,2">총중량</td>
+								<td Gcol="text,BAGQT"	GF="N 20,2">EA/BAG</td>
+								<td Gcol="text,PLTQT"	GF="N 20,2">BOX/Pallet</td>
+								<td Gcol="text,SOKQT"	GF="N 20,2">속(개/BALE)</td>
+								<td Gcol="text,EAQTY"	GF="N 20,2">매(sheet/속)</td>
+								<td GCol="text,SKUL01NM">품목구분</td>
+								<td GCol="text,LOTA01"	>저장위치</td>
+								<td GCol="text,LOTA08"	>국가코드</td>
+								<td GCol="text,LOTA09"	>거래처코드MTO</td>
+								<td GCol="text,LOTA11"	GF="D">제조일자</td>
+								<td GCol="text,LOTA12"	GF="D">입고일자</td>
+								<td GCol="text,LOTA13"	GF="D">유통기한</td>
+								<td GCol="text,LOTA15"	>SAP 배치번호</td>
+								<td GCol="text,LOTA02"	>플랜트</td>
+								<td GCol="text,WAREKY"	>거점</td>
+								<td GCol="text,WARENM"	>거점명</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="select_box">
+				<table>
+					<colgroup>
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+						<col width="25%" />
+					</colgroup>
+					<tbody>
+						<tr>
+							<th CL='STD_LOCATG'>To 로케이션</th>
+							<td colspan="2">
+								<input type="text" class="text" name="LOC_TEMP" id="LOC_TEMP" onfocus="fn_onfocus(this.id)" onchange="onReadTargetLocation(this.value)"/>
+							</td>
+							<td onclick ="searchLocMstList()">
+								<button class="bt" style="height: 32px;">
+									<p CL='BTN_FINDDATA'></p>
+								</button>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_QTTAOR'>작업수량</th>
+							<td colspan="2">
+								<input type="text" class="text" name="QTTAOR_TEMP" id="QTTAOR_TEMP" onfocus="fn_onfocus(this.id)" onKeyup="this.value=this.value.replace(/[^-\.0-9]/g,'');" onchange="setQTTAOR(this.value)"/>
+							</td>
+							<td style='margin-left:5px'>
+								<input type="text" class="text" name="UOMKEY_TEMP" id="UOMKEY_TEMP" GF="N 20,3" CL='STD_DUOMKY' readonly />
+							</td>
+						</tr>
+						<tr id="RECLOC_TR" style='visibility: hidden;'>
+							<th CL='STD_RECLOC'>로케이션추천</th>
+							<td colspan="3">
+								<input type="text" class="text" name="RECLOC" id="RECLOC" readonly/>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="50%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'></label>
+						</td>
+						<td class=f_1 width="50%" onclick ="saveData()" >
+							<label CL='BTN_COMPLE'></label>
+						</td>
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+</body>

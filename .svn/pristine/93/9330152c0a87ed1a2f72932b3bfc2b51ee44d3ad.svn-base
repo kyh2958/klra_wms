@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!--Converted at: Wed Feb 23 09:49:03 KST 2022-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="KppIF">
+	<!--
+		Sorry, I can`t migrate	DataMap
+		See console output for further details 
+	-->
+	<!--
+		Sorry, I can`t migrate	StringMap
+		See console output for further details 
+	-->
+	
+	<select id="KPP_TB_IF_DATA_LIST" parameterType="Map" resultType="DataMap">
+		SELECT * 
+		FROM TB_IF_DATA
+	</select>
+	
+	<!-- 기본 구문생성, 로직 작성후 수정 필요 -->
+	<insert id="KPP_TB_IF_DATA_INSERT" parameterType="Map">
+	    INSERT INTO KLEANNARA_USER.TB_IF_DATA
+	    (
+	        CST_COD,                -- 고객사 코드
+	        SEND_DAT,               -- 전송일자 (YYYYMMDD)
+	        SEND_SEQ,               -- 전송 시퀀스
+	        IF_KEY,                 -- 인터페이스 키
+	        DATA_TYP,               -- 데이터 타입
+	        DOC_TYP,                -- 문서 타입
+	        SND_DAT,                -- 발송일자
+	        ARV_DAT,                -- 도착일자
+	
+	        CST_SND_CST_COD,        -- 발송처 코드
+	        CST_SND_CST_NAM,        -- 발송처 명
+	        CST_SND_CST_TEL,        -- 발송처 연락처
+	        CST_SND_CST_ADDR,       -- 발송처 주소
+	
+	        CST_ORD_CST_COD,        -- 주문처 코드
+	        CST_ORD_CST_NAM,        -- 주문처 명
+	        CST_ORD_CST_TEL,        -- 주문처 연락처
+	        CST_ORD_CST_ADDR,       -- 주문처 주소
+	
+	        CST_ARV_CST_COD,        -- 도착처 코드
+	        CST_ARV_CST_NAM,        -- 도착처 명
+	        CST_ARV_CST_TEL,        -- 도착처 연락처
+	        CST_ARV_CST_ADDR,       -- 도착처 주소
+	
+	        PRD_COD,                -- 제품 코드
+	        DLV_QTY,                -- 배송 수량
+	        CHIT_NUM,               -- 전표 번호
+	        CAR_NUM,                -- 차량 번호
+	        TRN_CST_NAM,            -- 운송사 명
+	        DRIVER_NAM,             -- 기사 명
+	        DRIVER_TEL,             -- 기사 연락처
+	
+	        ITEM,                   -- 품목 정보
+	        ETC_DESC,               -- 비고
+	        KPP_GET_YN,             -- KPP 수신 여부
+	        REG_DAT                 -- 등록 일시
+	    )
+	    VALUES
+	    (
+	        #{CST_COD},                                      -- NOT NULL (필수)
+	        NVL(#{SEND_DAT}, TO_CHAR(SYSDATE,'YYYYMMDD')),
+	        NVL(#{SEND_SEQ}, 0),
+	        NVL(#{IF_KEY}, ' '),
+	
+	        NVL(#{DATA_TYP}, ' '),
+	        NVL(#{DOC_TYP}, ' '),
+	        NVL(#{SND_DAT}, ' '),
+	        NVL(#{ARV_DAT}, ' '),
+	
+	        NVL(#{CST_SND_CST_COD}, ' '),
+	        NVL(#{CST_SND_CST_NAM}, ' '),
+	        NVL(#{CST_SND_CST_TEL}, ' '),
+	        NVL(#{CST_SND_CST_ADDR}, ' '),
+	
+	        NVL(#{CST_ORD_CST_COD}, ' '),
+	        NVL(#{CST_ORD_CST_NAM}, ' '),
+	        NVL(#{CST_ORD_CST_TEL}, ' '),
+	        NVL(#{CST_ORD_CST_ADDR}, ' '),
+	
+	        NVL(#{CST_ARV_CST_COD}, ' '),
+	        NVL(#{CST_ARV_CST_NAM}, ' '),
+	        NVL(#{CST_ARV_CST_TEL}, ' '),
+	        NVL(#{CST_ARV_CST_ADDR}, ' '),
+	
+	        NVL(#{PRD_COD}, ' '),
+	        NVL(#{DLV_QTY}, 0),
+	        NVL(#{CHIT_NUM}, ' '),
+	        NVL(#{CAR_NUM}, ' '),
+	        NVL(#{TRN_CST_NAM}, ' '),
+	        NVL(#{DRIVER_NAM}, ' '),
+	        NVL(#{DRIVER_TEL}, ' '),
+	        NVL(#{ITEM}, ' '),
+	        NVL(#{ETC_DESC}, ' '),
+	
+	        NVL(#{KPP_GET_YN}, 'N'),
+	        NVL(#{REG_DAT}, SYSDATE)
+	    )
+	</insert>
+</mapper>

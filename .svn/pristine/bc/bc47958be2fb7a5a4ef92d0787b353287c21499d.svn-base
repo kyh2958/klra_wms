@@ -1,0 +1,92 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+<%
+    User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css">
+<style>
+    input[type="checkbox"]{height:unset;} 
+</style>
+<script type="text/javascript">
+	var dblIdx = 0;
+	var subIdx = 0;
+	var searchType = 0;
+	var paramH = new DataMap();
+	var menuky = configData.MENU_ID;
+	
+	$(document).ready(function(){
+// 	    setTopSize(300);
+	
+	});
+	
+	function searchList(){
+
+		//오라클 버전으로 있음
+		var data = page.getLinkPopData();	
+		
+// 		var param = new DataMap();
+		var param = inputList.setRangeParam("searchArea");
+		window.opener.LocPopCallback(param);
+		self.close();
+	}	
+	
+	function fn_closing(){
+		this.close();
+	}
+	
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search"){
+			searchList()
+		}
+		
+	} 
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>	
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">								
+				</div>				
+				<div class="fl_r">			
+					<input type="button" CB="Search SEARCH STD_SYSTO" />
+				</div>			        
+			</div>
+			<div class="search_inner">
+				<div class="search_wrap" style="height: 70px;">
+					<dl>
+                        <dt CL="STD_STKNUM">선적번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="STKNUM"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_SSHTYP">출고유형</dt>
+						<dd>
+							<select class="input" name="SSHTYP" Combo="WmsOutbound,TASOTYOUT"><option value=""/></select>
+						</dd>
+                    </dl>
+				</div>
+			</div>
+							
+		</div>	
+
+	</div>		
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

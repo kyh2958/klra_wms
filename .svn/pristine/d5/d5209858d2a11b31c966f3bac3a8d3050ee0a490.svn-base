@@ -1,0 +1,888 @@
+package project.mobile.service;
+
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.BadSqlGrammarException;
+import org.springframework.jdbc.UncategorizedSQLException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+import project.common.util.Util;
+import project.wms.service.IFService;
+import project.wms.service.InboundService;
+import project.wms.service.InventoryService;
+import project.wms.service.TaskService;
+import project.wms.service.WmsService;
+
+@Service
+public class MobilePutawayService {
+
+	private static Logger log = Logger.getLogger(MobilePutawayService.class);
+	
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired
+	public WmsService wmsService;
+	
+	@Autowired
+	private Util util;
+	
+	@Autowired
+	public InventoryService inventoryService;
+	
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired
+	public IFService iFService;
+	
+	@Autowired 
+	private PlatformTransactionManager transactionManager;
+	
+	@Transactional
+	public DataMap makeTaskCheckNomal(DataMap map) throws SQLException {
+		DataMap rsMap = new DataMap();
+		String validationSql = util.createValidationSql(map, "WAREKY,OWNRKY,SKUKEY,TASOTY,LOCATG,LOCASR,LOTA13,AVAILABLEQTY,QTTAOR");
+		if(validationSql.length() > 0){
+			map.put(CommonConfig.VALIDATION_SQL_KEY, validationSql);
+			map.setModuleCommand("WmsMobilePutaway", "MV01");
+			
+			List<DataMap> vList = commonDao.getValidation(map);
+			if(vList.size() > 0){
+				rsMap = vList.get(0);
+				if(!rsMap.getString("MSG").equals("OK")){
+					return rsMap;
+				}					
+			}
+		}		
+		
+		return rsMap;
+	}
+	
+	@Transactional
+	public DataMap makeTaskNomal_PDMV04(DataMap map) throws SQLException {
+		
+		DataMap result = makeTaskCheckNomal(map);
+		
+		if(!result.getString("MSG").equals("OK")){
+			return result;
+		}
+		
+		List<DataMap> dataList = map.getList("DATA");
+		List typeArray = map.getList("TYPE");
+		List<DataMap> workList = new ArrayList<DataMap>();
+		
+		DataMap copy = new DataMap();
+		
+		for(int k=0;k<typeArray.size();k++){
+			int QTTAOR_SUM = 0;
+			workList = new ArrayList<DataMap>();
+			for(int i = 0 ; i < dataList.size() ; i ++){
+				DataMap tempList = dataList.get(i).getMap("map");
+				if(tempList.getString("TASOTY").equalsIgnoreCase(""+typeArray.get(k))){
+					QTTAOR_SUM += tempList.getInt("QTTAOR");
+					copy = new DataMap(dataList.get(i).getMap("map"));
+					workList.add(copy);
+				}
+			}
+			String docNum = wmsService.getDocSeq(""+typeArray.get(k));
+			//result.add(docNum);
+			map.setModuleCommand("WmsMobilePutaway", "PDMV01HEAD");
+			map.put("TASOTY", typeArray.get(k));
+			List<DataMap> head = commonDao.getList(map);
+			
+			DataMap row = head.get(0).getMap("map");
+			row.setModuleCommand("WmsMobilePutaway", "TASDH_PDMV01");
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+			row.put("QTTAOR", QTTAOR_SUM);
+			row.put("TASKKY", docNum);
+			row.put("TASOTY", typeArray.get(k));
+			commonDao.insert(row);
+			DataMap itemRow;
+			int rowIndex = 0;
+			for(int i = 0 ; i < workList.size() ; i ++){
+				itemRow = workList.get(i).getMap("map");
+				int allQty = itemRow.getInt("QTTAOR");
+				itemRow.put("DOCUTY",typeArray.get(k));
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				itemRow.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				itemRow.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+				
+				itemRow.setModuleCommand("WmsMobilePutaway", "PDMV01BODY");
+				List<DataMap> list = commonDao.getList(itemRow);
+				for(int j=0;j<list.size();j++){
+					if(allQty - list.get(j).getInt("QTTAOR") >= 0){
+						rowIndex += 10;
+						row = list.get(j).getMap("map");
+						row.put("DROPID", "V");
+						row.put("TASKKY", docNum);
+						row.put("TASKIT", rowIndex);
+						if(typeArray.get(k).equals("310") || typeArray.get(k).equals("311")){
+							row.put("TASKTY", "PT");
+						}else{
+							row.put("TASKTY", "MV");
+						}
+						row.put("STATIT", "FPC");
+						row.put("QTTAOR", row.getString("AVAILABLEQTY"));
+						row.put("QTCOMP", row.getString("AVAILABLEQTY"));
+						row.put("LOCATG", map.getString("LOCATG"));
+						row.put("LOCAAC", map.getString("LOCATG"));
+						row.put("SECTAC", row.getString("SECTTG"));
+						row.put("PAIDAC", row.getString("PAIDTG"));
+						row.put("TRNUTG", map.getString("TRNUTG"));
+						row.put("TRNUAC", map.getString("TRNUTG"));
+						row.put("ATRUTY", row.getString("TTRUTY"));
+						row.put("AMEAKY", row.getString("TMEAKY"));
+						row.put("AUOMKY", row.getString("TUOMKY"));
+						row.put("QTAPUM", row.getString("QTTPUM"));
+						row.put("ADUOKY", row.getString("TDUOKY"));
+						row.put("QTADUM", row.getString("QTTDUM"));
+						row.put("QTSTKM", row.getString("AVAILABLEQTY"));
+						row.put("QTSTKC", row.getString("AVAILABLEQTY"));
+						row.setModuleCommand("WmsMobilePutaway", "TASDIEND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						row.setModuleCommand("WmsMobilePutaway", "TASDREND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						allQty = allQty - list.get(j).getInt("QTTAOR");
+					}else if(allQty > 0){
+						rowIndex += 10;
+						row = list.get(j).getMap("map");
+						row.put("DROPID", "V");
+						row.put("TASKKY", docNum);
+						row.put("TASKIT", rowIndex);
+						if(typeArray.get(k).equals("310") || typeArray.get(k).equals("311")){
+							row.put("TASKTY", "PT");
+						}else{
+							row.put("TASKTY", "MV");
+						}
+						
+						row.put("STATIT", "FPC");
+						row.put("QTTAOR", allQty);
+						row.put("QTCOMP", allQty);
+						row.put("LOCATG", map.getString("LOCATG"));
+						row.put("LOCAAC", map.getString("LOCATG"));
+						row.put("SECTAC", row.getString("SECTTG"));
+						row.put("PAIDAC", row.getString("PAIDTG"));
+						row.put("TRNUTG", map.getString("TRNUTG"));
+						row.put("TRNUAC", map.getString("TRNUTG"));
+						row.put("ATRUTY", row.getString("TTRUTY"));
+						row.put("AMEAKY", row.getString("TMEAKY"));
+						row.put("AUOMKY", row.getString("TUOMKY"));
+						row.put("QTAPUM", row.getString("QTTPUM"));
+						row.put("ADUOKY", row.getString("TDUOKY"));
+						row.put("QTADUM", row.getString("QTTDUM"));
+						row.put("QTSTKM", allQty);
+						row.put("QTSTKC", allQty);
+						row.setModuleCommand("WmsMobilePutaway", "TASDIEND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						
+						row.setModuleCommand("WmsMobilePutaway", "TASDREND_PDMV01");
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.put(CommonConfig.SES_USER_WHAREHOUSE_KEY, map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+						row.put(CommonConfig.SES_USER_OWNER_KEY, map.get(CommonConfig.SES_USER_OWNER_KEY));
+						commonDao.insert(row);
+						allQty = 0;
+					}
+				}
+				itemRow = new DataMap();
+				itemRow.put("DOCCAT", "300");
+				itemRow.put("DOCUKY", docNum);
+				itemRow.put("DOFLAG", "Z");
+				itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				
+				commonDao.getMap("WmsMobilePutaway.PDMV03_AIRWMS_DOCUMENT_PROCESS", itemRow);
+			}
+		}
+		
+		return result; 
+	}
+	
+//	@Transactional
+	public DataMap savePDPT01POP(DataMap map) throws SQLException {
+		
+		DataMap rsMap = new DataMap();
+		
+		List<DataMap> list = map.getList("list");
+		
+		List<DataMap> sjItemList = new ArrayList<DataMap>();
+		DataMap sjItemMap = new DataMap();                       // 저장위치 변경 프로세스 목록
+		
+		List<DataMap> ifList = new ArrayList<DataMap>(); 		 // 실적 인터페이스 목록
+		
+		List<DataMap> ifidList = new ArrayList<DataMap>();       // IFID : 인터페이스 전송 목록
+		DataMap ifidMap = new DataMap();                         // IFID : 입고유형별 LOGSEQNO
+		
+		List<Map> sjItemUpList = new ArrayList<Map>();   		 // 저장위치 변경 프로세스 목록
+		Map sjItemUpMap = new HashMap();                         // 저장위치 변경 프로세스 목록
+		
+		DataMap headRow = new DataMap();
+		DataMap row = new DataMap();
+		DataMap detailRow = new DataMap();
+		
+		String resultMsg = "SUCCESS";
+		
+		String taskky = map.getString("TASKKY");
+		
+		String inRsCode = "S";
+		String inRsMsg = "";
+		int errMsgLen = 200;    // 에러메세지 길이
+		String stPcnt = "0";    // 적치가능 수량
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		
+		try {
+			
+			for(int i=0; i<list.size(); i++){
+				
+				row = list.get(i).getMap("map");
+				
+				String rowState = row.getString(CommonConfig.GRID_ROW_STATE_ATT);
+				
+				float taskqtcomp = Float.parseFloat(row.getString("QTCOMP")); // 작업수량
+				
+				if(taskqtcomp==0) {
+					continue;
+				}
+				
+				if("C".equals(rowState)) {
+					// 신규 바코드 입력으로 다른 재고 데이터 처리시
+					
+					if (taskqtcomp == 0)continue;
+					
+					String STOKKY_ORG = row.getString("STOKKY");
+					String[] STOKKYS = STOKKY_ORG.split(",");
+					
+					for(int j=0; j<STOKKYS.length; j++){
+						
+						//if(1==1)continue;
+						
+						String STOKKY = STOKKYS[j];
+						
+						detailRow = new DataMap();
+						
+						detailRow.put("STOKKY", STOKKY);
+						detailRow.put("OWNRKY", row.getString("OWNRKY"));
+						detailRow.put("WAREKY", row.getString("WAREKY"));
+						detailRow.put("LOTA02", row.getString("LOTA02"));
+						detailRow.put("MTYPE", map.getString("MTYPE"));
+						
+						DataMap skkyRow = commonDao.getMap("WmsMobilePutaway.PDPT01_POP_STKKY", detailRow);
+						
+						if(skkyRow!=null) {
+						
+							float QTTAOR = Float.parseFloat(skkyRow.getString("QTTAOR")); // 입력가능수량
+							
+							String STLKY = skkyRow.getString("STLKY");           // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+							String LOTA01 = skkyRow.getString("LOTA01").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+							String LOCAAC = row.getString("LOCAAC").trim();      // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+							String PLNTKY = row.getString("PLNTKY").trim();      // TO지번(LOCATG)에 해당하는 구역마스터 플랜트 코드
+							
+							float toQTCOMP = 0;
+							
+							if (taskqtcomp > QTTAOR) {
+								toQTCOMP = QTTAOR;
+							}else {
+								toQTCOMP = taskqtcomp;
+							}
+							
+							//skkyRow.put("QTTAOR", taskqtcomp);
+							skkyRow.put("QTTAOR", toQTCOMP);
+							skkyRow.put("QTCOMP", toQTCOMP);
+							skkyRow.put("QTYUOM", toQTCOMP);
+							
+							skkyRow.put("LOCATG", row.getString("LOCAAC")); //적치 컨펌시는  TG값에 AC 값을 넣음  (수량/지번/ID)
+							skkyRow.put("LOCAAC", row.getString("LOCAAC"));
+							
+							skkyRow.put("SDUOKY", row.getString("SUOMKY"));
+							skkyRow.put("TUOMKY", row.getString("SUOMKY"));
+							skkyRow.put("TDUOKY", row.getString("SUOMKY"));
+							skkyRow.put("ADUOKY", row.getString("SUOMKY"));
+							skkyRow.put("AUOMKY", row.getString("SUOMKY"));
+							
+							skkyRow.put("SMEAKY", row.getString("SKUKEY"));
+							skkyRow.put("TMEAKY", row.getString("SKUKEY"));
+							skkyRow.put("AMEAKY", row.getString("SKUKEY"));
+							
+							if(!"".equals(LOCAAC.trim())) {
+								//row.put("LOCAAC", row.get("LOCATG"));
+								skkyRow.put("LOCAAC", LOCAAC);
+							}
+							
+							
+							skkyRow.put("STATIT","FPA");
+							
+							skkyRow.put("TASKKY", row.getString("TASKKY"));
+							
+							DataMap taskitKyRow = commonDao.getMap("WmsMobilePutaway.PDPT01_POP_TASKIT_KY", skkyRow);
+							
+							skkyRow.put("TASKIT", taskitKyRow.getString("TASKIT"));
+							
+							skkyRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+							skkyRow.setModuleCommand("WmsTask", "TASDIEND");
+							
+							log.debug(i + " - STLKY : " + STLKY + " - LOTA01 : " + LOTA01 + " - PLNTKY : " + PLNTKY);
+							if( !STLKY.equals(LOTA01) && !"".equals(PLNTKY) ) {
+								
+								log.debug(i + " - NO EQUALS STLKY : " + STLKY );
+								sjItemMap = new DataMap();
+								sjItemMap.putAll(row);
+								
+								sjItemMap.put("LOTA01", STLKY);
+								sjItemMap.put("ALOTA01", STLKY);
+								sjItemMap.put("PTLT01", STLKY);
+								sjItemMap.put("LOCAKY", row.get("LOCAAC"));
+								sjItemList.add(sjItemMap);
+								
+								sjItemUpMap = new DataMap();
+								sjItemUpMap.putAll(sjItemMap);
+								sjItemUpList.add(sjItemUpMap);
+								
+							}
+							
+							commonDao.insert(skkyRow);
+							
+							//skkyRow.put("STOKKY", "%");
+							skkyRow.put("STOKKY", STOKKY);
+							
+							commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", skkyRow);
+							
+							taskqtcomp = taskqtcomp - toQTCOMP;
+							
+							if(taskqtcomp==0) {
+							  break;
+							}
+							
+						}
+						
+					}
+					
+				}else {
+					
+					//if(1==1)continue;
+					
+					row.setModuleCommand("WmsTask", "TASDIDEL");
+					commonDao.delete(row);
+					
+					if (taskqtcomp > 0) {
+						
+						String STLKY  = row.getString("STLKY");          // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String LOTA01 = row.getString("LOTA01").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String LOCAAC = row.getString("LOCAAC").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String PLNTKY = row.getString("PLNTKY").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 플랜트 코드
+						
+						
+						row.put("STATIT","FPA");
+						
+						row.put("QTTAOR", taskqtcomp);
+		
+						//row.put("QTTAOR", curqtcomp);
+						//row.put("QTCOMP", taskqtytot+curqtcomp);
+						//row.put("LOCATG", taskkyMap.getString("LOCAAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+						//row.put("TRNUTG", taskkyMap.getString("TRNUAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+						//row.put("LOCAAC", taskkyMap.getString("LOCAAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+						//row.put("TRNUAC", taskkyMap.getString("TRNUAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+						//row.put("PTLT11", taskkyMap.getString("LOTA11").replace(".",""));
+						//row.put("PTLT12", taskkyMap.getString("LOTA12").replace(".",""));
+						row.put("QTYUOM", taskqtcomp);
+						//row.put("QTYUOM", curqtcomp);
+						row.put("SECTAC", row.get("SECTTG"));
+						row.put("PAIDAC", row.get("PAIDTG"));
+						row.put("ATRUTY", row.get("TTRUTY"));
+						row.put("AMEAKY", row.get("TMEAKY"));
+						row.put("AUOMKY", row.get("TUOMKY"));
+						row.put("QTAPUM", row.get("QTTPUM"));
+						row.put("ADUOKY", row.get("TDUOKY"));
+						row.put("QTADUM", row.get("QTTDUM"));
+						//row.put("PTLT15", "PDA");
+						
+						if("".equals(LOCAAC.trim())) {
+							row.put("LOCAAC", row.get("LOCATG"));
+						}
+						
+						row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						row.setModuleCommand("WmsTask", "TASDIEND");
+						
+						log.debug(i + " - STLKY : " + STLKY + " - LOTA01 : " + LOTA01 + " - PLNTKY : " + PLNTKY);
+						if( !STLKY.equals(LOTA01) && !"".equals(PLNTKY) ) {
+							
+							log.debug(i + " - NO EQUALS STLKY : " + STLKY );
+							sjItemMap = new DataMap();
+							sjItemMap.putAll(row);
+							
+							sjItemMap.put("LOTA01", STLKY);
+							sjItemMap.put("ALOTA01", STLKY);
+							sjItemMap.put("PTLT01", STLKY);
+							sjItemMap.put("LOCAKY", row.get("LOCAAC"));
+							sjItemList.add(sjItemMap);
+							
+							sjItemUpMap = new DataMap();
+							sjItemUpMap.putAll(sjItemMap);
+							sjItemUpList.add(sjItemUpMap);
+							
+						}
+						
+						commonDao.insert(row);
+						
+						row.put("STOKKY", row.getString("SRCSKY"));
+						//row.put("STOKKY", "%");
+		
+						commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", row);
+					}
+				
+				}
+				
+			}
+			
+			DataMap tasdirow = commonDao.getMap("WmsMobilePutaway.TASDINEW", map);
+			
+			stPcnt = tasdirow.getString("CNT");
+		
+		} catch(SQLException se) {
+			log.error("MobilePutawayService.savePDPT01POP 적치 테이블 insert 저장 실패 - SQLException Error : " + se.getMessage());
+			String errMsg = se.getMessage();
+			String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+			
+			inRsCode = "E";
+			inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			//se.printStackTrace();
+		} catch(BadSqlGrammarException bse) {
+			log.error("MobilePutawayService.savePDPT01POP 적치 테이블 insert 저장 실패 - BadSqlGrammarException Error : " + bse.getMessage());
+			inRsCode = "E";
+			//bse.printStackTrace();
+			
+			try {
+				SQLException se = bse.getSQLException();
+				String errMsg = se.getMessage();
+				String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+				inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			}catch(Exception e) {
+				String errMsg = bse.getMessage();
+				String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+				inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			}
+		} catch(UncategorizedSQLException bse) {
+			log.error("MobilePutawayService.savePDPT01POP 적치 테이블 insert 저장 실패 - UncategorizedSQLException Error : " + bse.getMessage());
+			inRsCode = "E";
+			//bse.printStackTrace();
+			
+			try {
+				SQLException se = bse.getSQLException();
+				String errMsg = se.getMessage();
+				String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+				inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			}catch(Exception e) {
+				String errMsg = bse.getMessage();
+				String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+				inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			}
+		} catch(Exception e) {
+			log.error("MobilePutawayService.savePDPT01POP 적치 테이블 insert 저장 실패 - Exception Error : " + e.getMessage());
+			String errMsg = e.getMessage();
+			String cutErrMsg = inboundService.getExceptionMsgCut(errMsg, errMsgLen);
+			inRsCode = "E";
+			inRsMsg = "적치 테이블 insert 저장 실패 : " + cutErrMsg;
+			e.printStackTrace();
+		}
+		
+		// 에러 처리
+		if("E".equals(inRsCode)) {
+			
+			// 인터페이스 에러 결과 메세지
+			resultMsg = inRsMsg;
+			
+			transactionManager.rollback(transactionStatus);
+			
+			log.debug("MobilePutawayService.savePDPT01POP 적치 테이블 저장 실패 - taskky : " + taskky + " - rollback");
+			
+			rsMap.put("stPcnt", stPcnt);
+			rsMap.put("resultMsg", resultMsg);
+			
+			return rsMap;
+			
+		}
+		
+		// 저장위치 변경시 재고 저장위치변경 로직 실행
+		if(sjItemList!=null && sjItemList.size()>0) {
+			
+			// docunum으로 대상 LIST 조회
+			DataMap param = new DataMap();
+			
+			param = new DataMap();
+			param.put("WAREKY", map.getString("WAREKY"));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+			param.put("DOCUTY", "401"); // 401: 재고저장위치변경
+			param.put("list", sjItemList);
+			
+			DataMap res = inventoryService.saveAdjByTask(param);
+			
+			String SAPRES = res.getString("SAPRES");
+			log.debug("Sap Response : " + SAPRES);
+			
+			String adjky = res.getString("SADJKY");
+			log.debug("MobilePutawayService.saveStock - SADJKY : " + adjky);
+			
+			if(!"SUCCESS".equals(SAPRES)) {
+				transactionManager.rollback(transactionStatus);
+				
+				resultMsg = "[" + taskky + "] 저장위치 변경 SAP 인터페이스 전송 에러 : " + SAPRES;
+				
+				log.debug("MobilePutawayService.savePDPT01POP SAP 저장위치 변경 인터페이스 실패 - taskky : " + taskky + " - adjky : " + adjky + " - rollback");
+				
+				// 2022.07.14 WMS, SAP이 1개의 트랜잭션으로 구성된 경우 IFSAPLOG INSERT 추가
+				res.put("ZDOCNO", adjky);
+				res.put("ERRTXT", resultMsg);
+				res.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				res.put("PROGID", map.getString("PROGID"));
+				res.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+				res.setModuleCommand("WmsInventory", "IFSAPLOG");
+				commonDao.insert(res);
+				
+			} else {
+				transactionManager.commit(transactionStatus);
+				log.debug("MobilePutawayService.savePDPT01POP SAP 저장위치 변경 인터페이스 성공 - taskky : " + taskky + " - adjky : " + adjky + " - commit");
+				
+				// 적치지시 아이템 데이터 대량 LOTA01 update
+				inboundService.execBatchList("WmsTask.TASDIEND_LOTA01_BATCH", sjItemUpList);
+				
+				resultMsg = SAPRES;
+			}
+			
+		}else {
+			transactionManager.commit(transactionStatus);
+			log.debug("MobilePutawayService.savePDPT01POP - commit");
+		}
+		
+		rsMap.put("stPcnt", stPcnt);
+		rsMap.put("resultMsg", resultMsg);
+
+		return rsMap;
+	}
+	
+	
+	@Transactional
+	public DataMap savePDPT01POP_20220729(DataMap map) throws SQLException {
+		
+		List<DataMap> list = map.getList("list");
+		
+		List<DataMap> sjItemList = new ArrayList<DataMap>();
+		DataMap sjItemMap = new DataMap();                       // 저장위치 변경 프로세스 목록
+		
+		List<DataMap> ifList = new ArrayList<DataMap>(); 		 // 실적 인터페이스 목록
+		
+		List<DataMap> ifidList = new ArrayList<DataMap>();       // IFID : 인터페이스 전송 목록
+		DataMap ifidMap = new DataMap();                         // IFID : 입고유형별 LOGSEQNO
+		
+		List<Map> sjItemUpList = new ArrayList<Map>();   		 // 저장위치 변경 프로세스 목록
+		Map sjItemUpMap = new HashMap();                         // 저장위치 변경 프로세스 목록
+		
+		//List<DataMap> list = (List<DataMap>) map.getMap("list");
+		DataMap headRow = new DataMap();
+		DataMap row = new DataMap();
+		DataMap detailRow = new DataMap();
+		
+		String taskky = map.getString("TASKKY");
+		String skukey = map.getString("SKUKEY");
+		
+		String LOGSEQNO = "";
+		
+		for(int i=0; i<list.size(); i++){
+			
+			row = list.get(i).getMap("map");
+			
+			String rowState = row.getString(CommonConfig.GRID_ROW_STATE_ATT);
+			
+			float taskqtcomp = Float.parseFloat(row.getString("QTCOMP")); // 작업수량
+			
+			if(taskqtcomp==0) {
+				continue;
+			}
+			
+			if("C".equals(rowState)) {
+				// 신규 바코드 입력으로 다른 재고 데이터 처리시
+				
+				if (taskqtcomp == 0)continue;
+				
+				String STOKKY_ORG = row.getString("STOKKY");
+				String[] STOKKYS = STOKKY_ORG.split(",");
+				
+				for(int j=0; j<STOKKYS.length; j++){
+					
+					//if(1==1)continue;
+					
+					String STOKKY = STOKKYS[j];
+					
+					detailRow = new DataMap();
+					
+					detailRow.put("STOKKY", STOKKY);
+					detailRow.put("OWNRKY", row.getString("OWNRKY"));
+					detailRow.put("WAREKY", row.getString("WAREKY"));
+					detailRow.put("LOTA02", row.getString("LOTA02"));
+					DataMap skkyRow = commonDao.getMap("WmsMobilePutaway.PDPT01_POP_STKKY", detailRow);
+					
+					if(skkyRow!=null) {
+					
+						float QTTAOR = Float.parseFloat(skkyRow.getString("QTTAOR")); // 입력가능수량
+						
+						String STLKY = skkyRow.getString("STLKY");  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String LOTA01 = skkyRow.getString("LOTA01").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String LOCAAC = row.getString("LOCAAC").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+						String PLNTKY = row.getString("PLNTKY").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 플랜트 코드
+						
+						float toQTCOMP = 0;
+						
+						if (taskqtcomp > QTTAOR) {
+							toQTCOMP = QTTAOR;
+						}else {
+							toQTCOMP = taskqtcomp;
+						}
+						
+						//skkyRow.put("QTTAOR", taskqtcomp);
+						skkyRow.put("QTTAOR", toQTCOMP);
+						skkyRow.put("QTCOMP", toQTCOMP);
+						skkyRow.put("QTYUOM", toQTCOMP);
+						
+						skkyRow.put("LOCATG", row.getString("LOCAAC")); //적치 컨펌시는  TG값에 AC 값을 넣음  (수량/지번/ID)
+						skkyRow.put("LOCAAC", row.getString("LOCAAC"));
+						
+						skkyRow.put("SDUOKY", row.getString("SUOMKY"));
+						skkyRow.put("TUOMKY", row.getString("SUOMKY"));
+						skkyRow.put("TDUOKY", row.getString("SUOMKY"));
+						skkyRow.put("ADUOKY", row.getString("SUOMKY"));
+						skkyRow.put("AUOMKY", row.getString("SUOMKY"));
+						
+						skkyRow.put("SMEAKY", row.getString("SKUKEY"));
+						skkyRow.put("TMEAKY", row.getString("SKUKEY"));
+						skkyRow.put("AMEAKY", row.getString("SKUKEY"));
+						
+						if("".equals(LOCAAC.trim())) {
+							row.put("LOCAAC", row.get("LOCATG"));
+						}
+						
+						
+						skkyRow.put("STATIT","FPA");
+						
+						skkyRow.put("TASKKY", row.getString("TASKKY"));
+						
+						DataMap taskitKyRow = commonDao.getMap("WmsMobilePutaway.PDPT01_POP_TASKIT_KY", skkyRow);
+						
+						skkyRow.put("TASKIT", taskitKyRow.getString("TASKIT"));
+						
+						skkyRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+						skkyRow.setModuleCommand("WmsTask", "TASDIEND");
+						
+						log.debug(i + " - STLKY : " + STLKY + " - LOTA01 : " + LOTA01 + " - PLNTKY : " + PLNTKY);
+						if( !STLKY.equals(LOTA01) && !"".equals(PLNTKY) ) {
+							
+							log.debug(i + " - NO EQUALS STLKY : " + STLKY );
+							sjItemMap = new DataMap();
+							sjItemMap.putAll(row);
+							
+							sjItemMap.put("LOTA01", STLKY);
+							sjItemMap.put("ALOTA01", STLKY);
+							sjItemMap.put("PTLT01", STLKY);
+							sjItemMap.put("LOCAKY", row.get("LOCAAC"));
+							sjItemList.add(sjItemMap);
+							
+							sjItemUpMap = new DataMap();
+							sjItemUpMap.putAll(sjItemMap);
+							sjItemUpList.add(sjItemUpMap);
+							
+							if("".equals(LOGSEQNO)){
+								LOGSEQNO = inboundService.getLOGSEQNO();
+								log.debug("LOGSEQNO : " + LOGSEQNO);
+							}
+							
+							sjItemMap.put("QTADJU", row.getString("QTCOMP"));
+							sjItemMap.put("TMATNR", row.getString("SKUKEY"));
+							sjItemMap.put("MEINS", row.getString("SUOMKY"));
+							sjItemMap.put("BWARTSAP", "311"); // TF 플랜트내 이전 : 311
+							sjItemMap.put("LOGSEQNO", LOGSEQNO);
+							ifList.add(sjItemMap);
+							
+						}
+						
+						
+						commonDao.insert(skkyRow);
+						
+						//skkyRow.put("STOKKY", "%");
+						skkyRow.put("STOKKY", STOKKY);
+						
+						commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", skkyRow);
+						
+						taskqtcomp = taskqtcomp - toQTCOMP;
+						
+						if(taskqtcomp==0) {
+						  break;
+						}
+						
+					}
+					
+				}
+				
+			}else {
+				
+				//if(1==1)continue;
+				
+				row.setModuleCommand("WmsTask", "TASDIDEL");
+				commonDao.delete(row);
+				
+				if (taskqtcomp > 0) {
+					
+					String STLKY = row.getString("STLKY");  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+					String LOTA01 = row.getString("LOTA01").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+					String LOCAAC = row.getString("LOCAAC").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 저장위치 코드
+					String PLNTKY = row.getString("PLNTKY").trim();  // TO지번(LOCATG)에 해당하는 구역마스터 플랜트 코드
+					
+					
+					row.put("STATIT","FPA");
+					
+					row.put("QTTAOR", taskqtcomp);
+	
+					//row.put("QTTAOR", curqtcomp);
+					//row.put("QTCOMP", taskqtytot+curqtcomp);
+					//row.put("LOCATG", taskkyMap.getString("LOCAAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+					//row.put("TRNUTG", taskkyMap.getString("TRNUAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+					//row.put("LOCAAC", taskkyMap.getString("LOCAAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+					//row.put("TRNUAC", taskkyMap.getString("TRNUAC").replace(" ",""));	//적치 컨펌시는  TG값에 AC 값을 넣음 
+					//row.put("PTLT11", taskkyMap.getString("LOTA11").replace(".",""));
+					//row.put("PTLT12", taskkyMap.getString("LOTA12").replace(".",""));
+					row.put("QTYUOM", taskqtcomp);
+					//row.put("QTYUOM", curqtcomp);
+					row.put("SECTAC", row.get("SECTTG"));
+					row.put("PAIDAC", row.get("PAIDTG"));
+					row.put("ATRUTY", row.get("TTRUTY"));
+					row.put("AMEAKY", row.get("TMEAKY"));
+					row.put("AUOMKY", row.get("TUOMKY"));
+					row.put("QTAPUM", row.get("QTTPUM"));
+					row.put("ADUOKY", row.get("TDUOKY"));
+					row.put("QTADUM", row.get("QTTDUM"));
+					//row.put("PTLT15", "PDA");
+					
+					if("".equals(LOCAAC.trim())) {
+						row.put("LOCAAC", row.get("LOCATG"));
+					}
+					
+					row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+					row.setModuleCommand("WmsTask", "TASDIEND");
+					
+					log.debug(i + " - STLKY : " + STLKY + " - LOTA01 : " + LOTA01 + " - PLNTKY : " + PLNTKY);
+					if( !STLKY.equals(LOTA01) && !"".equals(PLNTKY) ) {
+						
+						log.debug(i + " - NO EQUALS STLKY : " + STLKY );
+						sjItemMap = new DataMap();
+						sjItemMap.putAll(row);
+						
+						sjItemMap.put("LOTA01", STLKY);
+						sjItemMap.put("ALOTA01", STLKY);
+						sjItemMap.put("PTLT01", STLKY);
+						sjItemMap.put("LOCAKY", row.get("LOCAAC"));
+						sjItemList.add(sjItemMap);
+						
+						sjItemUpMap = new DataMap();
+						sjItemUpMap.putAll(sjItemMap);
+						sjItemUpList.add(sjItemUpMap);
+						
+						if("".equals(LOGSEQNO)){
+							LOGSEQNO = inboundService.getLOGSEQNO();
+							log.debug("LOGSEQNO : " + LOGSEQNO);
+						}
+						
+						sjItemMap.put("QTADJU", row.getString("QTCOMP"));
+						sjItemMap.put("TMATNR", row.getString("SKUKEY"));
+						sjItemMap.put("MEINS", row.getString("SUOMKY"));
+						sjItemMap.put("BWARTSAP", "311"); // TF 플랜트내 이전 : 311
+						sjItemMap.put("LOGSEQNO", LOGSEQNO);
+						ifList.add(sjItemMap);
+						
+					}
+					
+					commonDao.insert(row);
+	
+					row.put("STOKKY", "%");
+	
+					commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", row);
+				}
+			
+			}
+			
+		}
+		
+		DataMap tasdirow = commonDao.getMap("WmsMobilePutaway.TASDINEW", map);
+		
+		// 저장위치 변경시 재고 저장위치변경 로직 실행
+		if(sjItemList!=null && sjItemList.size()>0) {
+			
+			// docunum으로 대상 LIST 조회
+			DataMap param = new DataMap();
+			
+			param = new DataMap();
+			param.put("WAREKY", map.getString("WAREKY"));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+			param.put("DOCUTY", "401"); // 401: 재고저장위치변경
+			param.put("list", sjItemList);
+			
+			DataMap res = inventoryService.saveAdjByTask(param);
+//			ifidList.add(res.getMap("ifMap"));
+			
+			String docSeq = res.getString("SADJKY");
+			log.debug("PT02SaveEnd.saveStock - SADJKY : " + docSeq);
+			
+			// 적치지시 아이템 데이터 대량 LOTA01 update
+			inboundService.execBatchList("WmsTask.TASDIEND_LOTA01_BATCH", sjItemUpList);
+			
+			// 입고실적등록  인터페이스 호출
+			String ifid = "WMS_IF_404";
+			
+			DataMap ifMap = new DataMap();
+			ifMap.put("list", ifList);
+			ifMap.put("IFID", ifid);
+			ifMap.put("LOGSEQNO", LOGSEQNO);
+			ifMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			String insertErrMsg = iFService.dataInsertIF(ifMap);
+			log.debug( "PT01SaveEnd.dataInsertIF - Msg : " + insertErrMsg );
+			
+			
+			ifidMap = new DataMap();
+			
+			ifidMap.put("IFID", ifid);          // IFID 목록
+			ifidMap.put("LOGSEQNO", LOGSEQNO);  // IF 호출 유니크 키 생성
+			ifidList.add(ifidMap);
+			
+		}
+		
+		tasdirow.put("ifidList",ifidList);
+
+		return tasdirow;
+	}
+	
+}

@@ -1,0 +1,339 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+<head>
+<style type="text/css">
+button {float: right; }
+input:read-only { 
+	background-color: #e2e2e2;
+}
+select:DISABLED {
+	background-color: #e2e2e2;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>Mobile WMS</title>
+<%@ include file="/mobile/include/head.jsp" %>
+<script type="text/javascript" src="/wms/js/wms.js"></script>
+<script>
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			module         : "WmsInventory",
+			command        : "PDPC02",
+			gridMobileType : true,
+			editable       : false
+		});
+		
+		//searchDocList();
+		$('#PHYIKY').focus();
+	});
+
+	function fn_onfocus(objId){
+		$("#"+objId).select();
+	}
+
+	function initGrid() {
+		gridList.resetGrid('gridList');
+	}
+	
+	function searchDocList() {
+		mobile.linkPopOpen('/mobile/PDPC01_DOC_POP.page');
+	}
+	
+	function DocPopCallback (data) {
+		$('#PHYIKY').val(data.get('PHYIKY'));
+		searchList();
+	}
+	
+	function searchList() {
+		var param = inputList.setRangeParam("searchArea");
+		param.put("WAREKY", '<%= wareky %>');
+		param.put('LOTA01', $('#LOTA01').val());
+		param.put('LOTA02', $('#LOTA02').val());
+		
+		if (!param.containsKey('PHYIKY') ||
+			!param.get("PHYIKY").trim()
+		) {
+			return;
+		}
+		
+		$("#gridList").empty();
+		
+		if (param.get("searchType") == "N") {
+			var json = netUtil.sendData({
+				module : "WmsInventory",
+				command : "PDPC02",
+				sendType : "count",
+				param : param
+			});
+
+			setTimeout(function(){
+				//commonUtil.msgBox("VALID_M0009", "미조사 "+json.data+"건");
+				$("#gridList").append("<tr><td colspan='5'>미조사 "+json.data+"건</td></tr>");
+			}, 100);
+		} else {
+			param.put("BARCOD", '');
+			gridList.gridList({
+				id : "gridList",
+				param : param
+			});
+		}
+
+		$('#BARCOD').val('');
+		$('#BARCOD').focus();
+	}
+	
+	/* 바코드 스캔 이벤트 */
+	function onReadBarcode() {
+		var BARCOD = $('#BARCOD').val();
+		if (!BARCOD) {
+			return;
+		}
+		
+		
+		var param = inputList.setRangeParam("searchArea");
+		
+		if (param.get("searchType") != "N") {
+			commonUtil.msgBox("VALID_M0009", "미조사 목록에서만 재고실사 등록이 가능 합니다.");
+			return ;
+		}
+		
+		
+		// 재고실사 문서에 바코드 존재유무 확인
+		
+		var PHYIKY = $("#PHYIKY").val().trim();
+		var param = new DataMap();		
+		param.put("WAREKY", '<%= wareky %>');
+		param.put('PHYIKY', PHYIKY);
+		param.put('BARCOD', BARCOD);
+
+		json = netUtil.sendData({
+			module  : "WmsInventory",
+			command : "PDPC02",
+			param   : param,
+		});
+		
+		if (!json || !json.data || json.data.length == 0) {
+			commonUtil.msgBox("VALID_M2070", null, null, function () {
+				$('#BARCOD').focus();
+				
+				// 바코드 수집 프로세스 개발 필요로직
+				openRegistPop();
+			}); // 해당 실사문서에 등록되지 않은 바코드입니다.
+		} else {
+			//openDetailPop(rowNum); // 존재 시 상세 팝업 오픈
+			mobile.linkPopOpen('/mobile/PDPC02_DETAIL.page?BARCOD=' + BARCOD, param);
+			$('#BARCOD').val('').focus();
+			return ;
+		}
+		/*
+		var list = gridList.getGridData('gridList', true);
+		
+		var finded = list.find(data => data.get("LOTA14") == BARCOD);
+		
+		if (finded) {
+			var rowNum = finded.get("GRowNum");
+			gridList.setColFocus("gridList", rowNum, 'LOTA14');
+			openDetailPop(rowNum); // 존재 시 상세 팝업 오픈
+		} else {
+			
+		}
+		*/
+	}
+	
+	/* 더블클릭 이벤트 */ 
+	function gridListEventRowDblclick(gridId, rowNum, colName, colValue) {
+		openDetailPop(rowNum);
+	}
+	
+	function openRegistPop() {
+		// 실사번호, 바코드 validate
+		var PHYIKY = $("#PHYIKY").val().trim();
+		var BARCOD = $("#BARCOD").val().trim();
+		
+		if(!PHYIKY) {
+			var label = commonLabel.getLabel("STD_PHYIKY", 1);
+			commonUtil.msgBox("VALID_required", [label], null, function () {
+				$('#PHYIKY').focus()
+			}); // {0} 은(는) 필수 입력항목입니다.
+			return;
+		} else if (!BARCOD) {
+			var label = commonLabel.getLabel("STD_BARCOD", 1);
+			commonUtil.msgBox("VALID_required", [label], null, function () {
+				$("#BARCOD").focus()
+			}); // {0} 은(는) 필수 입력항목입니다.
+			return;
+		}
+		
+		// 그리드에 존재하는 바코드인지 확인
+		var gridData = gridList.getGridData('gridList', true);
+		var finded   = gridData.find(data => data.get("LOTA14") == BARCOD);
+		if (finded) {
+			var rowNum = finded.get("GRowNum");
+			gridList.setColFocus("gridList", rowNum, 'LOTA14');
+			
+			commonUtil.msgBox("VALID_M2071", null, null, function () {
+				$('#BARCOD').focus();
+			}); // 해당 실사문서에 이미 등록된 바코드입니다.
+			return;
+		}
+		
+		var param = inputList.setRangeParam("searchArea");
+		param.put("PHYIKY", PHYIKY);
+		param.put("BARCOD", BARCOD);
+		mobile.linkPopOpen('/mobile/PDPC02_NEW.page', param);
+	}
+	
+	function openDetailPop(rowNum) {
+		var param   = inputList.setRangeParam("searchArea");
+		var rowData = gridList.getRowData("gridList", rowNum);
+		rowData.put("BARCOD", rowData.get('LOTA14'));
+		
+		var paramStr = "?DEPTID4=" + rowData.get('DEPTID4') + '&LOCAKY=' + rowData.get('LOCAKY') + '&BARCOD=' + rowData.get('LOTA14');
+		
+		param.putAll(rowData);
+		mobile.linkPopOpen('/mobile/PDPC02_DETAIL.page' + paramStr, param);
+	}
+	
+	function comboEventDataBindeBefore(comboAtt){
+		if(comboAtt == "Wms,PLNTKYCOMBO"){
+			var param = new DataMap();
+			param.put("WAREKY", '<%=wareky%>');
+			param.put("OWNRKY", "<%=ownrky%>");
+			param.put("LANGKY", "<%=langky%>");
+			
+			return param;
+		}
+	}
+</script>
+</head>
+<body>
+	<div class="main_wrap">
+		<div class="tem4_content">
+			<div class="select_box" id="searchArea">
+				<table>
+					<colgroup>
+						<col width="20%" />
+						<col width="*" />
+					</colgroup>
+					<tbody id="searchArea">
+						<tr>
+							<th CL='STD_PHYIKY'>실사번호</th>
+							<td colspan="6">
+								<input type="text" class="text" name="PHYIKY" id="PHYIKY" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'searchList()')" style="text-align:center; float:left;"/>
+							</td>
+							<td colspan="2" onclick ="searchDocList()">
+								<button class="bt" style="height: 32px; min-width: 70px;"><p CL='BTN_FINDDATA'></p></button>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_BARCOD'>바코드</th>
+							<td colspan="8">
+								<input type="text" class="text" name="BARCOD" id="BARCOD" inputmode="none" onfocus="fn_onfocus(this.id)" onkeypress="commonUtil.enterKeyCheck(event, 'onReadBarcode()')" style="text-align:center; float:left;"/>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_LOTA01'>저장위치</th>
+							<td colspan="5">
+								<input type="text" class="text" name="LOTA01" id="LOTA01" onfocus="fn_onfocus(this.id)" style="text-align:center; float:left;"/>
+							</td>
+							<td colspan="3">
+								<select id="LOTA02" name="LOTA02" Combo="Wms,PLNTKYCOMBO" onchange="searchList();"></select>
+							</td>
+						</tr>
+						<tr>
+							<th CL='STD_SELECTOPTIONS'>검색조건</th>
+							<td><input type="radio" class="text" name="searchType" id="PDANON" value="N" onchange="searchList()" checked/></td>
+							<th CL='STD_PDANON'>미조사</th>
+							<td><input type="radio" class="text" name="searchType" id="PDAFSH" value="F" onchange="searchList()"/></td>
+							<th CL='STD_PDAFSH'>조사</th>
+							<td><input type="radio" class="text" name="searchType" id="PDAGAP" value="G" onchange="searchList()"/></td>
+							<th CL='STD_PDAGAP'>실사차이</th>
+							<td><input type="radio" class="text" name="searchType" id="PDAALL" value=""  onchange="searchList()"/></td>
+							<th CL='STD_ALL'   >전체</th>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="tableWrap_search section" style="margin-bottom: 0px;">
+				<div class="tableHeader">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="150px"/>
+							<col width="60px"/>
+							<col width="60px"/>
+							<col width="100px"/>
+							<col width="150px"/>
+							<col width="120px"/>
+							<col width="120px"/>
+							<col width="120px"/>
+							<col width="100px"/>
+						</colgroup>
+						<thead>
+							<tr class="thead">
+								<th CL="STD_NO"		>No.</th>
+								<th CL="STD_LOTA14"	>개별바코드</th>
+								<th CL="STD_AREAKY"	>영역</th>
+								<th CL="STD_ZONEKY"	>구역</th>
+								<th CL="STD_LOCAKY"	>로케이션</th>
+								<th CL="STD_SKUKEY"	>품목코드</th>
+								<th CL="STD_ORDQTY"	>지시수량</th>
+								<th CL="STD_QTSPHY"	>재고조사수량</th>
+								<th CL="STD_QTYPDA"	>PDA실사수량</th>
+								<th CL="STD_UOMKEY"	>단위</th>
+							</tr>
+						</thead>
+					</table>
+				</div>
+				<div class="tableBody">
+					<table style="width: 100vw;"> 
+						<colgroup>
+							<col width="40px" />
+							<col width="150px"/>
+							<col width="60px"/>
+							<col width="60px"/>
+							<col width="100px"/>
+							<col width="150px"/>
+							<col width="120px"/>
+							<col width="120px"/>
+							<col width="120px"/>
+							<col width="100px"/>
+						</colgroup>
+						<tbody id="gridList">
+							<tr CGRow="true">
+								<td GCol="rownum"					>No.</td>
+								<td GCol="text,LOTA14"				>개별바코드</td>
+								<td GCol="text,AREAKY"				>영역</td>
+								<td GCol="text,ZONEKY"				>구역</td>
+								<td GCol="text,LOCAKY"				>로케이션</td>
+								<td GCol="text,SKUKEY"				>품목코드</td>
+								<td GCol="text,QTSIWH"	GF="N 20,1"	>지시수량</td>
+								<td GCol="text,QTSPHY"	GF="N 20,1"	>재고조사수량</td>
+								<td GCol="text,QTYPDA"	GF="N 20,1"	>PDA실사수량</td>
+								<td GCol="text,UOMKEY"				>단위</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+			<div class="footer_5" style="position:fixed;">
+				<table>
+					<tr>
+						<td class=f_1 width="33%" onclick="window.top.closePage()">
+							<label CL='BTN_CLOSE'>닫기</label>
+						</td>
+						<td class=f_1 width="33%" onclick="searchList()">
+							<label CL='BTN_SEARCH'>조회</label>
+						</td>
+						<!-- <td class=f_1 width="34%" onclick ="openRegistPop()" >
+							<label CL='BTN_REGIST'>등록</label>
+						</td> -->
+					</tr>
+				</table>
+			</div>
+		</div>
+	</div>
+</body>

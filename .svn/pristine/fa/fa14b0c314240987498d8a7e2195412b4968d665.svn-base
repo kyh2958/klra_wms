@@ -1,0 +1,141 @@
+<div class="select_box" id="bindArea">
+    <div id="searchArea">
+        <table>
+            <colgroup>
+                    <col width="20%" />
+                    <col width="20%" />
+                    <col width="20%" />
+                    <col width="20%" />
+                    <col width="20%" />
+                </colgroup>
+            <tbody>
+                <tr>
+                    <th CL='STD_BARCOD'>바코드</th>
+                    <td colspan="5"><input type="text" class="text" name="BARCOD" id="BARCOD" onfocus="this.select();" onkeypress="eventKeydown(event,this.id)"/></td>
+             </tr>
+             <tr>
+                 <th CL='STD_SKUKEY'>품목코드</th>
+                 <td colspan="5">
+                     <input type="text" class="text" name="SKUKEY" id="SKUKEY" readonly/>
+                     <input type="hidden" class="text" name="LOTA07" id="LOTA01" readonly/>
+                     <input type="hidden" class="text" name="LOTA01" id="LOTA02" readonly/>
+                     <input type="hidden" class="text" name="LOTA07" id="LOTA07" readonly/>
+                     <input type="hidden" class="text" name="MTYPE" id="MTYPE" readonly/>
+                 </td>
+             </tr>
+             <tr>
+                 <th  CL='STD_DESC01'>품목명</th>
+                 <td colspan="5">
+                     <input type="text" class="text" name="DESC01" id="DESC01" readonly/>
+                 </td>
+             </tr>
+             <tr>
+                 <th  CL='STD_QTYRCV1'>지시수량</th>
+                 <td>
+                     <input type="text" class="text number" name="BQTSHPO" id="BQTSHPO" readonly onchange="valueChangeEvent(this)"/>
+                 </td>
+                 <td>
+                     <input type="text" class="text" name="BUOMKY" id="BUOMKY" readonly onchange="valueChangeEvent(this)"/>
+                 </td>
+                  <td>
+                     <input type="text" class="text number" name="QTSHPO" id="QTSHPO" readonly onchange="valueChangeEvent(this)"/>
+                 </td>                                   
+                 <td>
+                     <input type="text" class="text" name="DUOMKY" id="DUOMKY" readonly onchange="valueChangeEvent(this)"/>
+                 </td>
+             </tr>
+             <tr>            
+                 <th  CL='STD_QTJCMP'>피킹수량</th>
+                 <td>
+                     <input type="text" class="text number"name="BQTJCMP" id="BQTJCMP" readonly/>                           
+                 </td>
+                 <td>
+                     <input type="text" class="text" name="PUT_BUOMKY" id="PUT_BUOMKY" readonly/>
+                 </td>
+                 <td>
+                     <input type="text" class="text number"name="QTJCMP" id="QTJCMP" onchange="valueChangeEvent(this)"  readonly/>
+                     <!-- <input type="hidden" class="input" name="LASTOB" id="LASTOB"/>
+                     <input type="hidden" class="input" name="LLOTA11" id="LLOTA11"/>
+                     <input type="hidden" class="input" name="SHPOKY" id="SHPOKY"/>-->
+                     <input type="hidden" class="test" name="ROW_QTCOMP" id="ROW_QTCOMP"/>
+                     <input type="hidden" class="input" name="QTPUOM" id="QTPUOM"/> 
+                 </td>
+                 <td>
+                     <input type="text" class="text" name="PUT_DUOMKY" id="PUT_DUOMKY" readonly/>
+                 </td>
+             </tr>  
+              <tr>            
+                 <th  CL='STD_QTSPUT'>입력수량</th>
+                 <td>
+                     <input type="text" class="text number" name="BQTSPUT" id="BQTSPUT" onchange="valueChangeEvent(this)" onkeypress="callSaveCnt(event)"/>
+                 </td>
+                 <td>
+                     <input type="text" class="text" name="BUOMKEY" id="BUOMKEY" readonly/>
+                 </td>
+                 <td>
+                     <input type="text" class="text number"name="QTSPUT" id="QTSPUT" onchange="valueChangeEvent(this)" />
+                 </td>
+                 <td>
+                     <input type="text" class="text" name="DUOMKY2" id="DUOMKY2" readonly/>
+                 </td>                           
+             </tr>                                  
+         </tbody>
+     </table>
+     <!-- 할당로트피킹준수 HIDDEN -->
+     <input type="hidden" class="input" name="LOCAKY" id="LOCAKY"/>
+ </div>
+</div>
+<div class="tableWrap_search section">
+    <div class="tableHeader">                        
+        <table style="width: 100%;">
+            <colgroup>
+                <col width="40px" />
+                <col width="110px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="105px" />
+            </colgroup> 
+            <thead>
+                <tr>
+                    <th CL="STD_NO">NO</th>                             
+                    <th CL="STD_LOTA14">개별바코드</th>
+                    <th CL="STD_LOCAAC">실로케이션</th>
+                    <th CL="STD_QTJCMP">피킹수량</th>
+                    <th CL="STD_SDUOKY">기본단위</th>
+                    <th CL="STD_LOTA02">플랜트</th>
+                    <th CL="STD_LOTA01">저장위치</th>
+                    <th CL="STD_LOTA07">MTO/MTS</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+    <div class="tableBody">
+        <table style="width: 100%;">
+            <colgroup>
+                <col width="40px" />
+                <col width="110px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="75px" />
+                <col width="105px" />
+            </colgroup>
+            <tbody id="gridList">
+                <tr CGRow="true">
+	                <td GCol="rownum">순번</td>
+	                <td GCol="text,LOTA14">개별바코드</td>
+	                <td GCol="text,LOCAKY">실로케이션</td>
+	                <td GCol="text,QTCOMP" GF="N 20,3">피킹수량</td>
+	                <td GCol="text,DUOMKY">기본단위</td>
+	                <td GCol="text,LOTA02">플랜트</td>
+	                <td GCol="text,LOTA01">저장위치</td>
+	                <td GCol="text,LOTA07">MTO/MTS</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>    

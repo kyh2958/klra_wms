@@ -1,0 +1,62 @@
+<table style="width: 100%; display: none">
+	<colgroup>
+		<col width="40px" />
+		<col width="130px" />
+		<col width="130px" />
+		<col width="70px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="55px" />
+		<col width="40px" />
+		<col width="120px" />
+		<col width="80px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="90px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="50px" />
+		<col width="80px" />
+		<col width="50px" />
+	</colgroup>
+	<tbody id="gridListSkuSum">
+		<tr CGRow="true">
+			<td GCol="rownum">1</td>
+			<td GCol="text,SKUKEY">품목코드</td>
+			<td GCol="text,DESC01">품목명</td>
+			<td GCol="text,LOCAKY">지번</td>
+			<td Gcol="text,BOXQT">BOXQT</td>
+			<td Gcol="text,PLTQT">BOX/Pallet</td>
+			<td Gcol="text,LOTA06NM">재고상태</td>
+			<td GCol="text,QTSIWH" GF="N 20,2">재고수량</td>
+			<td GCol="text,UOMKEY">단위</td>
+			<td GCol="text,LOTA14">개별바코드</td>
+			<td GCol="text,USEQTY" GF="N 20,2">가용수량</td>
+			<td GCol="text,QTSCNU" GF="N 20,2">불용수량</td> <!-- Can Not Use -->
+			<td GCol="text,QTSIQT" GF="N 20,2">품질수량</td> <!-- Inspection QuanTity -->
+			<td GCol="text,QTSWQT" GF="N 20,2">폐기수량</td> <!-- Wasted     QuanTity -->
+			<td GCol="text,QTSHQT" GF="N 20,2">보류수량</td> <!-- Hold       QuanTity -->
+			<td GCol="text,QTSALO" GF="N 20,2">할당수량</td>
+			<td Gcol="text,TOTWG">총중량</td>
+			<td GCol="text,QTSPMO" GF="N 20,2">이동OUT</td>
+			<td GCol="text,QTSPMI" GF="N 20,2">이동IN</td>
+			<td GCol="text,SKUL01NM">품목구분</td>
+			<td Gcol="text,WAREKY">거점</td>
+			<td Gcol="text,WARENM">거점명</td>
+			<td Gcol="text,LOTA02">플랜트</td>
+			<td GCol="text,ZONEKY">구역</td>
+			<td Gcol="text,BAGQT">EA/BAG</td>
+			<td Gcol="text,EAQTY">매(sheet/속)</td>
+			<td Gcol="text,SOKQT">속(개/BALE)</td>
+		</tr>
+	</tbody>
+</table>

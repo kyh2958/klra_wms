@@ -1,0 +1,634 @@
+package project.wms.controller;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.controller.BaseController;
+import project.common.service.CommonService;
+import project.common.util.SqlUtil;
+import project.wms.service.InboundService;
+
+@Controller
+public class InboundController extends BaseController {
+
+	static final Logger log = LogManager.getLogger(InboundController.class.getName());
+	
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired
+	private CommonService commonService;
+	
+	@RequestMapping("/wms/inbound/json/SaveAS01.*")
+	public String saveAs01(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveAs01(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inbound/json/AS02Delete.*")
+	public String deleteAs02(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.deleteAs02(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR02.*")
+	public String saveGr02(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//Object data = inboundService.saveGr02(map);
+		DataMap rsMap = inboundService.saveGr02(map);
+		
+		String ifRsCode = "S";
+		String ifRsMsg = "";
+		
+		List<DataMap> ifidList = rsMap.getList("ifidList");
+		if(null!=ifidList && ifidList.size()>0) {
+			// 인터페이스 전송
+			for(DataMap item : ifidList) {
+				item.put("ownrky", map.getString("OWNRKY"));
+				item.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				inboundService.sendIf(item);
+				
+				if(!item.getString("ifRsMsg").equals("SUCCESS")) {
+					ifRsCode = "E";
+					ifRsMsg = item.getString("ifRsMsg");
+				}
+				
+			}
+
+		}
+		
+		model.put("data", rsMap);
+		
+		model.put("ifRsCode", ifRsCode);
+		model.put("ifRsMsg", ifRsMsg);
+		
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR02New.*")
+	public String SaveGR02New(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.saveGr02New(map); //ERP전송
+		//DataMap rsMap = inboundService.saveGr02New_X(map); //ERP전송 X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR02NewWms.*")
+	public String SaveGR02NewWms(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//DataMap rsMap = inboundService.saveGr02New(map); //ERP전송
+		DataMap rsMap = inboundService.saveGr02New_X(map); //ERP전송 X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR031New.*")
+	public String SaveGR031New(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.saveGr031New(map); //ERP전송
+		//DataMap rsMap = inboundService.saveGr02New_X(map); //ERP전송 X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/validationOrderGr02.*") 
+	public String validationOrderGr02(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		String result = inboundService.validationOrderGr02(map);
+		model.put("data", result);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/validationOrderGr031.*") 
+	public String validationOrderGr031(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		String result = inboundService.validationOrderGr031(map);
+		model.put("data", result);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deadlineGR02.*")
+	public String deadlineGR02(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.deadlineGR02(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deadlineCancelGR02.*")
+	public String deadlineCancelGR02(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.deadlineCancelGR02(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inbound/fileUp/saveSingleGrFile.*")
+	public String saveSingleGrFile(MultipartHttpServletRequest request, Map<String, Object> model) throws FileNotFoundException, IOException, Exception{		
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		int data = inboundService.saveSingleGrFile(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGrFile.*")
+	public String saveGrFile(HttpServletRequest request, Map<String, Object> model) throws Exception{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		int data = inboundService.saveGrFile(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inbound/json/SaveGR14.*")
+	public String saveGr14(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//Object data = inboundService.saveGr14(map);
+		DataMap rsMap = inboundService.saveGr14(map);
+		/*
+		List<DataMap> ifidList = rsMap.getList("ifidList");
+		
+		if(null!=ifidList && ifidList.size()>0) {
+			// 인터페이스 전송
+			for(DataMap item : ifidList) {
+				item.put("ownrky", map.getString("OWNRKY"));
+				item.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				inboundService.sendIf(item);
+			}
+		}
+		*/
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR14New.*")
+	public String saveGr14New(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.saveGr14New(map);
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR01.*")
+	public String saveGr01(HttpServletRequest request, Map model) throws Exception{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr01(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR00.*")
+	public String SaveGR00(HttpServletRequest request, Map model) throws Exception{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr00(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/ReflectGR01Item.*")
+	public String reflectGr01Item(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.reflectGr01Item(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR01POP2.*")
+	public String saveGr01pop2(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr01pop2(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR05.*")
+	public String saveGr05(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr05(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SaveGR06.*")
+	public String saveGr06(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr06(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	/*@RequestMapping("/wms/inbound/json/SaveGR15.*")
+	public String saveGr15(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr15(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}*/
+	
+	@RequestMapping("/wms/inbound/json/GR10Delete.*")
+	public String deleteGr10(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.deleteGr10(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGr20.*")
+	public String saveGr20(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr20(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGr03.*")
+	public String saveGr03(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr03(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGr15.*")
+	public String saveGr15(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.saveGr15(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/SendSMS.*")
+	public String SendSMS(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.SendSMS(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/savePrtseq.*")
+	public String savePrtseq(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.savePrtseq(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR09.*")
+	public String deleteGR09(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//Object data = inboundService.deleteGR09(map);
+		
+		DataMap rsMap = inboundService.deleteGR09(map);
+		/*
+		List<DataMap> ifidList = rsMap.getList("ifidList");
+		if(null!=ifidList && ifidList.size()>0) {
+			// 인터페이스 전송
+			for(DataMap item : ifidList) {
+				item.put("ownrky", map.getString("OWNRKY"));
+				item.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				inboundService.sendIf(item);
+			}
+
+		}
+		*/
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR09New.*")
+	public String deleteGR09New(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.deleteGR09New(map); //ERP전송
+		//DataMap rsMap = inboundService.deleteGR09New_X(map); //ERP전송 X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR09NewWms.*")
+	public String deleteGR09NewWms(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//DataMap rsMap = inboundService.deleteGR09New(map); //ERP전송
+		DataMap rsMap = inboundService.deleteGR09New_X(map); //ERP전송 X
+		
+		model.put("data", rsMap);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/validationGR09.*")
+	public String validationGR09(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		//System.out.println("controll start!!!");
+		Object data = inboundService.validationGR09(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inbound/json/ebelnGR02.*")
+	public String ebelnGR02(HttpServletRequest request, Map model) throws SQLException, InterruptedException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		SqlUtil sqlutil = new SqlUtil();
+		List keyList= new ArrayList();
+		
+			map.setModuleCommand("WmsInbound", "GR02");
+			keyList.add("PO.EBELN");
+			DataMap rangeMap = map.getMap(CommonConfig.RNAGE_DATA_MAP);
+			DataMap newRange = sqlutil.createRangeMap(rangeMap, keyList);
+			sqlutil.changeRangeKey(newRange, "PO.EBELN", "PO.USRID3");
+			String rangeSql1 = sqlutil.getRangeSql(newRange);
+
+			map.put("RANGE_SQL1", rangeSql1);
+		
+		String listData = commonService.getJdbcData(map);
+
+		model.put("data", listData);
+		
+		return TEXT_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/ebelnGR09.*")
+	public String ebelnGR09(HttpServletRequest request, Map model) throws SQLException, InterruptedException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		SqlUtil sqlutil = new SqlUtil();
+		List keyList= new ArrayList();
+		
+			map.setModuleCommand("WmsInbound", "GR09");
+			keyList.add("RI.SEBELN");
+			DataMap rangeMap = map.getMap(CommonConfig.RNAGE_DATA_MAP);
+			DataMap newRange = sqlutil.createRangeMap(rangeMap, keyList);
+			sqlutil.changeRangeKey(newRange, "RI.SEBELN", "LOTA07");
+			String rangeSql1 = sqlutil.getRangeSql(newRange);
+
+			map.put("RANGE_SQL1", rangeSql1);
+		
+		String listData = commonService.getJdbcData(map);
+
+		model.put("data", listData);
+		
+		return TEXT_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/gr01HeadList.*")
+	public String gr01HeadList(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		log.debug("############### InboundController gr01HeadList START ###################");
+		log.debug(map);
+		log.debug("############### InboundController gr01HeadList END ###################");
+
+		
+		Object data = inboundService.gr01HeadList(map);
+
+		model.put("data", data);
+		model.put("MSG", "OK");
+
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/gr01SubList.*")
+	public String gr01SubList(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		log.debug("############### InboundController gr01HeadList START ###################");
+		log.debug(map);
+		log.debug("############### InboundController gr01HeadList END ###################");
+
+		
+		Object data = inboundService.gr01SubList(map);
+
+		model.put("data", data);
+		model.put("MSG", "OK");
+
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/BARCDInsert.*")
+	public String BARCDInsert(HttpServletRequest request, Map model) throws SQLException{				
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.BARCDInsert(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGR98EXCEL.*")
+	public String saveGR98EXCEL(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inboundService.saveGR98EXCEL(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGR98.*")
+	public String saveGR98(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inboundService.saveGR98(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/saveGR98Proc.*")
+	public String saveGR98Proc(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inboundService.saveGR98Proc(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR98.*")
+	public String deleteGR98(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inboundService.deleteGR98(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inbound/json/saveGR99.*")
+	public String saveGR99(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		//Object data = inboundService.saveGR99(map);
+		DataMap rsMap = inboundService.saveGR99(map);
+		
+		List<DataMap> ifidList = rsMap.getList("ifidList");
+		
+		if(null!=ifidList && ifidList.size()>0) {
+			// 인터페이스 전송
+			for(DataMap item : ifidList) {
+				item.put("ownrky", map.getString("OWNRKY"));
+				item.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				inboundService.sendIf(item);
+			}
+			
+		}
+		
+		model.put("data", rsMap);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/Palletizing.*")
+	public String palletizing(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		String listData = inboundService.getPalletizingList(map);
+		model.put("data", listData);
+		return TEXT_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/PalletizingJson.*")
+	public String PalletizingJson(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inboundService.getPalletizingJsonList(map);
+		model.put("data", data.getList("list"));
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR40.*")
+	public String deleteGR40(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.deleteGR40(map);
+		
+		model.put("data", map);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteGR40New.*")
+	public String deleteGR40New(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap rsMap = inboundService.deleteGR40New(map);
+		
+		model.put("data", rsMap);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteTmpGR40.*")
+	public String deleteTmpGR40(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.deleteTmpGR40(map);
+		
+		model.put("data", map);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inbound/json/deleteTmpRollmaGR40.*")
+	public String deleteTmpRollmaGR40(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		Object data = inboundService.deleteTmpRollmaGR40(map);
+		
+		model.put("data", map);
+		return JSON_VIEW;
+	}
+	
+	
+}

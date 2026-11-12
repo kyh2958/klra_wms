@@ -1,0 +1,3147 @@
+package project.wms.service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.util.CollectionUtils;
+
+import project.common.airfw.RfcCallFunction;
+import project.common.airfw.Utils;
+import project.common.bean.CommonConfig;
+import project.common.bean.CommonLabel;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+
+@Service
+public class InventoryService {
+
+	private static Logger log = Logger.getLogger(InventoryService.class);
+	
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired
+	private WmsService wmsService;
+	
+	@Autowired
+	private IFService ifService;
+	
+	@Autowired
+	private CommonLabel commonLabel;
+	
+	@Autowired 
+	private PlatformTransactionManager transactionManager;
+	
+	/** TASK 데이터 생성 이후 재고조정 필요 시
+	 * <pre>
+	 * DOCUTY     : required String
+	 * WAREKY     : required String
+	 * SES_USER_ID: required String
+	 * list:[{
+	 *     TASKKY    : required String
+	 *     TASKIT    : required String
+	 *     ALOTA01~20: optional String
+	 * }]
+	 * 
+	 * * DOCUTY:{
+	 *     401: 재고저장위치변경
+	 *     402: 재고상태변경
+	 *     421: 재고품목변경(MtoM)
+	 *     422: 재고LOT속성변경
+	 *     423: 재고MTO변경
+	 * }
+	 * <pre/>
+	 * */
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap saveAdjByTask (DataMap param) throws SQLException {
+		// validate list
+		List<DataMap> list = param.getList("list");
+		String docuty = param.getString("DOCUTY");
+		String wareky = param.getString("WAREKY");
+		String userId = param.getString(CommonConfig.SES_USER_ID_KEY);
+		
+		if (StringUtils    .isEmpty(docuty)) { new SQLException("required DOCUTY"); }
+		if (StringUtils    .isEmpty(wareky)) { new SQLException("required WAREKY"); }
+		if (StringUtils    .isEmpty(userId)) { new SQLException("required " + CommonConfig.SES_USER_ID_KEY); }
+		if (CollectionUtils.isEmpty(list)  ) { new SQLException("empty list"); }
+		
+		/* 2022.05.20 재고저장위치변경 시 ALOTA01, ALOTA02가 비어있지 않은 데이터만 필터링 */
+		if("401".equals(docuty)) {
+			list = list.stream().filter(row -> {
+				String ALOTA01 = row.getString("ALOTA01").trim();
+				String ALOTA02 = row.getString("ALOTA02").trim();
+				return StringUtils.isNotEmpty(ALOTA01) && StringUtils.isNotEmpty(ALOTA02);
+			}).collect(Collectors.toList());
+			
+			/* 필터링 후 데이터 없다면 return */
+			if (CollectionUtils.isEmpty(list)) {
+				return param;
+			}
+			
+			param.put("list", list);
+		}
+		
+		String docSeq = wmsService.getDocSeq(docuty); // 문서번호생성
+		log.debug("docSeq: " + docSeq);
+
+		// ADJDH INSERT
+		DataMap copyParam = (DataMap) param.clone();
+		copyParam.setModuleCommand("WmsInventory", "SJ03");
+		List<DataMap> headList = commonDao.getList(copyParam);
+		DataMap head = headList.get(0);
+		head.put("SADJKY", docSeq);
+		head.put(CommonConfig.SES_USER_ID_KEY, userId);
+		head.setModuleCommand("WmsInventory", "ADJDH");
+		commonDao.update(head);
+
+		// 1. 재고 조정 전 validate
+		// 2. I/F대상 조회 (TASKKY, TASKKIT 기준)
+		// 3. ADJDI INSERT
+		int itemCount = 0;
+		List<DataMap> ifList = new ArrayList<>();
+		// validate, set interface data
+		for (DataMap row : list) {
+			String taskky = row.getString("TASKKY");
+			String taskit = row.getString("TASKIT");
+			
+			if (StringUtils.isEmpty(taskky)) { throw new SQLException("required TASKKY"); }
+			if (StringUtils.isEmpty(taskit)) { throw new SQLException("required TASKIT"); }
+			
+			row.put(CommonConfig.SES_USER_ID_KEY, userId);
+			row.put("WAREKY", wareky);
+			row.put("SADJKY", docSeq);
+			
+			itemCount += 10;
+			row.put("SADJIT", itemCount);
+			row.put("SADJIT", String.format("%06d", itemCount));
+			row.put("DOCUTY", docuty);
+			
+			// 재고 조정 전 I/F 대상 조회
+			row.setModuleCommand("WmsInventory", "ADJDI_TASKKY");
+			List<DataMap> ifDataList = commonDao.getList(row);
+			for (int i = 0; i < ifDataList.size(); i++) {
+				DataMap data  = ifDataList.get(i);
+				
+				// 변경될 플랜트에서 관리되는 품목인지 VALIDATE
+				DataMap validate = commonDao.getMap("WmsInventory.SKUPLT_VALIDATE", data);
+				if (validate == null || !"1".equals(validate.getString("RESULT"))) {
+					String ALOTA02 = data.getString("ALOTA02");
+					String SKUKEY  = data.getString("SKUKEY");
+					
+					validate = new DataMap();
+					validate.put("SAPRES", "해당 품목(" + SKUKEY  + ")은 플랜트 " + ALOTA02 + "에서 관리중인 품목이 아닙니다.");
+					return validate;
+				}
+				
+				String SAPSTS = getSAPSTS(docuty, data);
+				row.put("SAPSTS", SAPSTS);
+				data.put("SAPSTS", SAPSTS);
+				
+				boolean SAPIFYN = StringUtils.equals("V", head.getString("SAPIFYN"));
+				if (!"X".equals(SAPSTS) && SAPIFYN) {
+					ifList.add(setInterfaceData(docuty, data));
+				}
+			}
+			
+			// [SJ01] 재고상태변경 - TO재고상태가 50(폐기)인 경우
+			/* 저장위치, 보류상태 변경은 파라미터로 값이 안넘어오기 때문에 쿼리수정으로 대체 */
+			String ALOTA06 = row.getString("ALOTA06");
+			if ("402".equals(docuty) && "50".equals(ALOTA06)) {
+				row.put("ALOCAKY", "SCRLOC");
+			}
+			
+			row.setModuleCommand("WmsInventory", "ADJDI_TASKKY");
+			int result = (int) commonDao.insert(row);
+			
+			log.debug("insert result = " + result);
+			if (result < 1) {
+				throw new SQLException("failed insert - taskky : " + taskky + ", taskit : " + taskit);
+			}
+			
+			itemCount += 10;
+		}
+		
+		DataMap rsMap = new DataMap();
+		if (CollectionUtils.isEmpty(ifList) == false) {
+			// 인터페이스 파라미터 설정
+			DataMap ifMap = new DataMap();
+			param.clonSessionData(ifMap);
+			ifMap.put("IFID", getIFID(docuty));
+			ifMap.put("list", ifList);
+			ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+			ifMap.put("DOCDAT", param.getString("DOCDAT"));
+			ifMap.put(CommonConfig.MENU_ID_KEY, param.get(CommonConfig.MENU_ID_KEY));
+			ifService.dataInsertIF(ifMap); // IF DB insert
+			
+			ifMap.remove("list"); // sendIF 시 불필요.
+			
+			rsMap.put("SADJKY", docSeq);
+			rsMap.put("ifMap", ifMap);
+			
+			// 2022.07.13 WMS-SAP 동일 트랜잭션으로 처리
+			return sendIF(rsMap);
+		}
+		
+		rsMap.put("SAPRES", "SUCCESS");
+		return rsMap;
+	}
+	
+	/**
+	 * 재고조정
+	 * <br> SJ01 재고 상태변경
+	 * <br> SJ03 재고 저장위치변경
+	 * <br> SJ04 재고 LOT속성변경
+	 * <br> SJ05 재고 품목변경
+	 * <br> SJ18 재고MTO/MTS변경
+	 * <br> param: DataMap head, List&ltDataMap&gt list
+	 */
+//	@Transactional(rollbackFor = Exception.class)
+	public DataMap saveStock (DataMap map) throws Exception {
+		DataMap head = map.getMap("head").getMap("map");
+		
+		String docuty = head.getString("ADJUCA");
+		String docdat = head.getString("DOCDAT");
+		if (StringUtils.isEmpty(docuty.trim())) {
+			throw new Exception("empty ADJUCA");
+		}
+		
+		/* 문서유형 별 validation, set data */
+		map = validateAndSortADJ(docuty, map);
+		List<DataMap> list = map.getList("list");
+		if (CollectionUtils.isEmpty(list)) {
+			throw new Exception("empty list");
+		}
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+
+		int successCnt = 0;
+		List<DataMap> sapResList = new ArrayList<>();
+		String docSeq = "";
+		boolean SAPIFYN = StringUtils.equals("V", head.getString("SAPIFYN"));
+		
+		DataMap rsMap = new DataMap();
+		
+		DataMap errMap = new DataMap();
+		
+		try {
+			docSeq = wmsService.getDocSeq(docuty);
+			map.clonSessionData(head);
+			head.put("SADJKY", docSeq); // 문서번호
+			head.put("ADJFLG", "M");
+			
+			if (SAPIFYN == false) {
+				String doctxt = head.getString("DOCTXT");
+				doctxt += StringUtils.isBlank(doctxt) ? "" : ", ";
+				doctxt += "SAP 미연동";
+				head.put("DOCTXT", doctxt);
+			}
+			head.setModuleCommand("WmsInventory", "ADJDH");
+			commonDao.update(head);
+			
+			int itemCount = 0;
+			List<DataMap> ifList = new ArrayList<>();
+			
+			String bfSAPSTS = "";
+			
+			for (int i = 0; i < list.size(); i++) {
+				DataMap row = list.get(i).getMap("map");
+				String SAPSTS = getSAPSTS(docuty, row);
+				
+				if (SAPIFYN &&
+					CollectionUtils.isEmpty(ifList) == false &&
+					StringUtils.equals(SAPSTS, bfSAPSTS) == false
+				) {
+					// 인터페이스 파라미터 설정
+					DataMap ifMap = new DataMap();
+					map.clonSessionData(ifMap);
+					ifMap.put("IFID", getIFID(docuty));
+					ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+					ifMap.put("list", ifList);
+					ifMap.put("DOCDAT", docdat);
+					ifMap.put(CommonConfig.MENU_ID_KEY, map.get(CommonConfig.MENU_ID_KEY));
+					ifService.dataInsertIF(ifMap); // IF DB insert
+										
+					ifMap.remove("list"); // sendIF 시 불필요.
+					
+					// 240126 IF ERROR FLAG UPDATE
+					errMap.put("errMap", ifMap);
+							
+					DataMap sapReq = new DataMap();
+					sapReq.put("SADJKY", docSeq);
+					sapReq.put("ifMap", ifMap);
+					
+					// 2022.07.13 동일 트랜잭션으로 처리
+					DataMap result = sendIF(sapReq);
+					sapResList.add(result);
+					
+					String SAPRES = result.getString("SAPRES");
+					if ("SUCCESS".equals(SAPRES)) {
+						successCnt = i;
+						ifList.clear();
+						transactionSavepoint = transactionStatus.createSavepoint();
+					} else {
+						throw new Exception("SAP : " + SAPRES);
+					}
+				}
+				
+				map.clonSessionData(row);
+				row.put("SADJKY", docSeq); // 문서번호SAPSTS
+				row.put("SAPSTS", SAPSTS);
+				
+				String qtyStr = row.getString("AQTADJU");
+				double qty = Utils.parseDouble(qtyStr);
+				
+				if (!row.get("STOKKY").equals(" ")) {
+					/* ADJDIOLD paramSet */
+					itemCount += 10;
+					row.put("SADJIT", String.format("%06d", itemCount));
+					row.put("QTADJU", qty * -1);
+					row.setModuleCommand("WmsInventory", "ADJDIOLD");
+					commonDao.insert(row);
+				}
+				
+				/* ADJDI paramSet */
+				itemCount += 10;
+				row.put("SADJIT", String.format("%06d", itemCount));
+				row.put("QTADJU", qty);
+				row.put("STOKKY", " ");
+				row.put("LOTNUM", " ");
+				
+				if (StringUtils.equals(docuty, "421")) { /* 재고 품목변경 */
+					row.put("UOMKEY",row.get("AUOMKEY"));
+					row.put("DUOMKY",row.get("ADUOMKY"));
+					row.put("DESC01",row.get("ADESC01"));
+					row.put("DESC02",row.get("ADESC02"));
+					
+					//231215 제품군 추가("SKUG05" 값 변경 처리). 해당 품목의 제품군을 조회해야함.
+					/* SKUMA 테이블 정보로 세팅해줘야 함. */
+					row.setModuleCommand("WmsInventory", "SKUMA_SKUG");
+					DataMap SKUMA = commonDao.getMap(row);
+					row.put("SKUG05", SKUMA.getString("SKUG05"));
+					
+					String barcodCh = row.getString("BARCODCH");
+					if(barcodCh.equals("V")) {
+						row.setModuleCommand("WmsInventory", "BARCODE_SEQ");
+						commonDao.insert(row);
+						row.setModuleCommand("WmsInventory", "BARCODE_SEQ");
+						DataMap res;
+						res = commonDao.getMap(row);
+						String reseq = res.getString("CREDATE").substring(2)+"X";
+						String seqno = res.getString("SEQNO");
+						String str = String.format("%03d", Integer.parseInt(seqno));
+						reseq = reseq.concat(str);
+						row.put("ALOTA14", reseq);
+					}
+				}
+				
+				row.setModuleCommand("WmsInventory", "ADJDI");
+				commonDao.insert(row);
+				
+				if (!"X".equals(SAPSTS) && SAPIFYN) {
+					ifList.add(setInterfaceData(docuty, row));
+				}
+				
+				bfSAPSTS = SAPSTS;
+			}
+			
+			if (CollectionUtils.isEmpty(ifList) == false && SAPIFYN) {
+				// 인터페이스 파라미터 설정
+				DataMap ifMap = new DataMap();
+				map.clonSessionData(ifMap);
+				ifMap.put("IFID", getIFID(docuty));
+				ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+				ifMap.put("list", ifList);
+				ifMap.put("DOCDAT", docdat);
+				ifMap.put(CommonConfig.MENU_ID_KEY, map.get(CommonConfig.MENU_ID_KEY));
+				ifService.dataInsertIF(ifMap); // IF DB insert
+				
+				ifMap.remove("list"); // sendIF 시 불필요.
+
+				// 240126 IF ERROR FLAG UPDATE
+				errMap.putAll(ifMap);
+				
+				DataMap sapReq = new DataMap();
+				sapReq.put("SADJKY", docSeq);
+				sapReq.put("ifMap", ifMap);
+								
+				// 2022.07.13 동일 트랜잭션으로 처리
+				DataMap result = sendIF(sapReq);
+				sapResList.add(result);
+				
+				String SAPRES = result.getString("SAPRES");
+				log.debug("Sap Response : " + SAPRES);
+				
+				if("SUCCESS".equals(SAPRES)) {
+					successCnt = list.size();
+					ifList.clear();
+					transactionSavepoint = transactionStatus.createSavepoint();
+				} else {
+					throw new Exception("SAP : " + SAPRES);
+				}
+			}
+			
+			rsMap.put("SADJKY", docSeq);
+			rsMap.remove("ifMap");
+		} catch (SQLException e) {
+			transactionStatus.rollbackToSavepoint(transactionSavepoint);
+			
+			String msg = e.getMessage();
+			if (msg.length() > 300) {
+				msg = msg.substring(0, 300);
+			}
+			
+			DataMap result = new DataMap();
+			result.put("ZDOCNO", docSeq);
+			result.put("ERRTXT", msg);
+			result.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			result.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+			result.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+			result.setModuleCommand("WmsInventory", "IFSAPLOG");
+			
+			commonDao.insert(result);
+			
+			//240126 SAP 에러 발생 시, flag 갱신처리
+			//해당 LOGSEQ 선 조회 후 해당건이 'I'일 때 flag update
+			DataMap param = new DataMap();
+			param.putAll(errMap);
+			//param.put("LOGSEQNO", errMap.getString("LOGSEQNO"));
+			param.put("SADJKY", docSeq);
+			param.put("IFID", getIFID(docuty));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			param.setModuleCommand("Erpif", "IFWMS223_FLG_NEW"); //전송결과 update
+			param.put("PRCFLG", "E");
+			param.put("PRCETX", msg);
+			commonDao.update(param); // UPDATE IFWMS223
+						
+			sapResList.add(result);
+			
+			rsMap.put("successCnt", successCnt);
+			rsMap.put("sapResList", sapResList);
+		} catch (Exception e) {
+			transactionStatus.rollbackToSavepoint(transactionSavepoint);
+			
+			String msg = e.getMessage();
+			if (msg.length() > 300) {
+				msg = msg.substring(0, 300);
+			}
+			
+			DataMap result = new DataMap();
+			result.put("ZDOCNO", docSeq);
+			result.put("ERRTXT", msg);
+			result.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			result.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+			result.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+			result.setModuleCommand("WmsInventory", "IFSAPLOG");
+			
+			commonDao.insert(result);			
+
+			//240126 SAP 에러 발생 시, flag 갱신처리
+			//해당 LOGSEQ 선 조회 후 해당건이 'I'일 때 flag update
+			DataMap param = new DataMap();
+			param.putAll(errMap);
+			//param.put("LOGSEQNO", errMap.getString("LOGSEQNO"));
+			param.put("SADJKY", docSeq);
+			param.put("IFID", getIFID(docuty));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			param.setModuleCommand("Erpif", "IFWMS223_FLG_NEW"); //전송결과 update
+			param.put("PRCFLG", "E");
+			param.put("PRCETX", msg);
+			commonDao.update(param); // UPDATE IFWMS223
+			
+			sapResList.add(result);
+			
+			rsMap.put("successCnt", successCnt);
+			rsMap.put("sapResList", sapResList);
+		} finally {
+			transactionManager.commit(transactionStatus);
+		}
+		return rsMap;
+	}
+	
+	//인터페이스 X
+	public DataMap saveStock_X (DataMap map) throws Exception {
+		DataMap head = map.getMap("head").getMap("map");
+		
+		String docuty = head.getString("ADJUCA");
+		String docdat = head.getString("DOCDAT");
+		if (StringUtils.isEmpty(docuty.trim())) {
+			throw new Exception("empty ADJUCA");
+		}
+		
+		/* 문서유형 별 validation, set data */
+		map = validateAndSortADJ(docuty, map);
+		List<DataMap> list = map.getList("list");
+		if (CollectionUtils.isEmpty(list)) {
+			throw new Exception("empty list");
+		}
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+		
+		int successCnt = 0;
+		List<DataMap> sapResList = new ArrayList<>();
+		String docSeq = "";
+		boolean SAPIFYN = StringUtils.equals("V", head.getString("SAPIFYN"));
+		
+		DataMap rsMap = new DataMap();
+		
+		try {
+			docSeq = wmsService.getDocSeq(docuty);
+			map.clonSessionData(head);
+			head.put("SADJKY", docSeq); // 문서번호
+			head.put("ADJFLG", "M");
+			
+			if (SAPIFYN == false) {
+				String doctxt = head.getString("DOCTXT");
+				doctxt += StringUtils.isBlank(doctxt) ? "" : ", ";
+				doctxt += "SAP 미연동";
+				head.put("DOCTXT", doctxt);
+			}
+			head.setModuleCommand("WmsInventory", "ADJDH");
+			commonDao.update(head);
+			
+			int itemCount = 0;
+			List<DataMap> ifList = new ArrayList<>();
+			
+			String bfSAPSTS = "";
+			
+			for (int i = 0; i < list.size(); i++) {
+				DataMap row = list.get(i).getMap("map");
+				String SAPSTS = getSAPSTS(docuty, row);
+				
+//				if (SAPIFYN &&
+//						CollectionUtils.isEmpty(ifList) == false &&
+//						StringUtils.equals(SAPSTS, bfSAPSTS) == false
+//						) {
+//					// 인터페이스 파라미터 설정
+//					DataMap ifMap = new DataMap();
+//					map.clonSessionData(ifMap);
+//					ifMap.put("IFID", getIFID(docuty));
+//					ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+//					ifMap.put("list", ifList);
+//					ifMap.put("DOCDAT", docdat);
+//					ifMap.put(CommonConfig.MENU_ID_KEY, map.get(CommonConfig.MENU_ID_KEY));
+//					ifService.dataInsertIF(ifMap); // IF DB insert
+//					
+//					ifMap.remove("list"); // sendIF 시 불필요.
+//					
+//					DataMap sapReq = new DataMap();
+//					sapReq.put("SADJKY", docSeq);
+//					sapReq.put("ifMap", ifMap);
+//					
+//					// 2022.07.13 동일 트랜잭션으로 처리
+//					DataMap result = sendIF(sapReq);
+//					sapResList.add(result);
+//					
+//					String SAPRES = result.getString("SAPRES");
+//					if ("SUCCESS".equals(SAPRES)) {
+//						successCnt = i;
+//						ifList.clear();
+//						transactionSavepoint = transactionStatus.createSavepoint();
+//					} else {
+//						throw new Exception("SAP : " + SAPRES);
+//					}
+//				}
+				
+				map.clonSessionData(row);
+				row.put("SADJKY", docSeq); // 문서번호SAPSTS
+				row.put("SAPSTS", SAPSTS);
+				
+				String qtyStr = row.getString("AQTADJU");
+				double qty = Utils.parseDouble(qtyStr);
+				
+				if (!row.get("STOKKY").equals(" ")) {
+					/* ADJDIOLD paramSet */
+					itemCount += 10;
+					row.put("SADJIT", String.format("%06d", itemCount));
+					row.put("QTADJU", qty * -1);
+					row.setModuleCommand("WmsInventory", "ADJDIOLD");
+					commonDao.insert(row);
+				}
+				
+				/* ADJDI paramSet */
+				itemCount += 10;
+				row.put("SADJIT", String.format("%06d", itemCount));
+				row.put("QTADJU", qty);
+				row.put("STOKKY", " ");
+				row.put("LOTNUM", " ");
+				
+				if (StringUtils.equals(docuty, "421")) { /* 재고 품목변경 */
+					row.put("UOMKEY",row.get("AUOMKEY"));
+					row.put("DUOMKY",row.get("ADUOMKY"));
+					row.put("DESC01",row.get("ADESC01"));
+					row.put("DESC02",row.get("ADESC02"));
+				}
+				
+				row.setModuleCommand("WmsInventory", "ADJDI");
+				commonDao.insert(row);
+				
+				if (!"X".equals(SAPSTS) && SAPIFYN) {
+					ifList.add(setInterfaceData(docuty, row));
+				}
+				
+				bfSAPSTS = SAPSTS;
+			}
+			
+//			if (CollectionUtils.isEmpty(ifList) == false && SAPIFYN) {
+//				// 인터페이스 파라미터 설정
+//				DataMap ifMap = new DataMap();
+//				map.clonSessionData(ifMap);
+//				ifMap.put("IFID", getIFID(docuty));
+//				ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+//				ifMap.put("list", ifList);
+//				ifMap.put("DOCDAT", docdat);
+//				ifMap.put(CommonConfig.MENU_ID_KEY, map.get(CommonConfig.MENU_ID_KEY));
+//				ifService.dataInsertIF(ifMap); // IF DB insert
+//				
+//				ifMap.remove("list"); // sendIF 시 불필요.
+//				
+//				DataMap sapReq = new DataMap();
+//				sapReq.put("SADJKY", docSeq);
+//				sapReq.put("ifMap", ifMap);
+//				
+//				// 2022.07.13 동일 트랜잭션으로 처리
+//				DataMap result = sendIF(sapReq);
+//				sapResList.add(result);
+//				
+//				String SAPRES = result.getString("SAPRES");
+//				log.debug("Sap Response : " + SAPRES);
+//				
+//				if("SUCCESS".equals(SAPRES)) {
+//					successCnt = list.size();
+//					ifList.clear();
+//					transactionSavepoint = transactionStatus.createSavepoint();
+//				} else {
+//					throw new Exception("SAP : " + SAPRES);
+//				}
+//			}
+			
+			rsMap.put("SADJKY", docSeq);
+			rsMap.remove("ifMap");
+		} catch (SQLException e) {
+			transactionStatus.rollbackToSavepoint(transactionSavepoint);
+			
+//			String msg = e.getMessage();
+//			if (msg.length() > 300) {
+//				msg = msg.substring(0, 300);
+//			}
+//			
+//			DataMap result = new DataMap();
+//			result.put("ZDOCNO", docSeq);
+//			result.put("ERRTXT", msg);
+//			result.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+//			result.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+//			result.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+//			result.setModuleCommand("WmsInventory", "IFSAPLOG");
+//			
+//			commonDao.insert(result);
+//			
+//			sapResList.add(result);
+			
+			rsMap.put("successCnt", successCnt);
+			rsMap.put("sapResList", sapResList);
+		} catch (Exception e) {
+			transactionStatus.rollbackToSavepoint(transactionSavepoint);
+			
+//			String msg = e.getMessage();
+//			if (msg.length() > 300) {
+//				msg = msg.substring(0, 300);
+//			}
+//			
+//			DataMap result = new DataMap();
+//			result.put("ZDOCNO", docSeq);
+//			result.put("ERRTXT", msg);
+//			result.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+//			result.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+//			result.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+//			result.setModuleCommand("WmsInventory", "IFSAPLOG");
+//			
+//			commonDao.insert(result);
+//			
+//			sapResList.add(result);
+			
+			rsMap.put("successCnt", successCnt);
+			rsMap.put("sapResList", sapResList);
+		} finally {
+			transactionManager.commit(transactionStatus);
+		}
+		return rsMap;
+	}
+	
+	/* PDA 재고상태변경
+	 * 2022.05.13 바코드, 지번, 재고상태로 group by해서 보여준 후 해당 데이터로 수정할 수 있도록 saveStock와 분리.
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap savePDSJ01(DataMap map) throws SQLException {
+		String docuty = "402"; // 재고상태변경
+		String docSeq = wmsService.getDocSeq(docuty);
+		
+		// validate
+		if (StringUtils.equals(map.getString("LOTA06"), map.getString("ALOTA06"))) {
+			throw new SQLException("equals LOTA06, ALOTA06");
+		}
+		
+		double AQTADJU = Utils.parseDouble(map.get("AQTADJU")); // 조정수량
+		
+		// 바코드, 지번, 재고상태로 재고목록 조회
+		map.setModuleCommand("WmsInventory", "PDSJ01_ADJ_TARGET");
+		map.put("SADJKY", docSeq);
+		List<DataMap> stkkyList = commonDao.getList(map);
+		
+		// 조정대상 List 생성
+		List<DataMap> targetList = new ArrayList<>();
+		for (DataMap stkky : stkkyList) {
+			double QTADJU = Utils.parseDouble(stkky.get("QTADJU"));
+			
+			if (AQTADJU < QTADJU) { // 조정수량이 재고상태보다 작다면
+				stkky.put("AQTADJU", AQTADJU);
+				stkky.put( "QTADJU", AQTADJU);
+				targetList.add(stkky);
+				break;
+			} else {
+				stkky.put("AQTADJU", QTADJU);
+				stkky.put( "QTADJU", QTADJU);
+				targetList.add(stkky);
+				AQTADJU -= QTADJU;
+			}
+		}
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+		
+		// head 조회 (required : WAREKY, DOCUTY)
+		map.setModuleCommand("WmsInventory", "SJ03");
+		map.put("DOCUTY", docuty);
+		List<DataMap> headList = commonDao.getList(map);
+		
+		// head insert
+		DataMap head = headList.get(0);
+		map.clonSessionData(head);
+		head.put("SADJKY", docSeq);
+		head.put("ADJFLG", "M");
+		head.setModuleCommand("WmsInventory", "ADJDH");
+		commonDao.update(head);
+		
+		// insert item
+		List<DataMap> ifList = new ArrayList<>();
+		List<HashMap> mList  = new ArrayList<>();
+		int subSize = 100;
+		for (int i = 0; i < targetList.size(); i++) {
+			DataMap row = targetList.get(i);
+			map.clonSessionData(row);
+			
+			row.put("SADJKY", docSeq);
+			row.put("SADJIT", String.format("%06d", (i + 1) * 20));
+			
+			/* 2022.06.23 재고상태TO가 10, 30, 50인 경우 제품군에 따라 저장위치 변경 (P400 플랜트 제외) */
+			String  WAREKY = row.getString( "WAREKY");
+			String  SKUG05 = row.getString( "SKUG05");
+			String  LOTA01 = row.getString( "LOTA01");
+			String  LOTA02 = row.getString( "LOTA02");
+			String  LOTA06 = row.getString( "LOTA06").trim();
+			String ALOTA06 = row.getString("ALOTA06").trim();
+			
+			/**
+			 * 1. 2023.07.25 강내창고의 상태 변경시 저장위치 미변경
+			 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (강내창고 (P200 OR P300) && 3500 저장위치)
+			 *   >> 저장위치 변경없음
+			 * 
+			 * 2. 2024.12.13 영보창고의 상태 변경시 저장위치 미변경
+			 *  - 거점: 1100 && P100 && 3400 저장위치)
+			 *   >> 저장위치 변경없음
+			 *   
+			 * 3. 기존조건
+			 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (TO재고상태: 보류, 불용, 폐기, 품질)
+			 *   ㄴ 품질:
+			 *   	>> 저장위치(원자재): 유지
+			 *   	>> 저장위치(세품/상품/반제품): 3800
+			 *   ㄴ 그외
+			 *   	>> 저장위치(원자재): 1900
+			 *   	>> 저장위치(세품/상품/반제품): 3900
+			 * 
+			 * 4. 2022. 10. 10 재고상태변경 시 보류, 불용, 폐기에서 정상으로 변경되는 경우 기존 정상 상태의 저장위치로 세팅
+			 *    2023. 07. 25 재고상태변경 시 보류, 불용, 폐기에서 정상으로 변경되는 경우 저장위치 3000 세팅
+			 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (FROM재고상태: 정상 아닐때) && (TO재고상태: 정상)
+			 *   >> 저장위치(원자재): 변경없음
+			 *   >> 저장위치(세품/상품/반제품): 3000 고정
+			 *   
+			 * 5. 2023.08.08 제상품외부창고 3300위치 저장위치 미변경
+			 * 
+			 * */
+			if (StringUtils.equals   ( LOTA02, "P400") == false && // P400 플랜트 제외
+				StringUtils.equalsAny( WAREKY, "1100", "1500")  && // 거점이 1100, 1500에 해당
+				StringUtils.equals   ( LOTA01, "3500") && 		   // 강내창고 3500위치
+				StringUtils.equalsAny( LOTA02, "P200", "P300")) {
+
+			}
+			else if (StringUtils.equalsAny( WAREKY, "1100")  && 		// 거점이 1100 해당
+					StringUtils.equals   ( LOTA01, "3400") && 		   // 영보창고 3400
+					StringUtils.equalsAny( LOTA02, "P100")) {
+			}
+			else if (StringUtils.equals  ( LOTA02, "P400") == false && // P400 플랜트 제외
+					StringUtils.equalsAny( WAREKY, "1100")  && 		   // 거점이 1100 해당
+					StringUtils.equals   ( LOTA01, "3300") && 		   // 제상품외부창고 3300위치
+					StringUtils.equalsAny( LOTA02, "P100")) {
+				
+			}
+			else if (StringUtils.equals   ( LOTA02, "P400") == false && // P400 플랜트 제외
+				StringUtils.equalsAny( WAREKY, "1100", "1500")  && 		// 거점이 1100, 1500에 해당
+				StringUtils.equalsAny(ALOTA06, "10", "30", "50", "05")  // TO재고상태가 보류, 불용, 폐기, 품질에 해당
+			) {
+				// 품질
+				//System.out.println("753:" + ALOTA06);
+				if (StringUtils.equals   ( ALOTA06, "05")) {
+					if (!"00".equals(SKUG05)) {
+						row.put("ALOTA01", "3800"); // 3800: 제품/상품/반제품
+					}
+				}
+				// 보류, 불용, 폐기
+				else {
+					row.put("ALOTA01", "00".equals(SKUG05) ? "1900" : "3900");
+				}
+			}
+			else if (StringUtils.equals   ( LOTA02, "P400") == false &&     // P400 플랜트 제외
+					 StringUtils.equalsAny( WAREKY, "1100", "1500")  &&     // 거점이 1100, 1500에 해당
+					 StringUtils.equalsAny( LOTA06, "00") == false && 		// 재고상태가 정상
+					 StringUtils.equals   (ALOTA06, "00")                   // TO재고상태가 정상
+			) {
+				/*
+				row.setModuleCommand("WmsInventory", "WHTRH_ADJDI_LOTA06_00_INFO");
+				DataMap data = commonDao.getMap(row);
+				if (data != null) {
+					row.put("ALOTA01", data.getString("LOTA01"));
+				}
+				*/
+				if (!"00".equals(SKUG05)) {
+					row.put("ALOTA01", "3000");
+				}
+			}
+			
+			//System.out.println("776:" + row.get("ALOTA01"));
+			
+			// 재고상태TO가 10(보류)인 경우 LOTA10에 변경사유 setting
+			if ("10".equals(ALOTA06)) {
+				row.put("ALOTA10", row.getString("AADJRSN"));
+			}
+			
+			/* 2022.06.23 재고상태TO가 50(폐기)인 경우 지번 변경 (SCRLOC: 폐기) */
+			if ("50".equals(ALOTA06)) {
+				row.put("ALOCAKY", "SCRLOC");
+			}
+			
+			String SAPSTS = getSAPSTS(docuty, row);
+			row.put("SAPSTS", SAPSTS);
+			
+			mList.add(row);
+			if (mList.size() == subSize || i == targetList.size() - 1) {
+				commonDao.insert("ADJDI_MULTI_STOKKY", mList);
+				mList.clear();
+			}
+			
+			/* 인터페이스 데이터 세팅 */
+			if (!"X".equals(SAPSTS)) {
+				DataMap ifData = setInterfaceData(docuty, row);
+				map.clonSessionData(ifData);
+				ifList.add(ifData);
+			}
+		}
+		
+		if (CollectionUtils.isEmpty(ifList) == false) {
+			// 인터페이스 파라미터 설정
+			DataMap ifMap = new DataMap();
+			map.clonSessionData(ifMap);
+			ifMap.put("IFID", getIFID(docuty));
+			ifMap.put("list", ifList);
+			ifMap.put("LOGSEQNO", this.getIFLogSeqNo());
+			ifMap.put(CommonConfig.MENU_ID_KEY, map.get(CommonConfig.MENU_ID_KEY));
+			ifService.dataInsertIF(ifMap); // IF DB insert
+			ifMap.remove("list"); // sendIF 시 불필요.
+			
+			// 2022.07.13 동일 트랜잭션으로 처리
+			DataMap sapReq = new DataMap();
+			sapReq.put("SADJKY", docSeq);
+			sapReq.put("ifMap", ifMap);
+			DataMap result = sendIF(sapReq);
+			
+			String SAPRES = result.getString("SAPRES");
+			if ("SUCCESS".equals(SAPRES)) {
+				ifList.clear();
+				transactionSavepoint = transactionStatus.createSavepoint();
+			} else {
+				transactionStatus.rollbackToSavepoint(transactionSavepoint);
+				
+				result.put("ZDOCNO", docSeq);
+				result.put("ERRTXT", SAPRES);
+				result.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				result.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+				result.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+				result.setModuleCommand("WmsInventory", "IFSAPLOG");
+				commonDao.insert(result);
+				
+				transactionManager.commit(transactionStatus);
+				
+				DataMap rsMap = new DataMap();
+				rsMap.put("SAPRES", SAPRES);
+				return rsMap;
+			}
+		}
+		
+		transactionManager.commit(transactionStatus);
+		DataMap rsMap = new DataMap();
+		rsMap.put("SADJKY", docSeq);
+//		rsMap.put("ifMap", ifMap);
+		return rsMap;
+	}
+	
+	private DataMap validateAndSortADJ (String docuty, DataMap map) throws Exception {
+		DataMap labelMap   = commonLabel.getLabel("KR");
+		DataMap messageMap = commonLabel.getMessage("KR");
+		
+		String message = "";
+		String label   = "";
+
+//		String SAPSTS = "";
+		List<DataMap> list = map.getList("list");
+		if (CollectionUtils.isEmpty(list)) {
+			message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+			message = getMessage(message);
+			throw new Exception(message);
+		}
+		
+		/** 문서유형에 따라 SAPSTS 세팅, 데이터 가공
+		 * @see 2021. mes-wms 구축\산출물\Ⅱ.수행관리\2.WMS 수행\200.설계단계\04.프로그램 설계\96.깨끗한나라_WMS_문서유형 정의서
+		 *  */
+		switch(docuty) {
+			case "402": // 재고상태변경
+				for (int i = 0; i < list.size(); i++) {
+					DataMap row = list.get(i).getMap("map");
+					String  LOTA06 = row.getString( "LOTA06").trim();
+					String ALOTA06 = row.getString("ALOTA06").trim();
+					
+					if (StringUtils.isEmpty(ALOTA06)) {
+						message = messageMap.getString("VALID_required"); // {0} 은(는) 필수 입력항목입니다.
+						label   = labelMap.getString("STD_LOTA06");
+						message = getMessage(message, label);
+						throw new Exception(message);
+					}
+					if (StringUtils.equals(LOTA06, ALOTA06)) { // FR, TO 재고상태 동일
+						message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					double AQTADJU = Utils.parseDouble(row.get("AQTADJU"));
+					double  QTSIWH = Utils.parseDouble(row.get("QTSIWH"));
+					
+					if (AQTADJU <= 0) { // 조정수량 <= 0
+						message = messageMap.getString("TASK_M0021"); // 작업수량은 {0}보다 커야 됩니다.
+						message = message.replace("{0}", "0");
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					if (AQTADJU > QTSIWH) { // 조정수량 > 재고수량
+						message = messageMap.getString("INV_M0072"); // 재고수량보다 더 많이 조정할 수 없습니다.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					/* 2022.06.23 재고상태TO가 10, 30, 50인 경우 제품군에 따라 저장위치 변경 (P400 플랜트 제외) */
+					String LOTA01 = row.getString("LOTA01");
+					String LOTA02 = row.getString("LOTA02");
+					String SKUG05 = row.getString("SKUG05");
+					String WAREKY = row.getString("WAREKY");
+					
+					/**
+					 * 1. 2023.07.25 강내창고의 상태 변경시 저장위치 미변경
+					 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (강내창고 (P200 OR P300) && 3500 저장위치)
+					 *   >> 저장위치 변경없음
+					 * 
+					 * 2. 2024.12.13 영보창고의 상태 변경시 저장위치 미변경
+					 *  - 거점: 1100 && P100 && 3400 저장위치)
+					 *   >> 저장위치 변경없음
+					 *   
+					 * 3. 기존조건
+					 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (TO재고상태: 보류, 불용, 폐기, 품질)
+					 *   ㄴ 품질:
+					 *   	>> 저장위치(원자재): 저장위치 유지
+					 *   	>> 저장위치(세품/상품/반제품): 3800
+					 *   ㄴ 그외
+					 *   	>> 저장위치(원자재): 1900
+					 *   	>> 저장위치(세품/상품/반제품): 3900
+					 * 
+					 * 4. 2022. 10. 10 재고상태변경 시 보류, 불용, 폐기에서 정상으로 변경되는 경우 기존 정상 상태의 저장위치로 세팅
+					 *    2023. 07. 25 재고상태변경 시 보류, 불용, 폐기에서 정상으로 변경되는 경우 저장위치 3000 세팅
+					 *  - (P400 플랜트 제외) && (거점: 1100, 1500) && (FROM재고상태: 정상 아닐때) && (TO재고상태: 정상)
+					 *   >> 저장위치(원자재): 변경없음
+					 *   >> 저장위치(세품/상품/반제품): 3000 고정
+					 *   
+					 * 5. 2023.08.08 제상품외부창고 3300위치 저장위치 미변경
+					 * 
+					 * 
+					 * */
+					if (StringUtils.equals   ( LOTA02, "P400") == false && // P400 플랜트 제외
+						StringUtils.equalsAny( WAREKY, "1100", "1500")  && // 거점이 1100, 1500에 해당
+						StringUtils.equals   ( LOTA01, "3500") && 		   // 강내창고 3500위치
+						StringUtils.equalsAny( LOTA02, "P200", "P300")) {
+
+					}
+					else if (StringUtils.equalsAny( WAREKY, "1100")  && 	// 거점이 1100 해당
+							StringUtils.equals   ( LOTA01, "3400") && 		// 영보창고 3400위치
+							StringUtils.equalsAny( LOTA02, "P100")) {
+					}
+					else if (StringUtils.equals  ( LOTA02, "P400") == false && // P400 플랜트 제외
+							StringUtils.equalsAny( WAREKY, "1100")  && 		   // 거점이 1100 해당
+							StringUtils.equals   ( LOTA01, "3300") && 		   // 제상품외부창고 3300위치
+							StringUtils.equalsAny( LOTA02, "P100")) {
+						
+					}
+					else if (StringUtils.equals   ( LOTA02, "P400") == false && // P400 플랜트 제외
+						StringUtils.equalsAny( WAREKY, "1100", "1500")  && 		// 거점이 1100, 1500에 해당
+						StringUtils.equalsAny(ALOTA06, "10", "30", "50", "05")  // TO재고상태가 보류, 불용, 폐기, 품질에 해당
+					) {
+						// 품질
+						if (StringUtils.equals   ( ALOTA06, "05")) {
+							if (!"00".equals(SKUG05)) {
+								row.put("ALOTA01", "3800"); // 3800: 제품/상품/반제품
+							}
+						}
+						// 보류, 불용, 폐기
+						else {
+							row.put("ALOTA01", "00".equals(SKUG05) ? "1900" : "3900");
+						}
+					}
+					else if (StringUtils.equals   ( LOTA02, "P400") == false &&     // P400 플랜트 제외
+							 StringUtils.equalsAny( WAREKY, "1100", "1500")  &&     // 거점이 1100, 1500에 해당
+							 StringUtils.equalsAny( LOTA06, "00") == false && 		// 재고상태가 정상 아니면서
+							 StringUtils.equals   (ALOTA06, "00")                   // TO재고상태가 정상
+					) {
+						/*
+						row.setModuleCommand("WmsInventory", "WHTRH_ADJDI_LOTA06_00_INFO");
+						DataMap data = commonDao.getMap(row);
+						if (data != null) {
+							row.put("ALOTA01", data.getString("LOTA01"));
+						}
+						*/
+						if (!"00".equals(SKUG05)) {
+							row.put("ALOTA01", "3000");
+						}
+					}
+					
+					// 재고상태TO가 10(보류)인 경우 LOTA10에 변경사유 setting
+					if ("10".equals(ALOTA06)) {
+						row.put("ALOTA10", row.getString("AADJRSN"));
+					}
+					
+					/* 2022.06.23 재고상태TO가 50(폐기)인 경우 지번 변경 (SCRLOC: 폐기) */
+					if ("50".equals(ALOTA06)) {
+						row.put("ALOCAKY", "SCRLOC");
+					}
+					
+					// 240124 HNW 재고상태(TO) 변경 시, 조정상세사유 세팅(보류 -> 품질, 품질 -> 불용 등 변경하여도 LOTA10이 유지되는 현상 방지)
+					row.put("ALOTA10", row.getString("AADJRSN"));	//이전 재고상태값
+
+					list.set(i, row);
+				}
+				break;
+			case "401": // 재고저장위치변경
+				DataMap param = new DataMap();
+				map.clonSessionData(param);
+				param.put("WAREKY", map.get("WAREKY"));
+				param.setModuleCommand("WmsInventory", "STLMA"); // 저장위치 리스트 조회
+				List<DataMap> STLMAList = commonDao.getList(param);
+				
+				for (int i = 0; i < list.size(); i++) {
+					DataMap row = list.get(i).getMap("map");
+					String  LOTA01 = row.getString( "LOTA01").trim();
+					String ALOTA01 = row.getString("ALOTA01").trim();
+					String  LOTA02 = row.getString( "LOTA02").trim();
+					String ALOTA02 = row.getString("ALOTA02").trim();
+					double AQTADJU = Utils.parseDouble(row.get("AQTADJU"));
+					double  QTSIWH = Utils.parseDouble(row.get("QTSIWH"));
+					
+					if (StringUtils.isEmpty(ALOTA01)) {
+						message = messageMap.getString("VALID_required"); // {0} 은(는) 필수 입력항목입니다.
+						label   = labelMap.getString("STD_LOTA01");
+						message = getMessage(message, label);
+						throw new Exception(message);
+					}
+					
+					if (StringUtils.isEmpty(ALOTA02)) {
+						message = messageMap.getString("VALID_required"); // {0} 은(는) 필수 입력항목입니다.
+						label   = labelMap.getString("STD_LOTA02");
+						message = getMessage(message, label);
+						throw new Exception(message);
+					}
+					
+					if (StringUtils.equals(LOTA01, ALOTA01) &&
+						StringUtils.equals(LOTA02, ALOTA02)) {
+						message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+						label   = labelMap.getString("STD_LOTA02");
+						message = getMessage(message, label);
+						throw new Exception(message);
+					}
+				
+					if (
+						(StringUtils.equals(LOTA01, "3800") && StringUtils.equals(ALOTA01, "3900")) ||
+						(StringUtils.equals(LOTA01, "3900") && StringUtils.equals(ALOTA01, "3800"))
+					){
+							message = messageMap.getString("INV_M0089"); // 3800 3900 저장위치 불가
+							label   = "";
+							message = getMessage(message, label);
+							throw new Exception(message); 
+					}
+					
+					if (AQTADJU <= 0) { // 조정수량 <= 0
+						message = messageMap.getString("TASK_M0021"); // 작업수량은 {0}보다 커야 됩니다.
+						message = message.replace("{0}", "0");
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					if (AQTADJU > QTSIWH) { // 조정수량 > 재고수량
+						message = messageMap.getString("INV_M0072"); // 재고수량보다 더 많이 조정할 수 없습니다.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					/* 저장위치 validate */
+					if(STLMAList != null && STLMAList.size() > 0) {
+						boolean valid = false;
+						/* 저장위치 리스트에서 PLNTKY == ALOTA02 && STLKY == ALOTA01인 데이터 존재 시 true, 미존재시 false */
+						for (DataMap data : STLMAList) {
+							if (StringUtils.equals(data.getString("PLNTKY"), ALOTA02) &&
+								StringUtils.equals(data.getString("STLKY" ), ALOTA01)) {
+								valid = true;
+								break;
+							}
+						}
+						
+						if (STLMAList != null && STLMAList.size() > 0 && valid == false) {
+							message = messageMap.getString("VALID_remote"); // {0} 값이 유효하지 않습니다.
+							label   = labelMap.getString("STD_LOTA01_TO");
+							message = getMessage(message, label);
+							throw new Exception(message);
+						}
+					}
+					
+					/* 변경될 플랜트에서 관리되는 품목인지 조회 */
+					String  SKUKEY   = row.getString("SKUKEY");
+					DataMap validate = commonDao.getMap("WmsInventory.SKUPLT_VALIDATE", row);
+					
+					if (validate == null || !"1".equals(validate.getString("RESULT"))) {
+						throw new Exception("해당 품목(" + SKUKEY  + ")은 플랜트 " + ALOTA02 + "의 관리대상 품목이 아닙니다.");
+					}
+					
+					list.set(i, row);
+				}
+				break;
+			case "421": // 품목코드변경 (MTM)
+				for (int i = 0; i < list.size(); i++) {
+					DataMap row = list.get(i).getMap("map");
+					String  SKUKEY = row.getString( "SKUKEY").trim();
+					String ASKUKEY = row.getString("ASKUKEY").trim();
+					double AQTADJU = Utils.parseDouble(row.get("AQTADJU"));
+					double  QTSIWH = Utils.parseDouble(row.get("QTSIWH"));
+					
+					if (StringUtils.isEmpty(ASKUKEY)) {
+						message = messageMap.getString("VALID_required"); // {0} 은(는) 필수 입력항목입니다.
+						label   = labelMap.getString("STD_SKUKEY_TO");
+						message = getMessage(message, label);
+						throw new Exception(message);
+					}
+					
+					if (StringUtils.equals(SKUKEY, ASKUKEY)) {
+						message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (AQTADJU <= 0) { // 조정수량 <= 0
+						message = messageMap.getString("TASK_M0021"); // 작업수량은 {0}보다 커야 됩니다.
+						message = message.replace("{0}", "0");
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (AQTADJU > QTSIWH) { // 조정수량 > 재고수량
+						message = messageMap.getString("INV_M0072"); // 재고수량보다 더 많이 조정할 수 없습니다.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (StringUtils.equals(SKUKEY, "HWD-Z100001W") && StringUtils.equals(ASKUKEY, "1401048") == false ||
+						StringUtils.equals(SKUKEY, "HWD-Z100002W") && StringUtils.equals(ASKUKEY, "1401049") == false ||
+						StringUtils.equals(SKUKEY, "HWD-Z100004W") && StringUtils.equals(ASKUKEY, "1300009") == false ||
+						StringUtils.equals(SKUKEY, "HWD-Z100005W") && StringUtils.equals(ASKUKEY, "1300010") == false
+					) {
+						throw new Exception(SKUKEY + "에서 " + ASKUKEY + "로 변경할 수 없습니다.");
+					}
+					
+					/* 변경될 플랜트에서 관리되는 품목인지 조회 */
+					String ALOTA02 = row.getString("ALOTA02").trim();
+					DataMap validate = commonDao.getMap("WmsInventory.SKUPLT_VALIDATE", row);
+					
+					if (validate == null || !"1".equals(validate.getString("RESULT"))) {
+						throw new Exception("해당 품목(" + SKUKEY  + ")은 플랜트 " + ALOTA02 + "의 관리대상 품목이 아닙니다.");
+					}
+					/* SKUMA 테이블 정보로 세팅해줘야 함. */
+					row.setModuleCommand("WmsInventory", "SKUMA");
+					DataMap SKUMA = commonDao.getMap(row);
+					row.put("ADUOMKY", SKUMA.getString("ADUOMKY"));
+					row.put("AUOMKEY", SKUMA.getString("AUOMKEY"));
+					row.put("ADESC01", SKUMA.getString("ADESC01"));
+					row.put("ADESC02", SKUMA.getString("ADESC02"));
+					
+					//2022.11.29 다른 단위 수량으로 변경 불가
+					String uomkey = row.getString("UOMKEY").trim();
+					String auomkey = SKUMA.getString("AUOMKEY").trim();
+					if(!StringUtils.equals(uomkey, auomkey)) {
+						throw new Exception("[단위] : "+uomkey + "에서 " + auomkey + "로 변경할 수 없습니다.");
+					}
+					
+					list.set(i, row);
+				}
+				break;
+			case "423": // 재고MTO/MTS변경
+				for (int i = 0; i < list.size(); i++) {
+					DataMap row = list.get(i).getMap("map");
+					String  LOTA06 = row.getString( "LOTA06").trim();
+					String  LOTA07 = row.getString( "LOTA07").trim();
+					String ALOTA07 = row.getString("ALOTA07").trim();
+					String  LOTA09 = row.getString( "LOTA09").trim();
+					String ALOTA09 = row.getString("ALOTA09").trim();
+					double AQTADJU = Utils.parseDouble(row.get("AQTADJU"));
+					double  QTSIWH = Utils.parseDouble(row.get("QTSIWH"));
+					
+					if (StringUtils.equals(LOTA07, ALOTA07) &&
+						StringUtils.equals(LOTA09, ALOTA09)) {
+						message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (AQTADJU <= 0) { // 조정수량 <= 0
+						message = messageMap.getString("TASK_M0021"); // 작업수량은 {0}보다 커야 됩니다.
+						message = message.replace("{0}", "0");
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (AQTADJU > QTSIWH) { // 조정수량 > 재고수량
+						message = messageMap.getString("INV_M0072"); // 재고수량보다 더 많이 조정할 수 없습니다.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if ("00".equals(LOTA06) == false) {
+						throw new Exception("MTO/MTS 변경은 정상 재고만 처리 가능합니다.");
+					}
+					
+					list.set(i, row);
+				}
+				break;
+			case "422": // 제조LOT변경정보
+				for (int i = 0; i < list.size(); i++) {
+					DataMap row = list.get(i).getMap("map");
+					String  LOTA03 = row.getString( "LOTA03").trim();
+					String ALOTA03 = row.getString("ALOTA03").trim();
+					String  LOTA04 = row.getString( "LOTA04").trim();
+					String ALOTA04 = row.getString("ALOTA04").trim();
+					String  LOTA08 = row.getString( "LOTA08").trim();
+					String ALOTA08 = row.getString("ALOTA08").trim();
+					String  LOTA10 = row.getString( "LOTA10").trim();
+					String ALOTA10 = row.getString("ALOTA10").trim();
+					String  LOTA11 = row.getString( "LOTA11").trim();
+					String ALOTA11 = row.getString("ALOTA11").trim();
+					String  LOTA12 = row.getString( "LOTA12").trim();
+					String ALOTA12 = row.getString("ALOTA12").trim();
+					String  LOTA13 = row.getString( "LOTA13").trim();
+					String ALOTA13 = row.getString("ALOTA13").trim();
+					String  LOTA14 = row.getString( "LOTA14").trim();
+					String ALOTA14 = row.getString("ALOTA14").trim();
+					double AQTADJU = Utils.parseDouble(row.get("AQTADJU"));
+					double  QTSIWH = Utils.parseDouble(row.get("QTSIWH"));
+					
+					if (StringUtils.equals(LOTA03, ALOTA03) &&
+						StringUtils.equals(LOTA04, ALOTA04) &&
+						StringUtils.equals(LOTA08, ALOTA08) &&
+						StringUtils.equals(LOTA10, ALOTA10) &&
+						StringUtils.equals(LOTA11, ALOTA11) &&
+						StringUtils.equals(LOTA12, ALOTA12) &&
+						StringUtils.equals(LOTA13, ALOTA13) &&
+						StringUtils.equals(LOTA14, ALOTA14)) {
+						message = messageMap.getString("INV_M0055"); // 기존값과 동일합니다. 확인해주세요.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					if (AQTADJU <= 0) { // 조정수량 <= 0
+						message = messageMap.getString("TASK_M0021"); // 작업수량은 {0}보다 커야 됩니다.
+						message = message.replace("{0}", "0");
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					if (AQTADJU > QTSIWH) { // 조정수량 > 재고수량
+						message = messageMap.getString("INV_M0072"); // 재고수량보다 더 많이 조정할 수 없습니다.
+						message = getMessage(message);
+						throw new Exception(message);
+					}
+					
+					list.set(i, row);
+				}
+				break;
+			default: break;
+		}
+		
+		/* 이동유형을 기준으로 정렬 */
+		Collections.sort(list, new Comparator<DataMap>() {
+			@Override
+			public int compare(DataMap o1, DataMap o2) {
+				return StringUtils.compare(o1.getString("SAPSTS"), o2.getString("SAPSTS"));
+			}
+		});
+		
+		map.put("list", list);
+		return map;
+	}
+	
+
+	/** [MV01] 재고이동 */
+//	@Transactional(rollbackFor = Exception.class)
+	public DataMap MV01CreatTaskOrder(DataMap map) throws Exception {
+		DataMap head = map.getMap("head").getMap("map");
+		String docuty = head.getString("DOCUTY");
+		String docdat = head.getString("DOCDAT");
+		
+		List<DataMap> list = map.getList("list");
+		list = validateAndSortMV(docuty, list, "LOCATG");
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+		
+		String docnum = wmsService.getDocSeq(docuty);
+		head.put("TSPKEY", head.get("AREAKY"));
+		head.put("TASKKY", docnum);
+		head.put("TASOTY", docuty);
+		head.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		head.setModuleCommand("WmsTask", "TASDH");
+		commonDao.insert(head);
+		
+		int itemCount = 0;
+		int successCnt = 0;
+		String bfSAPSTS = "";
+		List<DataMap> sapResList = new ArrayList<>();
+		
+		for (int i = 0; i < list.size(); i++) {
+			DataMap row = list.get(i).getMap("map");
+			
+			String SAPSTS = row.getString("SAPSTS");
+			if ("320".equals(docuty) && // 재고이동 1Step 완료 시 [SJ03] 저장위치변경 TASK 호출 해야함.
+				StringUtils.isNotEmpty(bfSAPSTS) &&
+				StringUtils.equals(SAPSTS, bfSAPSTS) == false
+			) {
+				DataMap param = new DataMap();
+				param.put("WAREKY"                    , map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+				param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				param.put("DOCDAT"					  , docdat);
+				DataMap sapResMap = afterMoveStock(docnum, bfSAPSTS, param);
+				sapResList.add(sapResMap);
+				
+				String SAPRES = sapResMap.getString("SAPRES");
+				log.debug("Sap Response : " + SAPRES);
+				if("SUCCESS".equals(SAPRES)) {
+					successCnt = i;
+					transactionSavepoint = transactionStatus.createSavepoint();
+				} else {
+					transactionStatus.rollbackToSavepoint(transactionSavepoint);
+					
+					sapResMap.put("ZDOCNO", docnum);
+					sapResMap.put("ERRTXT", SAPRES);
+					sapResMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+					sapResMap.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+					sapResMap.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+					sapResMap.setModuleCommand("WmsInventory", "IFSAPLOG");
+					commonDao.insert(sapResMap);
+					
+					transactionManager.commit(transactionStatus);
+					
+					DataMap rsMap = new DataMap();
+					rsMap.put("successCnt", successCnt);
+					rsMap.put("sapResList", sapResList);
+					return rsMap;
+				}
+			}
+			
+			itemCount += 10;
+			String snum = String.format("%06d", itemCount);
+			String qtyStr = row.getString("QTTAOR");
+			double qty = Utils.parseDouble(qtyStr);
+			
+			// TASDI insert parameter 생성
+			String uomkey = row.getString("UOMKEY");
+			row.put("QTSTKM", row.getString("QTTAOR"));
+			row.put("QTSTKC", 0);
+			row.put("DROPID", "V");
+			row.put("TASKKY", docnum);
+			row.put("TASKIT", snum);
+			row.put("AUOMKY", uomkey);
+			row.put("SUOMKY", uomkey);
+			row.put("TUOMKY", uomkey);
+			row.put("TRNUAC", row.getString("TRNUTG"));
+			row.put("SECTAC", row.getString("SECTTG"));
+			row.put("PAIDAC", row.getString("PAIDTG"));
+			row.put("AMEAKY", row.getString("TMEAKY"));
+			row.put("ATRUTY", row.getString("TTRUTY"));
+			row.put("ADUOKY", row.getString("TDUOKY"));
+			row.put("QTAPUM", row.getString("QTTPUM"));
+			row.put("QTSTKM", qty);
+			row.put("QTYUOM", qty);
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			
+			switch(docuty) {
+				case "320" : // 1 step
+					row.put("STATIT", "FPC");
+					row.put("LOCAAC", row.getString("LOCATG"));
+					row.put("QTCOMP", qty);
+					row.put("QTSTKC", qty);
+					break;
+				case "325" : // 2 step
+					row.put("STATIT", "NEW");
+					row.put("QTCOMP", 0); // 2step의 경우 작업수량이 0으로 insert 이후 재고이동 완료에서 조회되도록 해야함 .
+					break;
+				default : break;
+			}
+			row.setModuleCommand("WmsTask", "TASDIEND");
+			commonDao.insert(row);
+			
+			// TASDR 프로시져에서 처리
+			
+			row.put("TASKIR", "0001"); 
+
+			row.setModuleCommand("WmsTask", "TASDR_INS");
+			commonDao.insert(row);
+			
+//			commonDao.getMap("WmsTask.SAVETK_SZP_INS_TASDR", row);
+			
+			bfSAPSTS = SAPSTS;
+		}
+		
+		if ("320".equals(docuty)) { // 재고이동 1Step 완료 시 [SJ03] 저장위치변경 TASK 호출 해야함.
+			DataMap param = new DataMap();
+			param.put("WAREKY"                    , map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			param.put("DOCDAT"					  , docdat);
+			DataMap sapResMap = afterMoveStock(docnum, bfSAPSTS, param); //////////////////
+			sapResList.add(sapResMap);
+			
+			String SAPRES = sapResMap.getString("SAPRES");
+			log.debug("Sap Response : " + SAPRES);
+			if("SUCCESS".equals(SAPRES)) {
+				successCnt = list.size();
+				transactionSavepoint = transactionStatus.createSavepoint();
+			} else {
+				transactionStatus.rollbackToSavepoint(transactionSavepoint);
+				
+				// 2022.07.14 WMS, SAP이 1개의 트랜잭션으로 구성된 경우 IFSAPLOG INSERT 추가
+				sapResMap.put("ZDOCNO", docnum);
+				sapResMap.put("ERRTXT", SAPRES);
+				sapResMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				sapResMap.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+				sapResMap.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+				sapResMap.setModuleCommand("WmsInventory", "IFSAPLOG");
+				commonDao.insert(sapResMap);
+				
+				transactionManager.commit(transactionStatus);
+				
+				DataMap rsMap = new DataMap();
+				rsMap.put("successCnt", successCnt);
+				rsMap.put("sapResList", sapResList);
+				return rsMap;
+			}
+		}
+		
+		transactionManager.commit(transactionStatus);
+		DataMap rsMap = new DataMap();
+		rsMap.put("successCnt", successCnt);
+		rsMap.put("sapResList", sapResList);
+		rsMap.put("TASKKY", docnum);
+		return rsMap;
+	}
+
+
+private int intValue(Double alertt) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	//	@Transactional(rollbackFor = Exception.class)
+	public DataMap MV02CreatTaskOrder(DataMap map) throws Exception {
+		List<DataMap> headList = map.getList("head");
+		
+		if (headList == null || headList.size() < 1) {
+			throw new Exception("작업대상이 존재하지 않습니다.");
+		}
+		
+		DataMap head = headList.get(0).getMap("map");
+		String TASKKY = head.getString("TASKKY");
+		String docuty = head.getString("DOCUTY");
+		
+		List<DataMap> list = map.getList("list");
+		list = validateAndSortMV(docuty, list, "LOCAAC");
+		
+		if (CollectionUtils.isEmpty(list)) {
+			throw new Exception("작업대상이 존재하지 않습니다.");
+		}
+		
+		TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+		TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+		Object transactionSavepoint = transactionStatus.createSavepoint();
+		
+		String bfSAPSTS = "";
+		int successCnt = 0;
+		List<DataMap> sapResList = new ArrayList<>();
+		for (int i = 0; i < list.size(); i++) {
+			DataMap row = list.get(i);
+			String SAPSTS = row.getString("SAPSTS");
+			
+			if (StringUtils.isNotEmpty(bfSAPSTS) &&
+				StringUtils.equals(SAPSTS, bfSAPSTS) == false
+			) {
+				// 재고이동 2Step 이동유형별 [SJ03] 저장위치변경 TASK 호출 해야함.
+				DataMap param = new DataMap();
+				
+				param.put("WAREKY"                    , map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+				param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				DataMap sapResMap = afterMoveStock(TASKKY, bfSAPSTS, param);
+				sapResList.add(sapResMap);
+				
+				String SAPRES = sapResMap.getString("SAPRES");
+				log.debug("Sap Response : " + SAPRES);
+				if("SUCCESS".equals(SAPRES)) {
+					successCnt = i;
+					transactionSavepoint = transactionStatus.createSavepoint();
+				} else {
+					transactionStatus.rollbackToSavepoint(transactionSavepoint);
+					
+					sapResMap.put("ZDOCNO", TASKKY);
+					sapResMap.put("ERRTXT", SAPRES);
+					sapResMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+					sapResMap.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+					sapResMap.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+					sapResMap.setModuleCommand("WmsInventory", "IFSAPLOG");
+					commonDao.insert(sapResMap);
+					
+					transactionManager.commit(transactionStatus);
+					
+					DataMap rsMap = new DataMap();
+					rsMap.put("successCnt", successCnt);
+					rsMap.put("sapResList", sapResList);
+					return rsMap;
+				}
+			}
+			
+			row.setModuleCommand("WmsTask", "TASDIDEL");
+			commonDao.delete(row);
+			
+			String qtcompStr = row.getString("QTCOMP");
+			double qtcomp = Utils.parseDouble(qtcompStr);
+			if (qtcomp > 0) {
+				row.put("STATIT", "FPA");
+				row.put("QTTAOR", row.get("QTCOMP"));
+				row.put("TRNUTG", row.get("TRNUAC"));
+				row.put("QTYUOM", row.get("QTCOMP"));
+				
+				row.put("SECTAC", row.get("SECTTG"));
+				row.put("PAIDAC", row.get("PAIDTG"));
+				row.put("ATRUTY", row.get("TTRUTY"));
+				row.put("AMEAKY", row.get("TMEAKY"));
+				
+				row.put("AUOMKY", row.get("TUOMKY"));
+				row.put("QTAPUM", row.get("QTTPUM"));
+				row.put("ADUOKY", row.get("TDUOKY"));
+				row.put("QTADUM", row.get("QTTDUM"));
+				
+				row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				row.setModuleCommand("WmsTask", "TASDIEND");
+				commonDao.insert(row);
+				
+				// TASDR 프로시져에서 처리
+				row.put("STOKKY", "%");
+				commonDao.getMap("WmsTask.DBMSPROC_SZP_INS_TASDR", row);
+			}
+			
+			bfSAPSTS = SAPSTS;
+		}
+		
+		if (successCnt != list.size() &&
+			StringUtils.isNotEmpty(bfSAPSTS)
+		) {
+			// 재고이동 2Step 이동유형별 [SJ03] 저장위치변경 TASK 호출 해야함.
+			DataMap param = new DataMap();
+			
+			param.put("WAREKY"                    , map.get(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+			param.put(CommonConfig.MENU_ID_KEY    , map.get(CommonConfig.MENU_ID_KEY));
+			param.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			DataMap sapResMap = afterMoveStock(TASKKY, bfSAPSTS, param);
+			sapResList.add(sapResMap);
+			
+			String SAPRES = sapResMap.getString("SAPRES");
+			log.debug("Sap Response : " + SAPRES);
+			if("SUCCESS".equals(SAPRES)) {
+				successCnt = list.size();
+				transactionSavepoint = transactionStatus.createSavepoint();
+			} else {
+				transactionStatus.rollbackToSavepoint(transactionSavepoint);
+				
+				// 2022.07.14 WMS, SAP이 1개의 트랜잭션으로 구성된 경우 IFSAPLOG INSERT 추가
+				sapResMap.put("ZDOCNO", TASKKY);
+				sapResMap.put("ERRTXT", SAPRES);
+				sapResMap.put("WAREKY", map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY));
+				sapResMap.put("PROGID", map.get(CommonConfig.MENU_ID_KEY));
+				sapResMap.put(CommonConfig.SES_USER_ID_KEY, map.getString(CommonConfig.SES_USER_ID_KEY));
+				sapResMap.setModuleCommand("WmsInventory", "IFSAPLOG");
+				commonDao.insert(sapResMap);
+				
+				transactionManager.commit(transactionStatus);
+				
+				DataMap rsMap = new DataMap();
+				rsMap.put("successCnt", successCnt);
+				rsMap.put("sapResList", sapResList);
+				return rsMap;
+			}
+		}
+		
+		transactionManager.commit(transactionStatus);
+		
+		DataMap rsMap = new DataMap();
+		rsMap.put("successCnt", successCnt);
+		rsMap.put("sapResList", sapResList);
+		return rsMap;
+	}
+	
+	private List<DataMap> validateAndSortMV(String docuty, List<DataMap> list, String targetLocKey) throws Exception {
+		List<DataMap> temp = new ArrayList<>();
+		
+		if (CollectionUtils.isEmpty(list)) {
+			throw new Exception("변경된 내역이 존재하지 않습니다.");
+		}
+		
+		for (int i = 0; i < list.size(); i++) {
+			DataMap row = list.get(i).getMap("map");
+			String WAREKY = row.getString("WAREKY");
+			String LOTA02 = row.getString("LOTA02");
+			
+//			if (StringUtils.equals("1100", WAREKY) &&
+//				StringUtils.isBlank(row.getString("LOTA07")) == false
+//			) {
+//				row.setModuleCommand("WmsInventory", "LOTA07_VALIDATE");
+//				DataMap validate = commonDao.getMap(row);
+//				if (validate != null && "FAIL".equals(validate.get("RESULT"))) {
+//					throw new Exception("해당지번[" + row.getString("LOCAKY") + "]에 다른 MTO 재고가 존재합니다.");
+//				}
+//			}
+			
+			// 변경될 플랜트 조회
+			DataMap LOCAKYval2param = new DataMap();
+			LOCAKYval2param.put("WAREKY", WAREKY);
+			LOCAKYval2param.put("ALOCAKY", row.getString(targetLocKey));
+			LOCAKYval2param.setModuleCommand("WmsTask", "LOCAKYval2");
+			DataMap LOCAKYval2 = commonDao.getMap(LOCAKYval2param);
+			
+			String ALOTA02 = LOCAKYval2.getString("PLNTKY");
+			String ALOTA01 = LOCAKYval2.getString("STLKY");
+			if (StringUtils.isBlank(ALOTA02) ||
+				StringUtils.isBlank(ALOTA01)
+			) {
+				ALOTA02 = row.getString("LOTA02");
+				ALOTA01 = row.getString("LOTA01");
+			}
+			row.put("ALOTA02", ALOTA02);
+			row.put("ALOTA01", ALOTA01);
+			
+			/* 2022.09.22 P200 => P300이거나 P300 => P200인 경우 혼적 가능하도록 기존 플랜트로 세팅 */
+			if ((StringUtils.equals("P200", LOTA02) && StringUtils.equals("P300", ALOTA02)) ||
+				(StringUtils.equals("P300", LOTA02) && StringUtils.equals("P200", ALOTA02))
+			) {
+				row.put("ALOTA02", LOTA02);
+			}
+			
+			// 변경될 플랜트에서 관리되는 품목인지 VALIDATE
+			DataMap validate = commonDao.getMap("WmsInventory.SKUPLT_VALIDATE", row);
+			if (validate == null || !"1".equals(validate.getString("RESULT"))) {
+//				String ALOTA02 = row.getString("ALOTA02");
+				String SKUKEY  = row.getString("SKUKEY");
+				throw new Exception("해당 품목(" + SKUKEY  + ")은 플랜트 " + ALOTA02 + "에서 관리중인 품목이 아닙니다.");
+			}
+			
+			List<String> keyList = null;
+			validate = new DataMap();;
+			if (StringUtils.equals("320", docuty)) { // 재고이동 1Step
+				validate = commonDao.getMap("WmsInventory.STKKY_VALIDATE", row);
+				keyList = Arrays.asList(
+							  row.getString("STOKKY")
+						  );
+			} else if ( // 재고이동 2Step
+				StringUtils.equals("325", docuty) &&
+				StringUtils.equals("", row.getString("TASKKY").trim()) == false &&
+				StringUtils.equals("", row.getString("TASKIT").trim()) == false
+			) {
+				validate = commonDao.getMap("WmsInventory.TASK_VALIDATE" , row);
+				keyList = Arrays.asList(
+							  row.getString("TASKKY")
+							, row.getString("TASKIT")
+						  );
+			}
+			
+			if (validate == null) {
+				throw new Exception("해당 재고를 찾을 수 없습니다." + keyList.toString());
+			} else if(StringUtils.isNotEmpty(validate.getString("ERRMSG"))) {
+				throw new Exception(validate.getString("ERRMSG") + keyList.toString());
+			}
+			
+			String SAPSTS = getSAPSTS(docuty, row);
+			row.put("SAPSTS", SAPSTS);
+			temp.add(row);
+		}
+		
+		/* 이동유형을 기준으로 정렬 */
+		Collections.sort(temp, new Comparator<DataMap>() {
+			@Override
+			public int compare(DataMap o1, DataMap o2) {
+				return StringUtils.compare(o1.getString("SAPSTS"), o2.getString("SAPSTS"));
+			}
+		});
+		return temp;
+	}
+	
+	/** 재고이동 완료 후<br>
+	 *  변경될 저장위치 조회하여 재고저장위치변경 method 호출
+	 */
+	private DataMap afterMoveStock(String TASKKY, String SAPSTS, DataMap userInfo) throws SQLException {
+		// docunum으로 대상 LIST 조회
+		DataMap param = new DataMap();
+		param.put("TASKKY", TASKKY);
+		param.put("SAPSTS", SAPSTS);
+		param.setModuleCommand("WmsInventory", "AFTER_MOVE_STOCK");
+		List<DataMap> list = commonDao.getList(param);
+		
+		/* 2022.09.22 P200 => P300이거나 P300 => P200인 경우 혼적 가능하도록 변경 */
+		list = list.stream().filter(row -> {
+			String  LOTA02 = row.getString( "LOTA02");
+			String ALOTA02 = row.getString("ALOTA02");
+			String LOTA01  = row.getString( "LOTA01");
+			String ALOTA01 = row.getString("ALOTA01");
+			
+			// 저장위치 (정상, 보류, 품질 상태)에서 재고 이동시 SAP I/F 미연동 처리 (지번만 변경 처리, 20250204 3000번 조건추가)
+			if (!StringUtils.equals(LOTA01, ALOTA01) && ("3000".equals(LOTA01) || "3800".equals(LOTA01) || "3900".equals(LOTA01))) {
+				// 2025.03.19 kyh 저장위치 변경 수행 (강내 ↔ PS강내)
+				// 2025.06.30 kyh 저장위치 (3900, 3800) ↔ 영보(3400)이동시 SAP I/F 수행
+				if ((("3000".equals(LOTA01) || "3800".equals(LOTA01) || "3900".equals(LOTA01)) && "3400".equals(ALOTA01)) || 
+					("3400".equals(LOTA01) && "3000".equals(ALOTA01))) {
+				} else {
+					return false;
+				}
+			}
+			
+			if ((StringUtils.equals("P200", LOTA02) && StringUtils.equals("P300", ALOTA02)) ||
+				(StringUtils.equals("P300", LOTA02) && StringUtils.equals("P200", ALOTA02))
+			) {
+				return !StringUtils.equals(LOTA01, ALOTA01);
+			}
+			
+			return true;
+		}).collect(Collectors.toList());
+		
+		if (CollectionUtils.isEmpty(list)) {
+			param.put("SAPRES", "SUCCESS");
+			return param;
+		}
+		
+		param = new DataMap();
+		param.putAll(userInfo);
+		param.put("list", list);
+		param.put("DOCUTY", "401"); // 401: 재고저장위치변경
+		
+		return saveAdjByTask(param);
+	}
+	
+	/** 재고이동 */
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap RecommendLocation(DataMap map) throws SQLException {
+		DataMap rstMap = new DataMap();
+		List<DataMap> retList = new ArrayList<>();
+		try {
+			List<DataMap> list = map.getList("list");
+			for (int i = 0; i < list.size(); i++) {
+				DataMap row = list.get(i).getMap("map");
+				row.put("LOTNUM", row.getString("LOTNUM"));
+				row.setModuleCommand("WmsInventory", "GUIDE_LOCATION_PROC_CALL");
+				commonDao.update(row);
+				retList.add(row);
+			}
+		} catch (Exception e) {
+			rstMap.put("MSG", "FAIL");
+			return rstMap;
+		}
+		rstMap.put("list", retList);
+		rstMap.put("MSG", "OK");
+		return rstMap;
+	}
+	
+	/** 재고실사지시 */
+	@Transactional(rollbackFor = Exception.class)
+	public String saveIP01(DataMap map) throws SQLException {
+		DataMap head = map.getMap("head").getMap("map");
+		List<DataMap> list = map.getList("list");
+		
+		String docuty = head.getString("DOCUTY");
+		String docnum = wmsService.getDocSeq(docuty);
+		
+		// insert head
+		map.clonSessionData(head);
+		head.put("PHYIKY", docnum);
+		head.setModuleCommand("WmsInventory", "PHYDH");
+		commonDao.insert(head);
+		
+		// insert item
+		List<HashMap> mList = new ArrayList<>();
+		int subSize = 100;
+		for (int i = 0; i < list.size(); i++) {
+			DataMap row = list.get(i).getMap("map");
+			map.clonSessionData(row);
+			
+			row.put("PHYIKY", docnum);
+			row.put("PHYIIT", String.format("%06d", (i + 1) * 10));
+			
+			
+			mList.add(row);
+			if (mList.size() == subSize || i == list.size() - 1) {
+				commonDao.insert("PHYDI_MULTI", mList);
+				mList.clear();
+			}
+		}
+		return docnum;
+	}
+	
+	/** 재고실사 > 중간 저장*/
+	@Transactional(rollbackFor = Exception.class)
+	public String saveIP02(DataMap map) throws SQLException {
+		List<DataMap> list = map.getList("list");
+		for (DataMap row : list) {
+			row = row.getMap("map");
+			row.setModuleCommand("WmsInventory", "PHYDI");
+			map.clonSessionData(row);
+			commonDao.update(row);
+		}
+		return "OK";
+	}
+	
+	/** 재고실사 > 조사완료 */
+	@Transactional(rollbackFor = Exception.class)
+	public String confirmIP02(DataMap map) throws SQLException {
+		DataMap head = new DataMap();
+		
+		head.setModuleCommand("WmsInventory", "PHYDH_CONFIRM");
+		map.clonSessionData(head);
+		head.put("PHYIKY", map.getString("PHYIKY"));
+		commonDao.update(head);
+		
+		return "OK";
+	}
+	
+	/** 재고실사 > 엑셀업로드 */
+	@Transactional(rollbackFor = Exception.class)
+	public List<DataMap> saveIP02POP(DataMap map) throws SQLException {
+		List<DataMap> list = map.getList("list");
+		
+		String wareky   = map.getString(CommonConfig.SES_USER_WHAREHOUSE_KEY);
+		String ownrky   = map.getString(CommonConfig.SES_USER_OWNER_KEY);
+		
+		List<DataMap> failedList = new ArrayList<>();
+		for (DataMap row : list) {
+			DataMap data = (DataMap) row.get("map");
+			
+			map.clonSessionData(data);
+			data.put("WAREKY", wareky);
+			data.put("OWNRKY", ownrky);
+			
+			String phyiit = data.getString("PHYIIT").trim();
+			
+			int sqlResult = 0;
+			if (StringUtils.isEmpty(phyiit)) {
+				data.setModuleCommand("WmsInventory", "PHYDI_EXCEL");
+				sqlResult = (int) commonDao.insert(data);
+			} else {
+				int number = data.getInt("PHYIIT");
+				phyiit = String.format("%06d", number);
+				data.put("PHYIIT", phyiit);
+				data.setModuleCommand("WmsInventory", "PHYDI_EXCEL");
+				sqlResult = (int) commonDao.update(data);
+			}
+			
+			if(sqlResult < 1) {
+				failedList.add(row);
+			}
+		}
+		
+		return failedList;
+	}
+	
+	/** PDA재고실사 > 저장 */
+	@Transactional(rollbackFor = Exception.class)
+	public String savePDPC01(DataMap map) throws SQLException {
+		List<DataMap> list = map.getList("list");
+		for (DataMap row : list) {
+			row = row.getMap("map");
+			row.setModuleCommand("WmsInventory", "PDA_PHYDI");
+			map.clonSessionData(row);
+			commonDao.update(row);
+		}
+		return "OK";
+	}
+
+	/** PDA재고실사 > 등록 > 저장 */
+	@Transactional(rollbackFor = Exception.class)
+	public String savePDPC01New(DataMap map) throws SQLException {
+		List<DataMap> list = map.getList("list");
+		
+		String PHYIKY = map.getString("PHYIKY");
+		String LANGKY = map.getString("LANGKY");
+		String OWNRKY = map.getString("OWNRKY");
+		
+		for (DataMap row : list) {
+			row = row.getMap("map");
+			row.setModuleCommand("WmsInventory", "PDA_PHYDI_NEW");
+			
+			row.put("PHYIKY", PHYIKY);
+			row.put("LANGKY", LANGKY);
+			row.put("OWNRKY", OWNRKY);
+			
+			map.clonSessionData(row);
+			commonDao.insert(row);
+		}
+		
+		return "OK";
+	}
+	
+	/** PDA재고실사 테스트 > 등록 > 저장 */
+	@Transactional(rollbackFor = Exception.class)
+	public String savePDPC02New(DataMap map) throws SQLException {
+		List<DataMap> list = map.getList("list");
+		
+		String PHYIKY = map.getString("PHYIKY");
+		String LANGKY = map.getString("LANGKY");
+		String OWNRKY = map.getString("OWNRKY");
+		
+		for (DataMap row : list) {
+			row = row.getMap("map");
+			row.setModuleCommand("WmsInventory", "PDA_PHYDI_NEW2");
+			
+			row.put("PHYIKY", PHYIKY);
+			row.put("LANGKY", LANGKY);
+			row.put("OWNRKY", OWNRKY);
+			
+			map.clonSessionData(row);
+			commonDao.insert(row);
+		}
+		
+		return "OK";
+	}
+	
+	public DataMap setInterfaceData (String DOCUTY, DataMap row) throws SQLException {
+		if (StringUtils.isEmpty(DOCUTY)) { throw new SQLException("empty DOCUTY"); }
+		
+		DataMap ifData = new DataMap();
+		ifData = (DataMap) row.clone();
+		ifData.put("MEINS" , row.get("UOMKEY" ));
+		ifData.put("TMATNR", row.get("ASKUKEY"));
+		
+		if ("402".equals(DOCUTY)) { // 재고상태변경
+			String  LOTA06 = row.getString( "LOTA06");
+			String ALOTA06 = row.getString("ALOTA06");
+			ifData.put( "LOTA06", convertALOTA06WmsToSap( LOTA06)); // SAP 재고상태로 변경
+			ifData.put("ALOTA06", convertALOTA06WmsToSap(ALOTA06)); // SAP 재고상태로 변경
+		}
+		
+		ifData.put("BWARTSAP", row.getString("SAPSTS"));
+		return ifData;
+	}
+	
+	/** 문서유형에 따라 I/F ID 세팅 */
+	private String getIFID(String DOCUTY) throws SQLException {
+		if (StringUtils.isEmpty(DOCUTY)) { throw new SQLException("empty DOCUTY"); }
+		
+		switch(DOCUTY) {
+			case "402" : return "WMS_IF_401"; // 재고상태변경
+			case "423" : return "WMS_IF_402"; // 재고MTO/MTS변경
+			case "422" : return "WMS_IF_403"; // 제조LOT변경정보
+			case "401" : return "WMS_IF_404"; // 저장위치변경정보
+			case "421" : return "WMS_IF_405"; // 품목코드변경 (MTM)
+			default    : throw new SQLException("empty IFID"); // quit method
+		}
+	}
+	
+	/* 문서유형과 데이터에 따라 SAPSTS 지정 */
+	public String getSAPSTS(String docuty, DataMap row) {
+		String SAPSTS = "";
+		String LOTA06 = row.getString("LOTA06").trim();
+		
+		switch(docuty) {
+			case "402": // 재고상태변경
+				String ALOTA06 = row.getString("ALOTA06").trim();
+				// FROM재고상태, TO재고상태 값에 따라 SAPSTS 다르게 설정
+				SAPSTS = "00".equals(LOTA06) && "05".equals(ALOTA06) ? "322" : // 00       -> 05
+						 "00".equals(LOTA06)                         ? "344" : // 00       -> 10, 30, 50
+						 "05".equals(LOTA06) && "00".equals(ALOTA06) ? "321" : // 05       -> 00
+						 "05".equals(LOTA06)                         ? "350" : // 05       -> 10, 30, 50
+						                        "00".equals(ALOTA06) ? "343" : // 10,30,50 -> 00
+						                        "05".equals(ALOTA06) ? "349" : // 10,30,50 -> 05
+																		 "X" ; // 10,30,50 -> 10,30,50 (SAP 전송X)
+				break;
+			
+			case "320": // 재고이동 1Step
+			case "325": // 재고이동 2Step
+			case "401": // 재고저장위치변경
+				String  LOTA02 = row.getString( "LOTA02").trim();
+				String ALOTA02 = row.getString("ALOTA02").trim();
+				boolean equalsLOTA02 = StringUtils.equals(LOTA02, ALOTA02);
+				SAPSTS = "00".equals(LOTA06) ? (equalsLOTA02 ? "311" : "301") : // 00
+						 "05".equals(LOTA06) ? (equalsLOTA02 ? "323" : "324") : // 05
+											   (equalsLOTA02 ? "325" : "326") ; // 10, 30, 50
+				break;
+			case "421": // 품목코드변경 (MTM)
+				SAPSTS = "309";
+				break;
+			case "423": // 재고MTO/MTS변경
+				String ALOTA07 = row.getString("ALOTA07").trim();
+				// 411: MTO -> MTS
+				// 413: MTO -> MTS, MTO -> MTO
+				SAPSTS = StringUtils.isEmpty(ALOTA07) ? "411" : "413";
+				break;
+			case "422": // 제조LOT변경정보
+				SAPSTS = "311";
+				break;
+			default:
+				SAPSTS = "X";
+				break;
+		}
+		return SAPSTS;
+	}
+	
+	/** 재고상태 SAP에서 재고상태를 00(정상), 05(품질), 10(보류)만 관리함.<br>
+	 *  30(불용), 50(폐기)는 10(보류)로 관리하기 때문에 변환작업 필요.
+	 */
+	private String convertALOTA06WmsToSap(String LOTA06) {
+		String sapLOTA06 = LOTA06;
+		switch(LOTA06) {
+			case "30": sapLOTA06 = "10"; break;
+			case "50": sapLOTA06 = "10"; break;
+		}
+		return sapLOTA06;
+	}
+	
+	public DataMap sendIF(DataMap map) {
+		try { // SAP 연동 실패 시 트랜잭션 ROLLBACK 미적용하기위해 try ~ catch
+			DataMap ifMap = map.getMap("ifMap");
+			String result = ifService.sendIF(ifMap); // send IF
+			map.put("SAPRES", result);
+		} catch (Exception e) {
+			log.error("Sap Connenct Exception : " + e.getMessage());
+		}
+		
+		map.remove("ifMap"); // 인터페이스 연동내용이 화면까지 나가지않도록 map에서 삭제처리
+		return map;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	private String getIFLogSeqNo() throws SQLException {
+		DataMap logoIdxMap = new DataMap();
+		logoIdxMap.setModuleCommand("Erpif", "IFWMSLOGSEQNO");
+		logoIdxMap = commonDao.getMap(logoIdxMap);
+		return logoIdxMap.getString("LOGSEQNO");
+	}
+	
+	
+	private String getMessage(String message) {
+		return getMessage(message, "");
+	}
+	
+	private String getMessage(String message, String label) {
+		if (StringUtils.isNotEmpty(message) && message.contains("↓")) {
+			message = message.split("↓")[1];
+		}
+		if (StringUtils.isNotEmpty(label) && message.contains("{0}")) {
+			message = message.replace("{0}", label);
+		}
+		return message;
+	}
+	
+
+	/** 재고조정내역 > 재고조정취소
+	 * <pre>
+	 * rsList [
+	 *   error: {
+	 *     901: 존재하지 않는 조정문서입니다.
+	 *     902: 이미 취소된 조정문서입니다.
+	 *     903: MTO/MTS 변경 문서는 취소 할 수 없습니다.
+	 *     904: 시스템에 의해 생성된 조정문서는 취소 할 수 없습니다. // ADJFLG != "M"
+	 *     905: 다른 작업에 의해 재고정보가 변경되어 취소 할 수 없습니다. (재고부족)
+	 *   }
+	 * ]
+	 * </pre>
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public List<DataMap> cancelAdjust(DataMap map) throws SQLException {
+		List<DataMap> headList = map.getList("headList");
+		List<DataMap> rsList = new ArrayList<>();
+		
+		for (DataMap head : headList) {
+			head = head.getMap("map");
+			
+			// validation
+			String docuty = head.getString("DOCUTY");
+			String SADJKY = head.getString("SADJKY");
+			String REFCKY = head.getString("REFCKY");
+			String CANCEL = head.getString("CANCEL");
+			String ADJFLG = head.getString("ADJFLG");
+			
+			DataMap rsMap = new DataMap();
+			if (StringUtils.isNotEmpty(REFCKY.trim()) ||
+				StringUtils.isNotEmpty(CANCEL.trim()))           { rsMap.put("ERROR", "902"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			if (StringUtils.equals(docuty.trim(), "423"))        { rsMap.put("ERROR", "903"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			if (StringUtils.equals(ADJFLG.trim(), "M") == false) { rsMap.put("ERROR", "904"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			
+			head.setModuleCommand("WmsInventory", "CANCEL_ADJUST");
+			List<DataMap> adjList = commonDao.getList(head); // HEAD.SADJKY로 ADJDI 목록 조회 (순서 역순, 수량 * -1)
+			
+			if (CollectionUtils.isEmpty(adjList))                { rsMap.put("ERROR", "901"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			
+			boolean validate = true;
+			for (int i = 0; i < adjList.size(); i += 2) { // 기존 재고문서의 변경후 데이터만 체크
+				DataMap adjTO = adjList.get(i);
+				double QTADJU = Utils.parseDouble(adjTO.getString("QTADJU")); // ADJDI 조정수량
+				double QTSIWH = Utils.parseDouble(adjTO.getString("QTSIWH")); // STKKY 재고수량
+				if (QTADJU * -1 > QTSIWH) { // 조정수량 > 재고수량
+					validate = false; break;
+				}
+			}
+			
+			if (validate == false)                               { rsMap.put("ERROR", "905"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			
+			// 문서번호 신규생성
+			String docSeq = wmsService.getDocSeq(docuty);
+			
+			// ADJDH INSERT
+			map.clonSessionData(head);
+			head.put("SADJKY", docSeq);
+			head.put("ADJUTY", docuty);
+			head.put("ADJUCA", docuty);
+			head.put("ADJFLG", "M");
+			head.put("REFCKY", SADJKY);
+			head.put("DOCTXT", "취소");
+			head.setModuleCommand("WmsInventory", "ADJDH");
+			commonDao.update(head);
+			
+			int itemCount = 0;
+			List<String> MBLNRList = new ArrayList<>();
+			for (int i = 0; i < adjList.size(); i++) {
+				DataMap row = new DataMap();
+				itemCount += 10;
+				
+				row = adjList.get(i);
+				map.clonSessionData(row);
+				row.put("SADJKY", docSeq);
+				row.put("SADJIT", String.format("%06d", itemCount));
+				
+				if (i % 2 == 0) {
+					row.setModuleCommand("WmsInventory", "ADJDIOLD");
+					commonDao.insert(row);
+				} else {
+					// ADJDI INSERT, 인터페이스 데이터 세팅
+					DataMap before = adjList.get(i - 1);
+					for (int j = 1; j <= 20; j++) { /* LOTA => ALOTA, BEFORE.LOTA => LOTA */
+						String num = String.format("%02d", j);
+						row.put("ALOTA" + num,    row.getString("LOTA" + num));
+						row.put( "LOTA" + num, before.getString("LOTA" + num));
+					}
+					
+					for (int j = 1; j <= 5; j++) { /* BEFORE.ASKU => AASKU */
+						String num = String.format("%02d", j);
+						row.put("AASKU" + num, before.getString("ASKU" + num));
+					}
+					
+					row.setModuleCommand("WmsInventory", "ADJDI");
+					commonDao.insert(row);
+					
+					// 인터페이스 호출하기 위한 데이터 세팅
+					String MBLNR = before.getString("SXBLNR");
+					if (StringUtils.isNotBlank(MBLNR) &&
+						!MBLNRList.contains(MBLNR)
+					) {
+						MBLNRList.add(MBLNR);
+					}
+				}
+			}
+			
+			String IFID  = "WMS_IF_778";
+			String BUDAT = head.getString("DOCDAT");
+			String MJAHR = BUDAT.substring(0, 4);
+			
+			for (String MBLNR : MBLNRList) {
+				/* 인터페이스 데이터 생성 */
+				List<DataMap> ifList  = new ArrayList<>();
+				String LOGSEQNO = this.getIFLogSeqNo();
+				DataMap ifData = new DataMap();
+				ifData.put("BUDAT", BUDAT);  //전표전기일
+				ifData.put("MJAHR", MJAHR);  //자재전표연도
+				ifData.put("MBLNR", MBLNR);  
+				ifData.put("WMSDN", SADJKY); //WMS조정문서번호
+				ifList.add(ifData);
+				
+				/* 인터페이스 로그 생성 */
+				DataMap logMap = new DataMap();
+				logMap.setModuleCommand("Erpif", "IFWMSLOG_RESULT");
+				logMap.put("IFID", IFID);
+				logMap.put("SEQNO", LOGSEQNO);
+				logMap.put("COMSTAT", "C"); // 호출
+				logMap.put("REMARK", SADJKY);
+				logMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+				commonDao.insert(logMap);
+				
+				// 인터페이스 파라미터 설정
+				DataMap ifMap = new DataMap();
+				ifMap.put("I_IF_NAM", IFID);
+				ifMap.put("I_IF_KEY", LOGSEQNO);
+				
+				/* 인터페이스 연동 */
+				RfcCallFunction sapConn = new RfcCallFunction();
+				DataMap sapResObj = sapConn.rfcCancel("Z_WMS_MAT_DOC_CANCEL", "T_INDATA", ifMap, ifList);
+				log.debug("Sap Response : " + sapResObj);
+				
+				/* 인터페이스 연동 결과 처리 */
+				List<DataMap> sapResList = sapResObj.getList("head");
+				for (DataMap sapRes : sapResList) {
+					String TYPE = sapRes.getString("TYPE");
+					
+					if ("S".equals(TYPE)) {
+						logMap.setModuleCommand("Erpif", "IFWMSLOG_RESULT");
+						logMap.put("COMSTAT", TYPE);
+						commonDao.update(logMap);
+					} else {
+						logMap.put("ERRTXT", sapRes.getString("MESSAGE"));
+						logMap.put("COMSTAT", TYPE);
+						logMap.setModuleCommand("Erpif", "IFWMSLOG");
+						commonDao.update(logMap);
+					}
+				}
+			}
+			
+			// 취소 전 조정문서에 취소여부 UPDATE
+			head.put("SADJKY", SADJKY);
+			head.setModuleCommand("WmsInventory", "ADJDH_CANCEL");
+			commonDao.update(head);
+			
+			rsMap = new DataMap();
+			rsMap.put("SADJKY", docSeq);
+			rsList.add(rsMap);
+		}
+		
+		return rsList;
+	}
+	
+	/** 재고조정내역 > 재고조정취소
+	 * <pre>
+	 * rsList [
+	 *   error: {
+	 *     901: 존재하지 않는 조정문서입니다.
+	 *     902: 이미 취소된 조정문서입니다.
+	 *     903: MTO/MTS 변경 문서는 취소 할 수 없습니다.
+	 *     904: 시스템에 의해 생성된 조정문서는 취소 할 수 없습니다. // ADJFLG != "M"
+	 *     905: 다른 작업에 의해 재고정보가 변경되어 취소 할 수 없습니다. (재고부족)
+	 *   }
+	 * ]
+	 * </pre>
+	 */
+//	@Transactional(rollbackFor = Exception.class)
+	public String cancelAdjustWMSONLY(DataMap map) throws SQLException {
+		List<DataMap> headList = map.getList("headList");
+//		List<DataMap> rsList = new ArrayList<>();
+		
+		for (DataMap head : headList) {
+			head = head.getMap("map");
+			
+			// validation
+			String docuty = head.getString("DOCUTY");
+			String SADJKY = head.getString("SADJKY");
+//			String REFCKY = head.getString("REFCKY");
+//			String CANCEL = head.getString("CANCEL");
+//			String ADJFLG = head.getString("ADJFLG");
+			
+			DataMap rsMap = new DataMap();
+//			if (StringUtils.isNotEmpty(REFCKY.trim()) || StringUtils.isNotEmpty(CANCEL.trim())) {
+//				rsMap.put("ERROR", "902");
+//				rsMap.put("SADJKY", SADJKY);
+//				rsList.add(rsMap);
+//				continue;
+//			}
+//			if (StringUtils.equals(docuty.trim(), "423")) {
+//				rsMap.put("ERROR", "903");
+//				rsMap.put("SADJKY", SADJKY);
+//				rsList.add(rsMap);
+//				continue;
+//			}
+//			if (StringUtils.equals(ADJFLG.trim(), "M") == false) {
+//				rsMap.put("ERROR", "904");
+//				rsMap.put("SADJKY", SADJKY);
+//				rsList.add(rsMap);
+//				continue;
+//			}
+
+			head.setModuleCommand("WmsInventory", "CANCEL_ADJUST_WMSONLY");
+			List<DataMap> adjList = commonDao.getList(head); // HEAD.SADJKY로 ADJDI 목록 조회 (순서 역순, 수량 * -1)
+
+//			if (CollectionUtils.isEmpty(adjList)) {
+//				rsMap.put("ERROR", "901");
+//				rsMap.put("SADJKY", SADJKY);
+//				rsList.add(rsMap);
+//				continue;
+//			}
+			
+//			boolean validate = true;
+//			for (int i = 0; i < adjList.size(); i += 2) { // 기존 재고문서의 변경후 데이터만 체크
+//				DataMap adjTO = adjList.get(i);
+//				double QTADJU = Utils.parseDouble(adjTO.getString("QTADJU")); // ADJDI 조정수량
+//				double QTSIWH = Utils.parseDouble(adjTO.getString("QTSIWH")); // STKKY 재고수량
+//				if (QTADJU * -1 > QTSIWH) { // 조정수량 > 재고수량
+//					validate = false; break;
+//				}
+//			}
+//			
+//			if (validate == false)                               { rsMap.put("ERROR", "905"); rsMap.put("SADJKY", SADJKY); rsList.add(rsMap); continue; }
+			
+			// 문서번호 신규생성
+			String docSeq = wmsService.getDocSeq(docuty);
+			
+			// ADJDH INSERT
+			map.clonSessionData(head);
+			head.put("SADJKY", docSeq);
+			head.put("ADJUTY", docuty);
+			head.put("ADJUCA", docuty);
+			head.put("ADJFLG", " ");
+			head.put("REFCKY", SADJKY);
+			head.put("DOCTXT", "품질결과 SAP오류에 의한 취소");
+			head.setModuleCommand("WmsInventory", "ADJDH");
+			commonDao.update(head);
+			
+			int itemCount = 0;
+//			List<String> MBLNRList = new ArrayList<>();
+			for (int i = 0; i < adjList.size(); i++) {
+				DataMap row = new DataMap();
+				itemCount += 10;
+				
+				row = adjList.get(i);
+				map.clonSessionData(row);
+				row.put("SADJKY", docSeq);
+				row.put("SADJIT", String.format("%06d", itemCount));
+				
+				if (i % 2 == 0) {
+					row.setModuleCommand("WmsInventory", "ADJDIOLD");
+					commonDao.insert(row);
+				} else {
+					// ADJDI INSERT, 인터페이스 데이터 세팅
+					DataMap before = adjList.get(i - 1);
+					for (int j = 1; j <= 20; j++) { /* LOTA => ALOTA, BEFORE.LOTA => LOTA */
+						String num = String.format("%02d", j);
+						row.put("ALOTA" + num,    row.getString("LOTA" + num));
+						row.put( "LOTA" + num, before.getString("LOTA" + num));
+					}
+					
+					for (int j = 1; j <= 5; j++) { /* BEFORE.ASKU => AASKU */
+						String num = String.format("%02d", j);
+						row.put("AASKU" + num, before.getString("ASKU" + num));
+					}
+					
+					row.setModuleCommand("WmsInventory", "ADJDI");
+					commonDao.insert(row);
+					
+//					// 인터페이스 호출하기 위한 데이터 세팅
+//					String MBLNR = before.getString("SXBLNR");
+//					if (StringUtils.isNotBlank(MBLNR) &&
+//						!MBLNRList.contains(MBLNR)
+//					) {
+//						MBLNRList.add(MBLNR);
+//					}
+				}
+			}
+			
+//			String IFID  = "WMS_IF_778";
+//			String BUDAT = head.getString("DOCDAT");
+//			String MJAHR = BUDAT.substring(0, 4);
+			
+//			for (String MBLNR : MBLNRList) {
+//				/* 인터페이스 데이터 생성 */
+//				List<DataMap> ifList  = new ArrayList<>();
+//				String LOGSEQNO = this.getIFLogSeqNo();
+//				DataMap ifData = new DataMap();
+//				ifData.put("BUDAT", BUDAT);
+//				ifData.put("MJAHR", MJAHR);
+//				ifData.put("MBLNR", MBLNR);
+//				ifData.put("WMSDN", SADJKY);
+//				ifList.add(ifData);
+//				
+//				/* 인터페이스 로그 생성 */
+//				DataMap logMap = new DataMap();
+//				logMap.setModuleCommand("Erpif", "IFWMSLOG_RESULT");
+//				logMap.put("IFID", IFID);
+//				logMap.put("SEQNO", LOGSEQNO);
+//				logMap.put("COMSTAT", "C"); // 호출
+//				logMap.put("REMARK", SADJKY);
+//				logMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+//				commonDao.insert(logMap);
+				
+//				// 인터페이스 파라미터 설정
+//				DataMap ifMap = new DataMap();
+//				ifMap.put("I_IF_NAM", IFID);
+//				ifMap.put("I_IF_KEY", LOGSEQNO);
+//				
+//				/* 인터페이스 연동 */
+//				RfcCallFunction sapConn = new RfcCallFunction();
+//				DataMap sapResObj = sapConn.rfcCancel("Z_WMS_MAT_DOC_CANCEL", "T_INDATA", ifMap, ifList);
+//				log.debug("Sap Response : " + sapResObj);
+//				
+//				/* 인터페이스 연동 결과 처리 */
+//				List<DataMap> sapResList = sapResObj.getList("head");
+//				for (DataMap sapRes : sapResList) {
+//					String TYPE = sapRes.getString("TYPE");
+//					
+//					if ("S".equals(TYPE)) {
+//						logMap.setModuleCommand("Erpif", "IFWMSLOG_RESULT");
+//						logMap.put("COMSTAT", TYPE);
+//						commonDao.update(logMap);
+//					} else {
+//						logMap.put("ERRTXT", sapRes.getString("MESSAGE"));
+//						logMap.put("COMSTAT", TYPE);
+//						logMap.setModuleCommand("Erpif", "IFWMSLOG");
+//						commonDao.update(logMap);
+//					}
+//				}
+//			}
+			
+			// 취소 전 조정문서에 취소여부 UPDATE
+			head.put("SADJKY", SADJKY);
+			head.setModuleCommand("WmsInventory", "ADJDH_CANCEL");
+			commonDao.update(head);
+			
+			rsMap = new DataMap();
+			rsMap.put("SADJKY", docSeq);
+//			rsList.add(rsMap);
+		}
+		
+		return "SUCCESS";
+	}
+	
+
+	@Transactional
+	public int saveSD09(DataMap map) throws SQLException {
+		List<DataMap> head = map.getList("head");
+		List<DataMap> selectList = new ArrayList<DataMap>();
+		if (map.get("list") != null && !map.get("list").equals("")) {
+			selectList = map.getList("list");
+		}
+		
+		int count = 0;
+
+		DataMap row;
+		DataMap itemRow;
+
+		List docNumList = new ArrayList();
+		DataMap rsMap = new DataMap();
+		
+	
+		for (int k = 0; k < selectList.size(); k++) {
+			itemRow = selectList.get(k).getMap("map");
+			itemRow.setModuleCommand("WmsInventory", "SD09");
+			itemRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+
+
+			count += commonDao.update(itemRow);
+		}
+			
+		return count;
+	}
+	
+	
+	public DataMap barcodePartition(DataMap map) throws SQLException {
+		DataMap rstMap = new DataMap();
+		List<DataMap> retList = new ArrayList<>();
+		String USER = map.getString(CommonConfig.SES_USER_ID_KEY);
+		try {
+			List<DataMap> list = map.getList("list");
+			for (int i = 0; i < list.size(); i++) {
+				DataMap row = list.get(i).getMap("map");
+				row.put("P_stokky", row.getString("STOKKY"));
+				row.put("P_qty", row.getString("QTTAOR"));
+				row.put("P_userid", USER);
+				row.setModuleCommand("WmsInventory", "P_AIRWMS_PLT_PARTITON_PROC");
+				commonDao.getMap(row);
+				retList.add(row);
+			}
+		} catch (Exception e) {
+			rstMap.put("MSG", e.getMessage());
+			return rstMap;
+		}
+		rstMap.put("MSG", "OK");
+		rstMap.put("LIST", retList);
+		return rstMap;
+	}
+	
+	public DataMap barcodeMerger(DataMap map) throws SQLException {
+		DataMap rstMap = new DataMap();
+		List<DataMap> retList = new ArrayList<>();
+		String USER = map.getString(CommonConfig.SES_USER_ID_KEY);
+		try {
+			List<DataMap> list = map.getList("list");
+			
+			StringBuilder sb = new StringBuilder();
+			
+			//List<String> SHPOKY_LIST = new ArrayList<>();
+	
+			/*
+			for (int j = 0; j < head.size(); j++) {
+				rowMap = head.get(j).getMap("map");
+				
+				String SHPOKY = rowMap.getString("SHPOKY");
+
+				SHPOKY_LIST.add(SHPOKY);
+			}
+			*/
+			//row.put("SHPOKY", SHPOKY_LIST.get(i));
+
+			
+
+			for (int i = 0; i < list.size(); i++) {
+				
+				if (i != 0) {
+					sb.append(",");
+				}
+				sb.append(list.get(i).getMap("map").getString("STOKKY"));
+				
+				
+				//SHPOKY_LIST.add(list.get(i).getMap("map").getString("STOKKY"));
+			}
+			
+			DataMap row = new DataMap();
+			row.put("P_stokky", sb);	// '123,1234,1235';
+			row.put("P_userid", USER);
+			//System.out.println("2507: " + row.toString());
+			row.setModuleCommand("WmsInventory", "P_AIRWMS_PLT_MERGER_PROC");
+			commonDao.getMap(row);
+			retList.add(row);
+			
+		} catch (Exception e) {
+			rstMap.put("MSG", e.getMessage());
+			return rstMap;
+		}
+		rstMap.put("MSG", "OK");
+		rstMap.put("LIST", retList);
+		return rstMap;
+	}
+	
+	public DataMap inboundSD82(DataMap map) throws SQLException {
+		
+		List<DataMap> itemList = new ArrayList<DataMap>();
+
+		int itemCount = 0;      // 입고 아이템 채번 번호
+		
+		int totCnt = 0;         // 입고 전체 건수
+		int sucCnt = 0;         // 입고 성공 건수 
+		int failCnt = 0;        // 입고 성공 건수
+		int errMsgLen = 500;    // 에러메세지 길이
+		
+		String totInRsCode = "S";    // 입고테이블 insert 결과 코드
+		StringBuffer totInRsSbMsg = new StringBuffer(); // 입고테이블 insert 결과 메세지
+
+		DataMap row;
+		DataMap itemRow;
+
+		DataMap rsMap = new DataMap();                          // return Map
+
+		List<Map> batchItemList = new ArrayList();              // Batch Insert Item List
+		Map batchItemMap = new HashMap();                       // Batch Insert Item Map
+	
+		List<DataMap> sucList = new ArrayList<DataMap>();       // 입고 RECDH,RECDI,SAP실적 성공 목록
+		
+		String cancelRecvky = "";
+		
+		totCnt = itemList.size();
+
+		itemList = map.getList("list");
+
+		try {
+			if(itemList.size() > 0){
+				
+				RfcCallFunction sapConn = new RfcCallFunction();
+				
+				for(int j = 0 ; j < itemList.size() ; j ++){
+					
+					itemRow = itemList.get(j).getMap("map");
+					
+					DataMap rfcMap = new DataMap();
+
+					// 2026.02.25 입고 I/F 제거 (KLOGI에서 이미 입고된 내역을 PULPIN 등록처리)
+					if (false) {
+						// ===== 필수 =====
+						rfcMap.put("IV_WERKS", itemRow.get("IV_WERKS"));
+						rfcMap.put("IV_BEDAT", itemRow.get("IV_BEDAT"));
+						rfcMap.put("IV_LIFNR", itemRow.get("IV_LIFNR"));
+						rfcMap.put("IV_SEQ",   itemRow.get("IV_SEQ"));
+						rfcMap.put("IV_MATNR", itemRow.get("IV_MATNR"));
+
+						// ===== 선택 =====
+						rfcMap.put("IV_CAR_NUMBER", itemRow.get("IV_CAR_NUMBER"));
+						rfcMap.put("IV_CHECKER",   itemRow.get("IV_CHECKER"));
+						rfcMap.put("IV_WEIGHER",   itemRow.get("IV_WEIGHER"));
+						//rfcMap.put("IV_BALE_CNT",  itemRow.get("IV_BALE_CNT"));
+						rfcMap.put("IV_BALE_CNT",  itemRow.get("QTSIWH"));	// 사용자 입력한 베일수: QTSIWH 
+
+						rfcMap.put("IV_WEIGHT_TIME",   itemRow.get("IV_WEIGHT_TIME"));
+						//rfcMap.put("IV_GR_MENGE",      itemRow.get("IV_GR_MENGE"));		
+						rfcMap.put("IV_GR_MENGE",      itemRow.get("GRSWGT"));	// 사용자 입력한 입고중량: GRSWGT
+						rfcMap.put("IV_MEINS",         itemRow.get("IV_MEINS"));
+
+						rfcMap.put("IV_TOTAL_WEIGHT",  itemRow.get("IV_TOTAL_WEIGHT"));
+						rfcMap.put("IV_EMPTY_WEIGHT",  itemRow.get("IV_EMPTY_WEIGHT"));
+						rfcMap.put("IV_ACTUAL_WEIGHT", itemRow.get("IV_ACTUAL_WEIGHT"));
+
+						rfcMap.put("IV_REGAIN1", itemRow.getOrDefault("IV_REGAIN1", "0"));
+						rfcMap.put("IV_REGAIN2", itemRow.getOrDefault("IV_REGAIN2", "0"));
+						rfcMap.put("IV_REGAIN3", itemRow.getOrDefault("IV_REGAIN3", "0"));
+
+						rfcMap.put("IV_REGAIN_REASON",     itemRow.get("IV_REGAIN_REASON"));
+						rfcMap.put("IV_TOTAL_LOSE_RATIO",  itemRow.get("IV_TOTAL_LOSE_RATIO"));
+						rfcMap.put("IV_LOSE_WEIGHT",       itemRow.get("IV_LOSE_WEIGHT"));
+
+						rfcMap.put("IV_VER1_TIME",   itemRow.get("IV_VER1_TIME"));
+						rfcMap.put("IV_VER2_TIME",   itemRow.get("IV_VER2_TIME"));
+						rfcMap.put("IV_VER1_WEIGHT", itemRow.get("IV_VER1_WEIGHT"));
+						rfcMap.put("IV_VER2_WEIGHT", itemRow.get("IV_VER2_WEIGHT"));
+
+						rfcMap.put("IV_BIGO1", itemRow.get("IV_BIGO1"));
+						rfcMap.put("IV_BIGO2", "");
+						rfcMap.put("IV_BIGO3", "");
+						rfcMap.put("IV_BIGO4", "");
+						rfcMap.put("IV_BIGO5", "");
+
+						rfcMap.put("IV_MOIST1", itemRow.get("IV_MOIST1"));
+						rfcMap.put("IV_MOIST2", itemRow.get("IV_MOIST2"));
+						rfcMap.put("IV_MOIST3", itemRow.get("IV_MOIST3"));
+						rfcMap.put("IV_MOIST4", itemRow.get("IV_MOIST4"));
+						rfcMap.put("IV_MOIST5", itemRow.get("IV_MOIST5"));
+						rfcMap.put("IV_MOIST6", itemRow.get("IV_MOIST6"));
+						rfcMap.put("IV_MOIST7", itemRow.get("IV_MOIST7"));
+						rfcMap.put("IV_MOIST8", itemRow.get("IV_MOIST8"));
+						rfcMap.put("IV_MOIST9", "");
+						rfcMap.put("IV_MOIST10", "");
+						
+						// SAP 입고실적 전송 (국산/수입 구분)
+						rsMap = sapConn.RfcCallZ_MM_ROH2_GR_FROM_PDA(rfcMap);
+						//System.out.println(rsMap);
+						
+						String rcode = rsMap.getString("EV_RCODE");
+						String rmsg  = rsMap.getString("EV_RMSG");
+						
+						// RFC 실패 → INSERT 대상 제외
+						if (!"S".equals(rcode)) {
+							log.debug("SAP RFC 입고 실패 [SEQ={}, MSG={}] " + itemRow.get("IV_SEQ") + " / " + rmsg );
+							continue;
+						} else {
+							itemRow.put("EV_ZEILE", rsMap.get("EV_ZEILE"));
+							itemRow.put("EV_EBELN", rsMap.get("EV_EBELN"));
+							itemRow.put("EV_MBLNR", rsMap.get("EV_MBLNR"));
+							itemRow.put("EV_EBELP", rsMap.get("EV_EBELP"));
+						}
+					}
+					
+
+					map.clonSessionData(itemRow);
+					
+					batchItemMap = new HashMap();
+					batchItemMap.putAll(itemRow);
+					batchItemList.add(batchItemMap);
+				}
+				// 입고 아이템 데이터 대량 insert
+				
+				if (batchItemList.size() > 0) {
+					execBatchList("WmsInventory.SD82SubMulti", batchItemList);
+				} else {
+					//System.out.println("입고대상 없음");
+				}
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// 입고 성공/실패 카운트
+		rsMap.put("sucCnt", batchItemList.size());
+		//rsMap.put("failCnt", );
+	
+		return rsMap;
+	}
+	
+	// 종이자원 출고처리
+	public DataMap sendSD82(DataMap map) throws SQLException {
+	    DataMap rsMap = new DataMap();
+
+	    // 1) 입력 리스트 먼저 로드
+	    List<DataMap> itemList = (map != null) ? map.getList("list") : null;
+	    
+	    if (itemList == null) itemList = new ArrayList<>();
+	    int totCnt = itemList.size();
+
+	    int sucCnt = 0;
+	    int failCnt = 0;
+
+	    // 제네릭 명시
+	    List<Map> batchItemList = new ArrayList<>();
+	    List<DataMap> failList = new ArrayList<>();
+
+	    RfcCallFunction sapConn = new RfcCallFunction();
+	    
+	    // 2) 아이템 준비(안전 파싱)
+	    for (int j = 0; j < itemList.size(); j++) {
+	        try {
+	            DataMap wrapper = itemList.get(j);
+	            DataMap itemRow = (wrapper != null) ? wrapper.getMap("map") : null;
+	            if (itemRow == null) throw new IllegalArgumentException("itemRow null at index " + j);
+
+	            int outQty   = parseIntOrDefault(itemRow.get("OUTQTY"), 0);      // "","  ","1,234","12.0" 대응
+	            double baleKg= parseDoubleOrDefault(itemRow.get("AVG_GRSWGT"), 0);  // "781.5" 대응, 평균 중량으로 출고처리
+	            BigDecimal menge = BigDecimal.valueOf(outQty).multiply(BigDecimal.valueOf(baleKg)).setScale(2, RoundingMode.HALF_UP);
+	            
+	            if (outQty == 0) {
+	            	continue;
+	            }
+	            
+	            // SAP I/F
+	            DataMap rfcMap = new DataMap();
+	            List<DataMap> tableList = new ArrayList();
+	            DataMap tRow = new DataMap();
+	            
+	            if (true) {
+	            	// ===== 필수 =====
+	    			//rfcMap.put("I_BUDAT", itemRow.get("I_BUDAT"));	// 전기일자
+	    			rfcMap.put("I_BWART", itemRow.get("SBWART"));		// 이동동유형
+	    			rfcMap.put("I_HEADTXT", itemRow.get("DOCTXT"));		// 비고
+	    			rfcMap.put("I_WERKS1",   itemRow.get("LOTA02"));	// 출고 플랜트
+	    			rfcMap.put("I_LGORT1", itemRow.get("LOTA01"));		// 출고 저장위치
+	    			rfcMap.put("I_WERKS2", itemRow.get("LOTA02_TO"));	// 입고 플랜트
+	    			
+	    			// 이전전기
+	    			if ("309".equals(itemRow.get("SBWART"))) {
+	    				rfcMap.put("I_MATNR", itemRow.get("SKUKEY_TO"));		// 자재코드 (이전 전기시 변경될 품목)
+	    			}
+
+	    			tRow.put("MATNR", itemRow.get("SKUKEY"));
+	    			tRow.put("LGORT", itemRow.get("LOTA01_TO"));
+					tRow.put("MENGE", String.valueOf(menge));
+					tRow.put("MEINS", "KG");
+			
+					tableList.add(tRow);
+	    			
+	    			// SAP 입고실적 전송 (국산/수입 구분)
+					log.debug("rfcMap > " + rfcMap.toString());
+					log.debug("tableList > " + tableList.toString());
+	    			rsMap = sapConn.RfcCallZ_MM_ROH2_GI_FROM_PDA(rfcMap, tableList);
+	    			
+	    			String rcode = rsMap.getString("EV_RCODE");
+	    			String rmsg  = rsMap.getString("EV_RMSG");
+	    			
+	    			log.debug("rsMap >" + rsMap.toString() );
+	    			// RFC 실패 → INSERT 대상 제외
+	    			if (!"S".equals(rcode)) {
+	    				log.debug("SAP RFC 출고 실패 [SEQ={}, MSG={}] " + itemRow.get("IV_SEQ") + " / " + rmsg );
+	    				continue;
+	    			} else {
+	    				// 성공 시 문서번호/연도 세팅
+	    			    itemRow.put("EV_MBLNR", rsMap.getString("EV_MBLNR"));
+	    			    itemRow.put("EV_MJAHR", rsMap.getString("EV_MJAHR"));
+	    			}
+	            }
+
+	            map.clonSessionData(itemRow);
+	            
+	            // 계산 컬럼
+	            itemRow.put("QTSIWH", outQty);
+	            itemRow.put("GRSWGT", String.valueOf(menge)); // 문자열로 저장 요구
+
+	            // 배치 입력 맵 (copy)
+	            Map<String, Object> batchItemMap = new HashMap<>();
+	            batchItemMap.putAll(itemRow);
+	            batchItemList.add(batchItemMap);
+
+	            sucCnt++; // 준비 성공 건
+	        } catch (Exception ex) {
+	            failCnt++;
+	            DataMap fail = new DataMap();
+	            fail.put("index", j);
+	            fail.put("error", ex.getMessage());
+	            failList.add(fail);
+	            // log.warn("sendSD82 prepare fail idx {}: {}", j, ex.toString());
+	        }
+	    }
+
+	    // 3) 배치 실행 (준비된 것만)
+	    if (!batchItemList.isEmpty()) {
+	        // execBatchList가 성공 건수를 리턴하지 않는다면, 여기서는 "준비 성공" 수를 성공으로 본다.
+	        // 리턴값이 있다면 sucCnt를 그 값으로 덮어쓰세요.
+	        execBatchList("WmsInventory.SD82SubMulti", batchItemList);
+	    }
+
+	    // 4) 결과 집계/반환
+	    rsMap.put("totCnt", totCnt);
+	    rsMap.put("sucCnt", sucCnt);
+	    rsMap.put("failCnt", failCnt);
+	    if (!failList.isEmpty()) rsMap.put("failList", failList);
+	    return rsMap;
+	}
+
+	/* ---------- 안전 파싱 유틸 ---------- */
+	private static int parseIntOrDefault(Object v, int def) {
+	    if (v == null) return def;
+	    String s = v.toString().trim().replace(",", "");
+	    if (s.isEmpty()) return def;
+	    // "12.0" 같은 값도 들어올 수 있음 → 반올림 규칙 선택
+	    if (s.contains(".")) return (int)Math.round(Double.parseDouble(s));
+	    return Integer.parseInt(s);
+	}
+
+	private static double parseDoubleOrDefault(Object v, double def) {
+	    if (v == null) return def;
+	    String s = v.toString().trim().replace(",", "");
+	    if (s.isEmpty()) return def;
+	    return Double.parseDouble(s);
+	}
+
+	
+	// 종이자원 입고, 출고 취소
+	public DataMap cancelSD82(DataMap map) throws SQLException {
+		
+		List<DataMap> itemList = new ArrayList<DataMap>();
+
+		String totInRsCode = "S";    // 입고테이블 insert 결과 코드
+		StringBuffer totInRsSbMsg = new StringBuffer(); // 입고테이블 insert 결과 메세지
+
+		DataMap row;
+		DataMap itemRow;
+
+		DataMap rsMap = new DataMap();                          // return Map
+
+		List<DataMap> sucList = new ArrayList<DataMap>();       // 입고 RECDH,RECDI,SAP실적 성공 목록
+		
+		String cancelRecvky = "";
+
+		itemList = map.getList("list");
+		
+		Integer succCnt = 0;
+
+		try {
+			if(itemList.size() > 0){
+				
+				RfcCallFunction sapConn = new RfcCallFunction();
+				
+				for (int i = 0; i < itemList.size(); i++) {
+					
+					itemRow = itemList.get(i).getMap("map");
+					
+					// 입고취소
+					if ("GR".equals(itemRow.getString("TASKTY_GRGI"))) {
+						// 
+						
+						DataMap rfcMap = new DataMap();
+						
+						// 2026.02.25 I/F 연동제거 (국내 입고취소)
+						if (false) {
+							// ===== 필수 =====
+							rfcMap.put("IV_WERKS", itemRow.getString("IV_WERKS"));   // 예: P100
+				            rfcMap.put("IV_BEDAT", itemRow.getString("IV_BEDAT"));   // W_DATE (YYYYMMDD 또는 YYYY-MM-DD? -> RFC 타입 BEDAT, 보통 YYYYMMDD 권장)
+				            rfcMap.put("IV_LIFNR", itemRow.getString("IV_LIFNR"));   // CUSTOMER_SAPCODE (공급업체)
+				            rfcMap.put("IV_SEQ",   itemRow.getString("IV_SEQ"));     // W_SEQ
+							
+				            rfcMap.put("IV_MJAHR", itemRow.getString("IV_MJAHR"));
+				            rfcMap.put("IV_EBELN", itemRow.getString("EV_EBELN"));
+				            rfcMap.put("IV_EBELP", itemRow.getString("EV_EBELP"));
+				            rfcMap.put("IV_MBLNR", itemRow.getString("EV_MBLNR"));
+				            rfcMap.put("IV_ZEILE", itemRow.getString("EV_ZEILE"));
+						
+						
+							// SAP 입고실적 전송 (국산/수입 구분)
+							rsMap = sapConn.RfcCallZ_MM_ROH2_CANCEL_FROM_PDA(rfcMap);
+							System.out.println(rsMap);
+							
+							String rcode = rsMap.getString("EV_RCODE");  // S/E/A
+				            String rmsg  = rsMap.getString("EV_RMSG");
+					        
+					        // RFC 실패 → INSERT 대상 제외
+					        if (!"S".equals(rcode)) {
+	
+					        	log.debug("SAP RFC 입고취소 실패 [SEQ={}, MSG={}] {} / {} " + itemRow.get("IV_SEQ") + " / " + rmsg );
+	
+					        	continue;
+					        }
+					        
+					        succCnt++;
+					        
+							map.clonSessionData(itemRow);
+						}
+						
+						// 수입입고 취소의 경우 I/F 수행
+						if (itemRow.get("EV_MBLNR") != null && !"".equals(itemRow.get("EV_MBLNR").toString().trim())) {
+							rfcMap.put("I_BLNO",  itemRow.get("EV_MBLNR"));		// B/L 관리번호 (ZFBLNO)
+							rfcMap.put("I_IVNO",  itemRow.get("EV_EBELN"));		// 통관요청 관리번호 (ZFIVNO)
+							rfcMap.put("I_BUDAT", itemRow.get("EV_MJAHR"));	// 전기일
+
+							rsMap = sapConn.RfcCallZ_IM_ROH2_CANCEL_FROM_PDA(rfcMap);
+							String rcode = rsMap.getString("EV_RCODE");
+							String rmsg  = rsMap.getString("EV_RMSG");
+							
+							// RFC 실패 → INSERT 대상 제외
+							if (!"S".equals(rcode)) {
+								log.debug("SAP RFC 입고취소 실패 [BLNO=" + rfcMap.getString("I_BLNO") + ", MSG=" + rmsg + "]");
+								continue;
+							} else {
+								itemRow.put("CANCEL_STATUS", "S");
+								itemRow.put("CANCEL_MSG", rmsg);
+							}
+						}
+						
+						succCnt++;
+						
+						map.clonSessionData(itemRow);
+						
+						itemRow.setModuleCommand("WmsInventory", "SD82");
+						commonDao.delete(itemRow);
+					}
+					// 출고취소
+					else if("GI".equals(itemRow.getString("TASKTY_GRGI"))) {
+						
+						DataMap rfcMap = new DataMap();
+						
+						// SAP 문서번호가 없는 기초재고의 경우 WMS, SAP 각각 출고취소 필요
+						if (itemRow.get("EV_MBLNR") != null && !"".equals(itemRow.get("EV_MBLNR").toString().trim())) {
+							// ===== 필수 =====
+							//rfcMap.put("I_BUDAT", itemRow.getString("I_BUDAT"));   // 취소 전기일 (미입력 시 오늘 날짜)
+							rfcMap.put("I_MJAHR", itemRow.getString("EV_MJAHR"));   // 취소할 문서 연도
+				            rfcMap.put("I_MBLNR", itemRow.getString("EV_MBLNR"));   // 취소할 문서 번호
+	
+							// SAP 입고실적 전송 (국산/수입 구분)
+							rsMap = sapConn.RfcCallZ_MM_ROH2_GI_CANCEL(rfcMap);
+							String rcode = rsMap.getString("EV_RCODE");  // S/E/A
+				            String rmsg  = rsMap.getString("EV_RMSG");
+					        
+					        // RFC 실패 → INSERT 대상 제외
+					        if (!"S".equals(rcode)) {
+					        	log.debug("SAP RFC 입고취소 실패 [SEQ={}, MSG={}] {} / {} " + itemRow.get("IV_SEQ") + " / " + rmsg );
+					        	continue;
+					        } 
+					        
+					        succCnt++;
+						}
+						
+						// 출고 이력 삭제
+						map.clonSessionData(itemRow);
+						
+						itemRow.setModuleCommand("WmsInventory", "SD82");
+						commonDao.delete(itemRow);
+					}
+					// 오류발생
+					else {
+						log.debug("TASKTY_GRGI 값 오류: {}" + itemRow.getString("TASKTY_GRGI"));
+			            continue;
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// 입고 성공/실패 카운트
+		rsMap.put("sucCnt", succCnt);
+		//rsMap.put("failCnt", );
+	
+		return rsMap;
+	}
+	
+	// 종이자원 수동입고
+	public int saveSD82(DataMap map) throws SQLException {
+
+		int count  = 0;
+		List<DataMap> list = new ArrayList<DataMap>();
+		DataMap rsMap = new DataMap();                          // return Map
+		
+		try {
+			list = map.getList("list");
+			int listSize = list.size();
+			
+			if(listSize > 0){
+				
+				RfcCallFunction sapConn = new RfcCallFunction();
+				
+				for (int i = 0; i < listSize; i++) {
+					DataMap row = list.get(i).getMap("map");
+					map.clonSessionData(row);
+					
+					row.setModuleCommand("WmsInventory", "SD82");
+					
+					String  gRowStatus = row.getString(CommonConfig.GRID_ROW_STATE_ATT);
+					Integer qtsiwh = row.getInt("QTSIWH");
+					Integer moveqt = row.getInt("MOVEQT");
+					double baleKg= parseDoubleOrDefault(row.get("AVG_GRSWGT"), 0);  // "781.5" 대응, 평균 중량으로 출고처리
+					
+					DataMap rfcMap = new DataMap();
+					
+					switch (gRowStatus) {
+					case "C":
+
+						// 수입인경우 SAP I/F 수행처리 필요
+						if (!"".equals(row.get("BLNO"))) {
+							
+							rfcMap.put("I_BLNO",  row.get("BLNO"));		// B/L 관리번호 (ZFBLNO)
+							rfcMap.put("I_IVNO",  row.get("IVNO"));		// 통관요청 관리번호 (ZFIVNO)
+							rfcMap.put("I_BUDAT", row.get("LOTA12"));	// 전기일
+
+							List<DataMap> tableList = new ArrayList<>();
+							DataMap tRow = new DataMap();
+							
+							tRow.put("EBELN", row.get("EBELN"));		// 구매 문서 번호	(EBELN)
+							tRow.put("EBELP", row.get("EBELP"));		// 구매 문서 품목 번호(EBELP)
+							tRow.put("FBLIT", row.get("ZFBLIT"));		// B/L 품목번호	(ZFBLIT)
+							tRow.put("MENGE", row.get("GRSWGT"));		// 수량			(GRMENGE)
+							tRow.put("LGORT", row.get("LOTA01"));		// 저장 위치
+
+							tableList.add(tRow);
+
+							rsMap = sapConn.RfcCallZ_IM_ROH2_GR_FROM_PDA(rfcMap, tableList);
+							String rcode = rsMap.getString("EV_RCODE");
+							String rmsg  = rsMap.getString("EV_RMSG");
+							
+							// RFC 실패 → INSERT 대상 제외
+							if (!"S".equals(rcode)) {
+								log.debug("SAP RFC 수입입고 실패 [SEQ={}, MSG={}] " + row.get("IV_SEQ") + " / " + rmsg );
+								continue;
+							} else {
+								row.put("EV_MBLNR", row.get("BLNO"));		// B/L 관리번호 (ZFBLNO)
+								row.put("EV_EBELN", row.get("IVNO"));		// 통관요청 관리번호 (ZFIVNO)
+								row.put("EV_MJAHR", row.get("LOTA12"));		// 전기일
+								
+								commonDao.insert(row);
+								count++;
+							}
+							
+						// 국내 입고
+						} else {
+							
+						}
+	
+						
+						break;
+					case "U":
+						
+						// 전체이동
+						if (qtsiwh == moveqt) {
+							row.setModuleCommand("WmsInventory", "SD82_MOVESTK");
+							count += commonDao.update(row);
+						
+						// 부분이동
+						} else {
+							// 이동수량 INSERT
+							// 2건이상의 ROW가 존재한느경우 반복문을 통해 이동수량만큼 ROW만큼 차감 처리하기 또는 전체이동만 제공하기
+							row.put("MOVEQT", moveqt);
+							row.put("GRSWGT", moveqt * baleKg);
+							row.setModuleCommand("WmsInventory", "SD82_SELECT");
+							commonDao.insert(row);
+							
+							// 남은수량 적용 (기초재고 STOKKY = 00000 재고는 그룹핑된 데이터라 다건 갱신발생 가능성 존재)
+							row.put("LOCATG", "");
+							row.put("QTSIWH", qtsiwh-moveqt);
+							row.put("GRSWGT", (qtsiwh-moveqt) * baleKg);
+							row.setModuleCommand("WmsInventory", "SD82_MOVESTK");
+							count += commonDao.update(row);
+						}
+						break;
+					case "D":
+						//count += commonDao.delete(row);
+						break;
+					default:
+						break;
+					}
+				}
+			}
+			
+		} catch (Exception e) {
+			throw new SQLException(e.getMessage());
+		}
+		return count;
+	}
+	
+	@Transactional
+	public void execBatchList(String moduleCommand, List<Map> batchList) throws SQLException {
+		
+		log.debug("batch start - batchList.size() : " + batchList.size());
+		//DataMap rsMap = new DataMap();
+		int limitCnt = 100;
+		int loopSize = (batchList.size()/limitCnt);
+		int rmSize = (batchList.size()%limitCnt);
+		
+		if( batchList!=null && batchList.size()>0 && loopSize==0) {
+			loopSize=1;
+			rmSize=0;
+		}
+		
+		log.debug("batch loopSize : " + loopSize);
+		log.debug("batch rmSize : " + rmSize);
+		
+		for (int k = 0; k < loopSize; k++) {
+			
+			if(batchList.size()<limitCnt) {
+				commonDao.insert(moduleCommand, batchList.subList( (k*limitCnt), batchList.size() ) );
+				log.debug( k + " - batch - start : " + (k*limitCnt) + " - end : " + batchList.size() );
+			}else {
+				commonDao.insert(moduleCommand, batchList.subList( (k*limitCnt), (((k+1)*limitCnt)) ) );
+				log.debug( k + " - batch - start : " + (k*limitCnt) + " - end : " + (((k+1)*limitCnt)) );
+			}
+			
+			if( k==(loopSize-1) && rmSize!=0 ) {
+				commonDao.insert(moduleCommand, batchList.subList( ((k+1)*limitCnt), batchList.size()) );
+				log.debug( k + " - batch last - start : " + ((k+1)*limitCnt) + " - end : " + batchList.size() );
+			}
+		}
+		log.debug("batch end - batchList.size() : " + batchList.size());
+		
+	}
+}

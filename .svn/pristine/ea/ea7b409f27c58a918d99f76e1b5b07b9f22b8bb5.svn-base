@@ -1,0 +1,558 @@
+package project.wms.service;
+
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.dao.CommonDAO;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import org.springframework.transaction.PlatformTransactionManager;
+
+@Service
+public class WmsSystemService {
+
+	static final Logger log = LogManager.getLogger(WmsSystemService.class.getName());
+	
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired 
+	private PlatformTransactionManager transactionManager;
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap savePDIS01(DataMap map) throws Exception {
+		DataMap param = map.getMap("map");
+		
+		String  LOTA01 = param.getString( "LOTA01");
+		String ALOTA01 = param.getString("ALOTA01");
+		String  LOTA02 = param.getString( "LOTA02");
+		String ALOTA02 = param.getString("ALOTA02");
+		
+		map.clonSessionData(param);
+		param.setModuleCommand("WmsSystem", "INTSTKP");
+		
+		List<DataMap> dataList = commonDao.getList(param);
+		for (DataMap data : dataList) {
+			if (StringUtils.equals("V", data.getString("PHYCHK"))) {
+				throw new Exception("이미 실사가 완료된 재고입니다.");
+			}
+		}
+		
+		DataMap res = new DataMap();
+		/* 플랜트, 저장위치가 기존정보와 동일한 경우 UPDATE, 아닌경우 INSERT */
+		if (StringUtils.equals(LOTA01, ALOTA01) &&
+			StringUtils.equals(LOTA02, ALOTA02)
+		) {
+			res.put("result", commonDao.update(param));
+		} else {
+			res.put("result", commonDao.insert(param));
+		}
+		return res;
+	}
+	
+	@Transactional(rollbackFor = Exception.class)
+	public DataMap canclePDIS03(DataMap map) throws SQLException {
+		DataMap param = map.getMap("map");
+		String  PHYCPY = param.getString( "PHYCPY");
+		
+		map.clonSessionData(param);
+		param.setModuleCommand("WmsSystem", "PDIS03");
+		
+		DataMap res = new DataMap();
+		/* 플랜트, 저장위치가 기존정보와 동일한 경우 UPDATE, 아닌경우 INSERT */
+		if (StringUtils.equals(PHYCPY, "V")) {
+			res.put("result", commonDao.delete(param));
+		} else {
+			res.put("result", commonDao.update(param));
+		}
+		return res;
+	}
+	
+	@Transactional
+	public int saveIS01EXCEL(DataMap map) throws SQLException, Exception {
+		
+		// 기초재고셋업 excel 업로드
+		List<DataMap> excelList = map.getList("excelList");
+		DataMap excelRow = new DataMap();
+		DataMap headRow = new DataMap();
+		
+		List<Map> batchItemList = new ArrayList();             // Batch Insert Item List
+		Map batchItemMap = new HashMap();                      // Batch Insert Item Map
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		// default 기초재고번호 채번 및 재고조정 입고 location 조회
+		map.setModuleCommand(sqlMapNamespace, "IS01");
+		DataMap infoRow = commonDao.getMap(map);
+		
+		String intseq = infoRow.getString("INTSEQ");
+		
+		headRow.setModuleCommand(sqlMapNamespace, "IS01_EXCE_HEAD");
+		headRow.put("INTSEQ", intseq);
+		headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		commonDao.insert(headRow);
+		
+		int count = 0;
+		
+		for(int i = 0; i < excelList.size(); i++) {
+			
+			excelRow = excelList.get(i).getMap("map");
+			
+			excelRow.put("OWNRKY", map.get("OWNRKY"));
+			excelRow.put("INTSEQ", intseq);
+			excelRow.put("STKSEQ", (count+1));
+			
+			String LOTA11 = excelRow.getString("LOTA11").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			String LOTA12 = excelRow.getString("LOTA12").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			String LOTA13 = excelRow.getString("LOTA13").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA11 : " + LOTA11 );
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA12 : " + LOTA12 );
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA13 : " + LOTA13 );
+			
+			excelRow.put("LOTA11", LOTA11 );
+			excelRow.put("LOTA12", LOTA12 );
+			excelRow.put("LOTA13", LOTA13 );
+			
+			excelRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			/*
+			String AREAKY = excelRow.getString("AREAKY").trim();
+			String ZONEKY = excelRow.getString("ZONEKY").trim();
+			String LOCAKY = excelRow.getString("LOCAKY").trim();
+			
+			if("".equals(AREAKY) && "".equals(ZONEKY) && "".equals(LOCAKY)) {
+				excelRow.put("AREAKY", infoRow.getString("AREAKY"));
+				excelRow.put("ZONEKY", infoRow.getString("ZONEKY"));
+				excelRow.put("LOCAKY", infoRow.getString("LOCAKY"));
+			}
+			*/
+			//excelRow.setModuleCommand(sqlMapNamespace, "saveGR98EXCEL");
+			//commonDao.insert(excelRow);
+			
+			batchItemMap = new HashMap();
+			batchItemMap.putAll(excelRow);
+			batchItemList.add(batchItemMap);
+			
+			count ++;
+		}
+		
+		// 기초재고 아이템 데이터 대량 insert
+		inboundService.execBatchList(sqlMapNamespace+"."+"IS01_EXCE_ITEM_BATCH", batchItemList);
+		
+		return count;
+	}
+	
+	@Transactional
+	public DataMap inspectionIntstki(DataMap map) throws SQLException {
+		
+		DataMap row = new DataMap();
+		DataMap rstMap = new DataMap();
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		String O_SUCCESSCNT = "";
+		String O_FAILCNT = "";
+		String O_ERRORCODE = "";
+		String O_ERRORMESG = "";
+		
+		try {
+			
+			row.put("OWNRKY", map.get("OWNRKY"));
+			row.put("INTSEQ", map.get("INTSEQ"));
+			row.put("USERID", map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand(sqlMapNamespace, "INSPECTION_IS01_PROC_CALL");
+			commonDao.update(row);
+			
+			O_SUCCESSCNT = row.getString("O_SUCCESSCNT");
+			O_FAILCNT = row.getString("O_FAILCNT");
+			O_ERRORCODE = row.getString("O_ERRORCODE");
+			O_ERRORMESG = row.getString("O_ERRORMESG");
+			
+			if(!"1".equals(O_ERRORCODE)) {
+				rstMap.put("ERRCODE", "F");
+				rstMap.put("ERRMSG", O_ERRORMESG);
+				rstMap.put("SUCCESSCNT", O_SUCCESSCNT);
+				rstMap.put("FAILCNT", O_FAILCNT);
+				return rstMap;
+			}
+			
+			log.debug("INSPECTION_IS01_PROC_CALL After : " + row);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			rstMap.put("ERRCODE", "F");
+			rstMap.put("ERRMSG", e.getMessage());
+			rstMap.put("SUCCESSCNT", "0");
+			rstMap.put("FAILCNT", "0");
+			return rstMap;
+		}
+		
+		rstMap.put("ERRCODE", "S");
+		rstMap.put("ERRMSG", "Success");
+		rstMap.put("SUCCESSCNT", O_SUCCESSCNT);
+		rstMap.put("FAILCNT", O_FAILCNT);
+		
+		return rstMap;
+	}
+	
+	@Transactional
+	public DataMap palletizingIntstki(DataMap map) throws SQLException {
+		
+		DataMap row = new DataMap();
+		DataMap rstMap = new DataMap();
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		String O_SUCCESSCNT = "";
+		String O_FAILCNT = "";
+		String O_ERRORCODE = "";
+		String O_ERRORMESG = "";
+		
+		try {
+			
+			row.put("OWNRKY", map.get("OWNRKY"));
+			row.put("INTSEQ", map.get("INTSEQ"));
+			row.put("USERID", map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand(sqlMapNamespace, "PALLETIZING_IS01_PROC_CALL");
+			commonDao.update(row);
+			
+			log.debug("PALLETIZING_IS01_PROC_CALL After : " + row);
+			
+			O_ERRORCODE = row.getString("O_ERRORCODE");
+			O_ERRORMESG = row.getString("O_ERRORMESG");
+			
+			if(!"1".equals(O_ERRORCODE)) {
+				rstMap.put("ERRCODE", "F");
+				rstMap.put("ERRMSG", O_ERRORMESG);
+				return rstMap;
+			}
+			
+			
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			rstMap.put("ERRCODE", "F");
+			rstMap.put("ERRMSG", e.getMessage());
+			return rstMap;
+		}
+		
+		rstMap.put("ERRCODE", "S");
+		rstMap.put("ERRMSG", O_ERRORMESG);
+		
+		return rstMap;
+	}
+	
+	
+	@Transactional
+	public DataMap deleteIS01(DataMap map) throws SQLException {
+		
+		DataMap rsMap = new DataMap();                         	// return Map
+		
+		List<DataMap> head = map.getList("head"); 				// 입고번호 헤더
+
+		DataMap headRow = new DataMap();
+		DataMap itemRow = new DataMap();
+		
+		int count = 0;
+		
+		StringBuffer sb = new StringBuffer();
+		
+		// validation check
+		for(int i=0;i<head.size();i++){
+			headRow = head.get(i).getMap("map");
+			
+			String intseq = headRow.getString("INTSEQ");
+			
+			if(sb.length() > 0) sb.append(" , ");
+			
+			sb.append(" '").append(intseq).append("' ");
+			
+		}
+		
+		map.setModuleCommand("WmsSystem", "SI01_DELETE"); // 쿼리키값 넣을것
+		map.put("INTSEQS", sb.toString());
+		List<DataMap> validList = commonDao.getValidation(map);
+		if(validList.size() > 0){
+			//DataMap valid = validList.get(0);
+			//return valid;
+			rsMap.put("count",count);
+			rsMap.put("RESULTMSG",validList.get(0).getString("RESULTMSG"));
+			return rsMap;
+		}
+		
+		// 데이터 삭제
+		for(int i=0;i<head.size();i++){
+			headRow = head.get(i).getMap("map");
+			
+			// 기초재고 TEMP - Pallet 삭제
+			headRow.setModuleCommand("WmsSystem", "IS01_INTSTKP");
+			headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			commonDao.delete(headRow);
+			
+			// 기초재고 TEMP - Item 삭제
+			headRow.setModuleCommand("WmsSystem", "IS01_INTSTKI");
+			headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			commonDao.delete(headRow);
+			
+			// 기초재고 TEMP - Header 삭제
+			headRow.setModuleCommand("WmsSystem", "IS01_INTSTKH");
+			headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			commonDao.delete(headRow);
+			
+			count ++;
+		}
+		
+		rsMap.put("count",count);
+		rsMap.put("RESULTMSG","OK");
+		return rsMap;
+		
+	}
+	
+	public List<DataMap> saveSI02Proc(DataMap map) throws Exception {
+		
+		List<DataMap> list = map.getList("head");
+		
+		DataMap row = new DataMap();
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		List<DataMap> rsList = new ArrayList<DataMap>();
+		
+		for(int i=0; i < list.size(); i++) {
+			
+			row = list.get(i).getMap("map");
+			
+			TransactionDefinition transactionDefinition = new DefaultTransactionDefinition();
+	        TransactionStatus transactionStatus = transactionManager.getTransaction(transactionDefinition);
+	        transactionStatus.createSavepoint();
+	        
+	        int isSerializable = transactionDefinition.ISOLATION_SERIALIZABLE;
+	        
+	        int islevel = transactionDefinition.getIsolationLevel();
+	        
+	        log.debug("islevel : " + islevel + " - isSerializable : " + isSerializable );
+	        
+	        row.setModuleCommand(sqlMapNamespace, "SAVE_SI02_BF_STATE"); 
+	        commonDao.update(row);
+	        
+	        
+	        row.put("OWNRKY", map.get("OWNRKY"));
+			row.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand(sqlMapNamespace, "SAVE_SI02_PROC_CALL"); 
+			commonDao.getMap(row);
+			
+			String ERRORCODE = row.getString("ERRORCODE");
+			String ERRORMESG = row.getString("ERRORMESG");
+			
+			log.debug("---------------------------------------------------------------------------------------------------------------------------");
+			log.debug("WmsSystemService.saveGRSI02Proc - i  " + i+ " - INTSEQ : " + row.getString("INTSEQ") + " - WAREKY : " + row.getString("WAREKY") + " - LOTA02 : " + row.getString("LOTA02") + " - SKUG05 : " + row.getString("SKUG05"));
+			log.debug(i + " - ERRORCODE : " + ERRORCODE);
+			log.debug(i + " - ERRORMESG : " + ERRORMESG);
+			if("1".equals(ERRORCODE)) {
+				transactionManager.commit(transactionStatus);
+				log.debug(i + " - commit");
+			}else {
+				
+		        row.setModuleCommand(sqlMapNamespace, "SAVE_SI02_FAIL_STATE"); 
+		        commonDao.update(row);
+				
+				transactionManager.rollback(transactionStatus);
+				log.debug(i + " - rollback");
+			}
+			log.debug("---------------------------------------------------------------------------------------------------------------------------");
+			
+			rsList.add(row);
+			
+		}
+		
+		return rsList;
+	}
+	
+	
+	@Transactional
+	public DataMap getPsKlogiToWms(DataMap map) throws SQLException {
+		
+		DataMap row = new DataMap();
+		DataMap rstMap = new DataMap();
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		String O_TOTCNT = "";
+		String O_SUCCESSCNT = "";
+		String O_FAILCNT = "";
+		String O_ERRORCODE = "";
+		String O_ERRORMESG = "";
+		
+		try {
+			
+			row.put("OWNRKY", map.get("OWNRKY"));
+			row.put("USERID", map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand(sqlMapNamespace, "PS_KLOGI_TO_WMS_IS01_PROC_CALL");
+			commonDao.update(row);
+			
+			O_TOTCNT = row.getString("O_TOTCNT");
+			O_SUCCESSCNT = row.getString("O_SUCCESSCNT");
+			O_FAILCNT = row.getString("O_FAILCNT");
+			O_ERRORCODE = row.getString("O_ERRORCODE");
+			O_ERRORMESG = row.getString("O_ERRORMESG");
+			
+			log.debug("PS_KLOGI_TO_WMS_IS01_PROC_CALL O_ERRORCODE : " + O_ERRORCODE);
+			log.debug("PS_KLOGI_TO_WMS_IS01_PROC_CALL O_ERRORMESG : " + O_ERRORMESG);
+			
+			if(!"1".equals(O_ERRORCODE)) {
+				rstMap.put("ERRCODE", "F");
+				rstMap.put("ERRMSG", O_ERRORMESG);
+				rstMap.put("O_TOTCNT", O_TOTCNT);
+				rstMap.put("SUCCESSCNT", O_SUCCESSCNT);
+				rstMap.put("FAILCNT", O_FAILCNT);
+				return rstMap;
+			}
+			
+			log.debug("PS_KLOGI_TO_WMS_IS01_PROC_CALL After : " + row);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			rstMap.put("ERRCODE", "F");
+			rstMap.put("ERRMSG", e.getMessage());
+			rstMap.put("O_TOTCNT", "0");
+			rstMap.put("SUCCESSCNT", "0");
+			rstMap.put("FAILCNT", "0");
+			return rstMap;
+		}
+		
+		rstMap.put("ERRCODE", "S");
+		rstMap.put("ERRMSG", O_ERRORMESG);
+		rstMap.put("O_TOTCNT", O_TOTCNT);
+		rstMap.put("SUCCESSCNT", O_SUCCESSCNT);
+		rstMap.put("FAILCNT", O_FAILCNT);
+		
+		return rstMap;
+	}
+	
+	
+	@Transactional
+	public int saveIS03EXCEL(DataMap map) throws SQLException, Exception {
+		
+		// 기초재고셋업 excel 업로드
+		List<DataMap> excelList = map.getList("excelList");
+		DataMap excelRow = new DataMap();
+		DataMap headRow = new DataMap();
+		
+		List<Map> batchItemList = new ArrayList();             // Batch Insert Item List
+		Map batchItemMap = new HashMap();                      // Batch Insert Item Map
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		// default 기초재고번호 채번 및 재고조정 입고 location 조회
+		map.setModuleCommand(sqlMapNamespace, "IS01");
+		DataMap infoRow = commonDao.getMap(map);
+		
+		String intseq = infoRow.getString("INTSEQ");
+		
+		headRow.setModuleCommand(sqlMapNamespace, "IS01_EXCE_HEAD");
+		headRow.put("INTSEQ", intseq);
+		headRow.put("SKUGBN", "10"); // 제품군 구분(10:PS, 20:OTHERS)
+		headRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		commonDao.insert(headRow);
+		
+		int count = 0;
+		
+		for(int i = 0; i < excelList.size(); i++) {
+			
+			excelRow = excelList.get(i).getMap("map");
+			
+			excelRow.put("OWNRKY", map.get("OWNRKY"));
+			excelRow.put("INTSEQ", intseq);
+			excelRow.put("STKSEQ", (count+1));
+			
+			String LOTA11 = excelRow.getString("LOTA11").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			String LOTA12 = excelRow.getString("LOTA12").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			String LOTA13 = excelRow.getString("LOTA13").replaceAll("[.]", "").replaceAll("-", "").replaceAll("/", "").trim();
+			
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA11 : " + LOTA11 );
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA12 : " + LOTA12 );
+			//log.debug("saveIS01EXCEL - i [" + i + "] LOTA13 : " + LOTA13 );
+			
+			excelRow.put("LOTA11", LOTA11 );
+			excelRow.put("LOTA12", LOTA12 );
+			excelRow.put("LOTA13", LOTA13 );
+			
+			excelRow.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+			
+			batchItemMap = new HashMap();
+			batchItemMap.putAll(excelRow);
+			batchItemList.add(batchItemMap);
+			
+			count ++;
+		}
+		
+		// 기초재고 아이템 데이터 대량 insert
+		inboundService.execBatchList(sqlMapNamespace+"."+"IS01_EXCE_ITEM_BATCH", batchItemList);
+		
+		return count;
+	}
+	
+	@Transactional
+	public DataMap palletizingIntstkiIS03(DataMap map) throws SQLException {
+		
+		DataMap row = new DataMap();
+		DataMap rstMap = new DataMap();
+		
+		String sqlMapNamespace = "WmsSystem";
+		
+		String O_SUCCESSCNT = "";
+		String O_FAILCNT = "";
+		String O_ERRORCODE = "";
+		String O_ERRORMESG = "";
+		
+		try {
+			
+			row.put("OWNRKY", map.get("OWNRKY"));
+			row.put("INTSEQ", map.get("INTSEQ"));
+			row.put("USERID", map.get(CommonConfig.SES_USER_ID_KEY));
+			row.setModuleCommand(sqlMapNamespace, "PALLETIZING_IS03_PROC_CALL");
+			commonDao.update(row);
+			
+			O_ERRORCODE = row.getString("O_ERRORCODE");
+			O_ERRORMESG = row.getString("O_ERRORMESG");
+			
+			if(!"1".equals(O_ERRORCODE)) {
+				rstMap.put("ERRCODE", "F");
+				rstMap.put("ERRMSG", O_ERRORMESG);
+				return rstMap;
+			}
+			
+			log.debug("PALLETIZING_IS01_PROC_CALL After : " + row);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			rstMap.put("ERRCODE", "F");
+			rstMap.put("ERRMSG", e.getMessage());
+			return rstMap;
+		}
+		
+		rstMap.put("ERRCODE", "S");
+		rstMap.put("ERRMSG", "Success");
+		
+		return rstMap;
+	}
+	
+}

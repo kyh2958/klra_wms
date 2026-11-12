@@ -1,0 +1,739 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<style>
+@page {
+    size: A4;
+    margin: 5mm;
+    size: landscape;
+}
+
+body #moveSheet {
+    margin: 0;
+    font-family: "Malgun Gothic", Arial, sans-serif;
+    font-size: 12px;
+}
+
+#moveSheet.sheet {
+    display: flex;
+    width: 100%;
+    background-color: white;
+}
+
+#moveSheet .slip {
+    width: 25%;
+    box-sizing: border-box;
+    border-right: 2px dashed #000;
+    padding: 10px;
+}
+
+#moveSheet .slip:last-child {
+    border-right: none;
+}
+
+#moveSheet .header {
+    text-align: center;
+    margin-bottom: 4px;
+    border-top:none;
+    border-left:none;
+    border-right:none;
+}
+
+#moveSheet .header .title{
+    font-size: 14px
+}
+
+#moveSheet .logo img {
+    width:70%
+}
+
+#moveSheet .barcode_header, #moveSheet .barcode_footer {
+    border: 0px solid #000;
+    margin: auto;
+    text-align: center;
+    font-size: 10px;
+}
+
+#moveSheet .title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+#moveSheet table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#moveSheet th, td {
+    border: 1px solid #000;
+    padding: 2px;
+    height: 25px;
+    text-align: center;
+}
+
+#moveSheet .x2H {
+    height: 50px;
+}
+
+#moveSheet th {
+    background: #f5f5f5;
+    font-weight: normal;
+    text-align: left;
+    width: 10%;
+}
+
+#moveSheet .section-title {
+    text-align: center;
+    font-weight: bold;
+    background: #eee;
+}
+
+#moveSheet .section-title td{
+	writing-mode: vertical-lr;
+	letter-spacing: 5px;
+}
+
+#moveSheet th, #moveSheet td {
+    text-align: center;+
+}
+
+#moveSheet .footer {
+    margin-top: 4px;
+    text-align: center;
+    font-size: 10px;
+}
+</style>
+<script type="text/javascript">
+
+var contents;
+var retBody;
+
+$(function(){
+	
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			url : "/KppIF/list/json/KPP_TB_IF_DATA.data",
+			gridMobileType : true,
+			colorType : true
+		});
+		
+		
+		searchList('Search');
+	});
+	
+	function searchList(type){
+		var param = inputList.setRangeParam("searchArea");
+		param.put("SKUKEY", 'INIT');
+		param.put("BARCOD", 'INIT');
+
+		gridList.gridList({
+			id : "gridList",
+			param : param
+		});  
+		
+	}
+	
+	// DB조회된 이동전표값으로 반복문 처리하여 
+	$("#print").on('click', function(){
+		var $div = $("#moveSheet .slip");
+		
+		//$("#bcTarget").barcode("1234567890128", "ean13");  
+		$div.find(".barcode_header").barcode('01099992958', 'code128', {barWidth:2, barHeight:35})
+		$div.find(".logo img").attr("src", '/mobile/img/logo_kpp.png')
+		$div.find(".sendDate").text('2026.01.26')
+		$div.find(".companyFrom").text('발송회사')
+		$div.find(".nameFrom").text('이삭')
+		$div.find(".phoneFrom").text('010-1234-1234')
+		
+		$div.find(".companyTo").text('도착')
+		$div.find(".nameTo").text('일삭')
+		$div.find(".phoneTo").text('010-5555-6666')
+		
+		$div.find(".company").text('아윤이네')
+		$div.find(".carNo").text('02가 1234')
+		$div.find(".name").text('김윤호')
+		$div.find(".phone").text('010-9999-2958')
+		$div.find(".barcode_footer").barcode('910731-1', 'code128', {barWidth:2, barHeight:30})
+		
+		setTimeout(function(){
+			
+			printWindow('moveSheet');
+			
+		}, 200)
+		
+	})
+	
+})
+
+
+function printWindow(div) {
+    prtContent = document.getElementById(div);
+    window.onbeforeprint = beforePrint;
+    window.onafterprint = afterPrint;
+    window.print();
+}
+
+function beforePrint(){
+	$("#print").hide()
+    //initBody = document.body.innerHTML;
+    //document.body.innerHTML = contents.innerHTML;
+}
+
+function afterPrint(){
+	$("#print").show()
+    //document.body.innerHTML = retBody;
+}
+
+
+const eventSource = new EventSource("/api/sse/subscribe?topic=DL081");
+
+eventSource.addEventListener("WmsLoginController.login", function (event) {
+	
+	const payload = JSON.parse(event.data);
+
+    console.dir(payload)
+
+    payload.data.forEach(row => {
+        console.log(row);
+    });
+});
+
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<script type="text/javascript" src="/mobile/js/jquery-barcode.min.js"></script>  
+<!-- content -->
+<div class="content_wrap">
+    <div class="content_inner">
+        <div class="sheet" id='moveSheet'>
+
+		    <!-- 발송처 -->
+		    <div class="slip">
+			    <table class="slip-table">
+			        <!-- HEADER -->
+			        <tr>
+			            <td colspan="6" class="header">
+			                <div class="logo"><img src='/mobile/img/logo_aj.png'></div>
+			                <div class="barcode_header">BARCODE</div>
+			                <div class="title">파렛트 이동전표<br>(발송처용)</div>
+			            </td>
+			        </tr>
+			
+			        <!-- 발송일 -->
+			        <tr>
+			            <th colspan="2">발송일</th>
+			            <td colspan="4" class="sendDate">2014.03.14</td>
+			        </tr>
+			
+			        <!-- 발송처 -->
+			        <tr class="section-title">
+			            <td rowspan="4">발송지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyFrom x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameFrom">이상범</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneFrom">031-700-</td>
+			        </tr>
+			
+			        <!-- 도착지 -->
+			        <tr>
+			            <th colspan="2">도착일</th>
+			            <td colspan="4" class="reciveDate">2026.01.31</td>
+			        </tr>
+			        <tr class="section-title">
+			            <td rowspan="4">도착지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyTo x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameTo">xxx</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneTo">010-xxxx-xxxx</td>
+			        </tr>
+			
+			        <!-- 운송회사 -->
+			        <tr class="section-title">
+			            <td rowspan="5">운송회사</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="company"></td>
+			        </tr>
+			        <tr>
+			            <th>차량번호</th>
+			            <td colspan="4" class="carNo">5213</td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="4" class="name"></td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="3" class="phone"></td>
+			            <td>(인)</td>
+			        </tr>
+			
+			        <!-- 수량 -->
+			        <tr>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			
+			        <!-- 품목 / 비고 -->
+			        <tr>
+			            <th colspan="2">품목</th>
+			            <td colspan="4"></td>
+			        </tr>
+			        <tr>
+			            <th colspan="2">비고</th>
+			            <td colspan="4" class='x2H'></td>
+			        </tr>
+			
+			        <!-- FOOTER -->
+			        <tr>
+			            <td colspan="6" class="footer">
+			                <div>http://edi.ajups.com | 1600-5599(대표)</div>
+			                <div>(02)6363-9883, (02)6363-9887</div>
+			                <div class="barcode_footer">BARCODE</div>
+			            </td>
+			        </tr>
+			    </table>
+			</div>
+			
+			<!-- 파렛트회사용 -->
+		    <div class="slip">
+			    <table class="slip-table">
+			        <!-- HEADER -->
+			        <tr>
+			            <td colspan="6" class="header">
+			                <div class="logo"><img src='/mobile/img/logo_aj.png'></div>
+			                <div class="barcode_header">BARCODE</div>
+			                <div class="title">파렛트 이동전표<br>(파렛트회사용)</div>
+			            </td>
+			        </tr>
+			
+			        <!-- 발송일 -->
+			        <tr>
+			            <th colspan="2">발송일</th>
+			            <td colspan="4" class="sendDate">2014.03.14</td>
+			        </tr>
+			
+			        <!-- 발송처 -->
+			        <tr class="section-title">
+			            <td rowspan="4">발송지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyFrom x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameFrom">이상범</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneFrom">031-700-</td>
+			        </tr>
+			
+			        <!-- 도착지 -->
+			        <tr>
+			            <th colspan="2">도착일</th>
+			            <td colspan="4" class="reciveDate">2026.01.31</td>
+			        </tr>
+			        <tr class="section-title">
+			            <td rowspan="4">도착지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyTo x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameTo">xxx</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneTo">010-xxxx-xxxx</td>
+			        </tr>
+			
+			        <!-- 운송회사 -->
+			        <tr class="section-title">
+			            <td rowspan="5">운송회사</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="company"></td>
+			        </tr>
+			        <tr>
+			            <th>차량번호</th>
+			            <td colspan="4" class="carNo">5213</td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="4" class="name"></td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="3" class="phone"></td>
+			            <td>(인)</td>
+			        </tr>
+			
+			        <!-- 수량 -->
+			        <tr>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			
+			        <!-- 품목 / 비고 -->
+			        <tr>
+			            <th colspan="2">품목</th>
+			            <td colspan="4"></td>
+			        </tr>
+			        <tr>
+			            <th colspan="2">비고</th>
+			            <td colspan="4" class='x2H'></td>
+			        </tr>
+			
+			        <!-- FOOTER -->
+			        <tr>
+			            <td colspan="6" class="footer">
+			                <div>http://edi.ajups.com | 1600-5599(대표)</div>
+			                <div>(02)6363-9883, (02)6363-9887</div>
+			                <div class="barcode_footer">BARCODE</div>
+			            </td>
+			        </tr>
+			    </table>
+			</div>
+			
+			<!-- 운송회사용 -->
+		    <div class="slip">
+			    <table class="slip-table">
+			        <!-- HEADER -->
+			        <tr>
+			            <td colspan="6" class="header">
+			                <div class="logo"><img src='/mobile/img/logo_aj.png'></div>
+			                <div class="barcode_header">BARCODE</div>
+			                <div class="title">파렛트 이동전표<br>(운송회사용)</div>
+			            </td>
+			        </tr>
+			
+			        <!-- 발송일 -->
+			        <tr>
+			            <th colspan="2">발송일</th>
+			            <td colspan="4" class="sendDate">2014.03.14</td>
+			        </tr>
+			
+			        <!-- 발송처 -->
+			        <tr class="section-title">
+			            <td rowspan="4">발송지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyFrom x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameFrom">이상범</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneFrom">031-700-</td>
+			        </tr>
+			
+			        <!-- 도착지 -->
+			        <tr>
+			            <th colspan="2">도착일</th>
+			            <td colspan="4" class="reciveDate">2026.01.31</td>
+			        </tr>
+			        <tr class="section-title">
+			            <td rowspan="4">도착지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyTo x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameTo">xxx</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneTo">010-xxxx-xxxx</td>
+			        </tr>
+			
+			        <!-- 운송회사 -->
+			        <tr class="section-title">
+			            <td rowspan="5">운송회사</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="company"></td>
+			        </tr>
+			        <tr>
+			            <th>차량번호</th>
+			            <td colspan="4" class="carNo">5213</td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="4" class="name"></td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="3" class="phone"></td>
+			            <td>(인)</td>
+			        </tr>
+			
+			        <!-- 수량 -->
+			        <tr>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			
+			        <!-- 품목 / 비고 -->
+			        <tr>
+			            <th colspan="2">품목</th>
+			            <td colspan="4"></td>
+			        </tr>
+			        <tr>
+			            <th colspan="2">비고</th>
+			            <td colspan="4" class='x2H'></td>
+			        </tr>
+			
+			        <!-- FOOTER -->
+			        <tr>
+			            <td colspan="6" class="footer">
+			                <div>http://edi.ajups.com | 1600-5599(대표)</div>
+			                <div>(02)6363-9883, (02)6363-9887</div>
+			                <div class="barcode_footer">BARCODE</div>
+			            </td>
+			        </tr>
+			    </table>
+			</div>
+			
+			<!-- 도착지용 -->
+		    <div class="slip">
+			    <table class="slip-table">
+			        <!-- HEADER -->
+			        <tr>
+			            <td colspan="6" class="header">
+			                <div class="logo"><img src='/mobile/img/logo_aj.png'></div>
+			                <div class="barcode_header">BARCODE</div>
+			                <div class="title">파렛트 이동전표<br>(도착지용)</div>
+			            </td>
+			        </tr>
+			
+			        <!-- 발송일 -->
+			        <tr>
+			            <th colspan="2">발송일</th>
+			            <td colspan="4" class="sendDate">2014.03.14</td>
+			        </tr>
+			
+			        <!-- 발송처 -->
+			        <tr class="section-title">
+			            <td rowspan="4">발송지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyFrom x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameFrom">이상범</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneFrom">031-700-</td>
+			        </tr>
+			
+			        <!-- 도착지 -->
+			        <tr>
+			            <th colspan="2">도착일</th>
+			            <td colspan="4" class="reciveDate">2026.01.31</td>
+			        </tr>
+			        <tr class="section-title">
+			            <td rowspan="4">도착지</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="companyTo x2H"></td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="3" class="nameTo">xxx</td>
+			            <td>(인)</td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="4" class="phoneTo">010-xxxx-xxxx</td>
+			        </tr>
+			
+			        <!-- 운송회사 -->
+			        <tr class="section-title">
+			            <td rowspan="5">운송회사</td>
+			        </tr>
+			        <tr>
+			            <th>회사명</th>
+			            <td colspan="4" class="company"></td>
+			        </tr>
+			        <tr>
+			            <th>차량번호</th>
+			            <td colspan="4" class="carNo">5213</td>
+			        </tr>
+			        <tr>
+			            <th>담당자</th>
+			            <td colspan="4" class="name"></td>
+			        </tr>
+			        <tr>
+			            <th>연락처</th>
+			            <td colspan="3" class="phone"></td>
+			            <td>(인)</td>
+			        </tr>
+			
+			        <!-- 수량 -->
+			        <tr>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			            <th colspan="2" >유형</th>
+			            <th>수량</th>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			        <tr>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			            <td colspan="2" class="pltType"></td>
+			            <td class="pltQty"></td>
+			        </tr>
+			
+			        <!-- 품목 / 비고 -->
+			        <tr>
+			            <th colspan="2">품목</th>
+			            <td colspan="4"></td>
+			        </tr>
+			        <tr>
+			            <th colspan="2">비고</th>
+			            <td colspan="4" class='x2H'></td>
+			        </tr>
+			
+			        <!-- FOOTER -->
+			        <tr>
+			            <td colspan="6" class="footer">
+			                <div>http://edi.ajups.com | 1600-5599(대표)</div>
+			                <div>(02)6363-9883, (02)6363-9887</div>
+			                <div class="barcode_footer">BARCODE</div>
+			            </td>
+			        </tr>
+			    </table>
+			</div>
+		    
+		
+		</div>
+		
+		<div id='print'>출력</div>
+    </div>
+    
+    <div class="table_box section" id="tab1-1">
+						<div class="table_list01">
+							<div class="scroll">
+								<table class="table_c">
+									<tbody id="gridList">
+										<tr CGRow="true">
+											<td GH="40 STD_NUMBER"  GCol="rownum">1</td>
+											<td GH="100 STD_LOTA02" GCol="text,CST_COD">플랜트</td>
+											<td GH="100 WCS_LOC_GRPNM" GCol="text,SEND_DAT">LOC_NM</td>
+											<td GH="100 WCS_CNT_STATE3" GCol="text,SEND_SEQ">적재(팔레트)</td>
+											<td GH="100 WCS_CNT_STATE1" GCol="text,IF_KEY">미적재(팔레트)</td>
+											<td GH="100 WCS_CNT_STATE1" GCol="text,DATA_TYP">미적재(팔레트)</td>
+											<td GH="100 WCS_CNT_STATE1" GCol="text,DOC_TYP">미적재(팔레트)</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+						<div class="btn_lit tableUtil">
+							<button type="button" GBtn="find"></button>
+							<button type="button" GBtn="sortReset"></button>
+							<button type="button" GBtn="layout"></button>
+							<button type="button" GBtn="total"></button>
+							<button type="button" GBtn="excel"></button>
+							<button type='button' GBtn="subTotal"></button>
+							<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+						</div>
+					</div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!doctype html>
+<head>
+<style type="text/css">
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    font-family: "Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+    background: linear-gradient(135deg,#f6f8ff,#fdf6f2);
+    color: #1f1f29;
+    overflow-x: hidden;
+}
+
+button {
+    float: none !important;
+    vertical-align: middle !important;
+    height: auto !important;
+    box-sizing: border-box;
+}
+
+input:read-only { background-color: #e2e2e2; }
+select:disabled { background-color: #e2e2e2; }
+
+.main_wrap {
+    width: 100%;
+    min-height: 100vh;
+}
+
+.tem4_content {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 18px 16px 70px;
+    box-sizing: border-box;
+}
+
+/* 조회영역 */
+.select_box {
+    width: 100%;
+    margin: 0 0 16px 0;
+    padding: 16px 18px;
+    background: #fff;
+    border: 1px solid rgba(37,61,126,0.10);
+    border-radius: 22px;
+    box-shadow: 0 14px 24px rgba(27,46,106,0.10);
+    box-sizing: border-box;
+}
+
+.select_box table {
+    width: 100% !important;
+    margin: 0 !important;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+.select_box th {
+    padding: 0 10px 0 0 !important;
+    font-size: 40px;
+    font-weight: 700;
+    color: #1f1f29;
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.select_box td {
+    padding: 0 !important;
+    vertical-align: middle;
+}
+
+.select_box .text {
+    width: 100% !important;
+    height: 50px !important;
+    margin: 0 !important;
+    padding: 0 14px !important;
+    border: 1px solid #cfd7f1 !important;
+    border-radius: 16px !important;
+    background: #f7f9ff !important;
+    text-align: center;
+    font-size: 22px;
+    box-sizing: border-box;
+}
+
+.select_box .bt {
+    width: 100% !important;
+    height: 50px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 1px solid #c7cce7 !important;
+    border-radius: 16px !important;
+    background: #f4f6ff !important;
+    color: #2742c3 !important;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: none !important;
+}
+
+.select_box .bt p {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 50px !important;
+    font-size: 40px !important;
+    color: #2742c3 !important;
+}
+
+.select_box td:last-child {
+    padding-left: 10px !important;
+}
+
+.select_box .bt {
+    margin-left: 8px !important;
+}
+
+/* 결과영역 */
+.tableWrap_search.section {
+    width: 100%;
+    margin: 0 !important;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid rgba(37,61,126,0.10);
+    border-radius: 22px;
+    box-shadow: 0 14px 24px rgba(27,46,106,0.10);
+    box-sizing: border-box;
+}
+
+.tableWrap_search .tableHeader {
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+}
+
+.tableWrap_search .tableHeader table {
+    width: 100% !important;
+    margin: 0 !important;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tableWrap_search .tableHeader table thead th {
+    background: #32436d !important;
+    color: #fff !important;
+    padding: 12px 10px !important;
+    font-size: 40px !important;
+    text-align: center;
+    white-space: nowrap;
+}
+.tableWrap_search .tableBody {
+       min-height: 200px !important;
+    max-height: 200px !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #cbd2ec;
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    box-sizing: border-box;
+    background: #fff;
+    padding-bottom: 12px;
+}
+
+
+
+.tableWrap_search .tableBody table {
+    width: 100% !important;
+    margin: 0 !important;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tableWrap_search .tableBody table tbody td {
+    padding: 12px 10px !important;
+    font-size: 36px !important;
+    text-align: center;
+    border-bottom: 1px solid #dde2f3 !important;
+    box-sizing: border-box;
+}
+
+.tableWrap_search .tableBody table tbody tr:nth-child(even) td {
+    background: #f6f8ff;
+}
+
+.tableWrap_search .tableBody table tbody tr:hover td {
+    background: rgba(63,89,216,0.08);
+    cursor: pointer;
+}
+
+/* 하단 버튼 */
+
+.footer_5 {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 9999 !important;
+
+    display: block !important;
+    width: 100% !important;
+    min-height: 64px !important;
+    padding: 6px 10px !important;
+    margin: 0 !important;
+
+    background: #1e2a44 !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 -6px 20px rgba(0,0,0,0.15) !important;
+    overflow: visible !important;
+}
+
+.footer_5 table {
+    width: 100% !important;
+    height: 48px !important;
+    margin: 0 !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    table-layout: fixed;
+    background: transparent !important;
+}
+
+.footer_5 table tr,
+.footer_5 table td {
+    height: 48px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    vertical-align: middle !important;
+}
+
+.footer_5 .f_1 {
+    height: 48px !important;
+    padding: 0 !important;
+    overflow: hidden;
+    box-sizing: border-box;
+    text-align: center;
+    vertical-align: middle !important;
+    cursor: pointer;
+}
+
+.footer_5 .f_1:first-child {
+    background: #46516b !important;
+    border-radius: 8px 0 0 8px !important;
+    border-right: 3px solid #1e2a44 !important;
+}
+
+.footer_5 .f_1:last-child {
+    background: linear-gradient(135deg, #4b6bff, #3a57e8) !important;
+    border-radius: 0 8px 8px 0 !important;
+}
+
+.footer_5 .f_1 label {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 100% !important;
+    height: 48px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    color: #fff !important;
+
+    box-sizing: border-box !important;
+    background: transparent !important;
+    cursor: pointer;
+}
+
+
+.footer_5 .f_1:hover,
+.select_box .bt:hover {
+    filter: brightness(1.05);
+}
+.select_box#searchArea { display:none !important; }
+.select_box#searchArea + .tableWrap_search.section {
+    margin-top: 0 !important;
+}
+
+@media (max-width: 540px) {
+    .tem4_content {
+        padding: 14px 12px 88px;
+    }
+
+    .select_box {
+        padding: 14px;
+    }
+
+    .tableWrap_search.section {
+         padding: 24px !important;
+    }
+
+    .select_box th {
+        font-size: 16px;
+    }
+
+    .select_box .text {
+        height: 46px !important;
+        font-size: 20px;
+    }
+
+    .select_box .bt {
+        height: 46px !important;
+        border-radius: 14px !important;
+    }
+
+    .select_box .bt p {
+        line-height: 46px !important;
+        font-size: 36px !important;
+    }
+
+    .tableWrap_search .tableBody {
+        min-height: 170px;
+        max-height: 170px;
+    }
+
+    .tableWrap_search .tableBody table tbody td {
+        font-size: 36px !important;
+    }
+
+    .footer_5 .f_1 {
+        height: 48px !important;
+    }
+
+    .footer_5 .f_1 label {
+        height: 48px;
+        line-height: 48px;
+        font-size: 20px;
+    }
+    .tem4_content {
+    padding: 18px 16px 72px !important;
+	}
+
+	.footer_5 {
+	    padding: 6px 12px !important;
+	}
+	
+	.footer_5 .f_1 {
+	    height: 48px !important;
+	}
+	
+	.footer_5 .f_1 label {
+	    height: 48px !important;
+	    line-height: 48px !important;
+	    padding: 0 !important;
+	    margin: 0 !important;
+	    font-size: 20px !important;
+	}
+
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, target-densitydpi=medium-dpi" />
+<meta name="format-detection" content="telephone=no" />
+<title>차량조회</title>
+
+<%@ include file="/mobile/include/head.jsp" %>
+<script type="text/javascript" src="/wms/js/wms.js"></script>
+
+<script>
+$(document).ready(function(){
+
+    gridList.setGrid({
+      id : "gridList",
+      editable : false,
+      module : "WmsMobileOutboundPicking_COPY",
+      command : "KIOSK_CARNO",
+      gridMobileType : true,
+      emptyMsgType : false
+    });
+
+    var popParam = getPopParamDataMap();
+    if (popParam) {
+        if (popParam.get("VEHINO")) $("#VEHINO").val(popParam.get("VEHINO"));
+        if (popParam.get("SCHMODE")) $("#SCHMODE").val(popParam.get("SCHMODE"));
+    }
+
+    var initVehino = $.trim($("#VEHINO").val());
+    if (initVehino !== "") {
+        searchList();
+    } else {
+        initGrid();
+    }
+
+    $("#VEHINO").focus();
+
+    try { window.resizeTo(560, 540); } catch(e) {}
+});
+
+
+  
+  var selectedRowNum = 0;
+
+  function initGrid() {
+    gridList.resetGrid("gridList");
+  }
+
+  
+  function getQueryParam(name) {
+	  name = name.replace(/[\\[\\]]/g, "\\$&");
+	  var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+	  var results = regex.exec(window.location.href);
+	  if (!results || !results[2]) return null;
+	  return decodeURIComponent(results[2].replace(/\+/g, " "));
+	}
+
+  function getPopParamDataMap() {
+
+	  // 0) iframe(parent) 전달값 우선
+	  try {
+	    if (window.parent && window.parent !== window && window.parent.KIOSKQ_CARNO_POP_PARAM) {
+	      return window.parent.KIOSKQ_CARNO_POP_PARAM;
+	    }
+	  } catch (e0) {}
+
+	  // 1) URL ?POP_PARAM=... 우선
+	  var qp = getQueryParam("POP_PARAM");
+	  if (qp) {
+	    try {
+	      var obj = JSON.parse(qp);
+	      var dm = new DataMap();
+	      dm.putObject(obj);
+	      return dm;
+	    } catch (e) {
+	      // JSON이 아니거나 깨졌으면 무시
+	    }
+	  }
+
+	  // 2) 기존 linkPopOpen 방식
+	  try {
+	    return mobile.getLinkPopData();
+	  } catch (e2) {
+	    return null;
+	  }
+	}
+
+  
+	function searchList(){
+	    initGrid();
+
+	    var vehino = $.trim($("#VEHINO").val());
+	    if (vehino === "") {
+	        return;
+	    }
+
+	    var param = inputList.setRangeParam("searchArea");
+	    var popParam = getPopParamDataMap();
+
+	    param.put("WAREKY", "<%=wareky%>");
+	    param.put("OWNRKY", "<%=ownrky%>");
+	    param.put("LANGKY", "<%=langky%>");
+	    if (popParam) {
+	        param.put("KIOSK_MTYPE", popParam.get("KIOSK_MTYPE"));
+	    }
+
+	    gridList.gridList({
+	      id : "gridList",
+	      param : param
+	    });
+	}
+  
+
+  function gridListEventDataBindEnd(gridId, dataLength){
+    if(gridId == "gridList"){
+      $("#VEHINO").focus();
+      
+      if(dataLength == 0){
+          commonUtil.msgBox("배차등록 되지 않았습니다.\n사무실에 연락 부탁드립니다.");
+        }
+    }
+  }
+
+  function gridListEventRowDblclick(gridId, rowNum) {
+    var data = gridList.getRowData("gridList", rowNum);
+    callback(data);
+  }
+
+  function gridListEventRowClick(gridId, rowNum) {
+    selectedRowNum = rowNum;
+  }
+
+  function onClickChooseBtn() {
+    var data = gridList.getRowData("gridList", selectedRowNum);
+    callback(data);
+  }
+
+  function closeThisPop() {
+	  try {
+	    if (window.parent && window.parent !== window && window.parent.closeVehinoLayerPopup) {
+	      window.parent.closeVehinoLayerPopup();
+	      return;
+	    }
+	  } catch (e1) {}
+
+	  self.close();
+	}
+  
+  
+  function callback(data) {
+	  if (!data || data.isEmpty()) {
+	    return;
+	  }
+
+	  // 1. iframe 방식
+	  try {
+	    if (window.parent && window.parent !== window && window.parent.vehinoPopCallback) {
+	      if (window.parent.KIOSKQ_CARNO_POP_PARAM) {
+	        data.put("param", window.parent.KIOSKQ_CARNO_POP_PARAM);
+	      }
+	      window.parent.vehinoPopCallback(data);
+	      return;
+	    }
+	  } catch (e1) {}
+
+	  // 2. 기존 popup 방식 유지
+	  try {
+	    data.put("param", mobile.getLinkPopData());
+	    if (window.opener && window.opener.vehinoPopCallback) {
+	      window.opener.vehinoPopCallback(data);
+	      self.close();
+	      return;
+	    }
+	  } catch (e2) {}
+	}
+  
+  function fn_onfocus(objId){
+    $("#"+objId).select();
+  }
+</script>
+</head>
+
+<body>
+  <div class="main_wrap">
+    <div class="tem4_content">
+
+      <div class="select_box" id="searchArea">
+        <table>
+          <colgroup>
+            <col width="20%" />
+            <col width="60%" />
+            <col width="20%" />
+          </colgroup>
+          <tbody id="searchArea">
+            <tr>
+              <th>차량번호</th>
+              <td>
+                <input type="text" class="text" name="VEHINO" id="VEHINO"
+                       onfocus="fn_onfocus(this.id)"
+                       onkeypress="commonUtil.enterKeyCheck(event, 'searchList()')"
+                       style="text-align:center; width:95%;" />
+              </td>
+              <td onclick="searchList()">
+                <button class="bt" style="height: 32px;">
+                  <p>조회</p>
+                </button>
+              </td>
+            </tr>
+
+            <!-- ✅ 메인에서 1111(4자리) 입력 시 LAST4로 넘어옴 -->
+            <input type="hidden" name="SCHMODE" id="SCHMODE" />
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tableWrap_search section" style="margin-bottom: 0px;">
+        <div class="tableHeader">
+          <table style="width: inherit">
+            <colgroup>
+              <col width="15%" />
+              <col width="85%" />
+            </colgroup>
+            <thead>
+              <tr class="thead">
+                <th>No.</th>
+                <th>차량번호</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        <div class="tableBody">
+          <table style="width: inherit">
+            <colgroup>
+              <col width="15%" />
+              <col width="85%" />
+            </colgroup>
+            <tbody id="gridList">
+              <tr CGRow="true">
+                <td GCol="rownum">No.</td>
+                <td GCol="text,VEHINO">차량번호</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footer_5" style="position:fixed;">
+        <table>
+          <tr>
+           <td class=f_1 width="50%" onclick="closeThisPop()">
+              <label>닫기</label>
+            </td>
+            <td class=f_1 width="50%" onclick ="onClickChooseBtn()">
+              <label>선택</label>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

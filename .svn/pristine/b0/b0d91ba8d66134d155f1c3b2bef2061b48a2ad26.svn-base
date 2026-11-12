@@ -1,0 +1,508 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css">
+<style>
+	input[type="checkbox"]{height:unset;}
+</style> 
+<script type="text/javascript">
+	
+	var dblIdx = 0;
+	var subIdx = 0;
+	var searchType = 0;
+	var paramH = new DataMap();
+	var menuky = configData.MENU_ID;
+
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",			
+			module : "WmsTask",
+			command : "DL06POPH",
+			itemGrid : "gridListSub",
+	        itemSearch : true
+		});
+		
+		gridList.setGrid({
+			id : "gridListSub",
+			module : "WmsTask",
+			command : "DL06POPD"
+		});
+		
+		
+		inputList.setInput("tab2_area");
+		
+		//오라클 버전으로 있음
+		var data = page.getLinkPopData();	
+		
+		var param = new DataMap();
+		param.put("data", data);	
+		
+		searchList(data);
+		
+	});
+	
+	function searchList(data){
+		var param = data;
+		searchType = 1;
+		
+		gridList.gridList({
+			id : "gridList",
+			url : "/wms/outbound/json/DL06POPH.data",
+			param : param
+		});
+	}
+	
+	function gridListEventDataBindEnd(gridId, dataLength){
+		if(gridId == "gridList" && dataLength > 0){
+	        headFocusNum = 0;
+	        
+	        if(searchType == 1){
+	        	searchSubItemList(0);
+	        }else if(searchType == 2){
+	            searchSubItemList(0);
+	        }
+	    }else if(gridId == "gridListSub" && dataLength == 0){
+// 	    	fn_closing()
+	    }
+	}
+	
+	function gridListEventItemGridSearch(gridId, rowNum, itemGridList){
+	   /*  if(gridId == "gridList"){
+	        var param = getItemSearchParam(rowNum);
+	
+	        gridList.gridList({
+	            id : "gridListSub",
+	            param : param
+	        });
+	        dblIdx = rowNum;
+	        subIdx = rowNum;
+	    } */
+	}
+	
+	function getItemSearchParam(rowNum){
+	    var rowData = gridList.getRowData("gridList", rowNum);
+	    var param = new DataMap();
+	    param.putAll(rowData);
+	
+	    return param;
+	}
+	
+	 function searchSubItemList(rowNum, locaky){
+	    gridList.resetGrid("gridListSub");
+	    
+	    var SKUKEY = gridList.getColData("gridList", rowNum, "SKUKEY");
+	    var LOTA01 = gridList.getColData("gridList", rowNum, "LOTA01");
+	    var LOTA02 = gridList.getColData("gridList", rowNum, "LOTA02");
+	    var LOTA03 = gridList.getColData("gridList", rowNum, "LOTA03");	    
+	    var LOTA07 = gridList.getColData("gridList", rowNum, "LOTA07");
+	    var LOTA08 = gridList.getColData("gridList", rowNum, "LOTA08");
+	    var LOTA09 = gridList.getColData("gridList", rowNum, "LOTA09");
+	    var LOTA16 = gridList.getColData("gridList", rowNum, "LOTA16");
+	    var LOTA17 = gridList.getColData("gridList", rowNum, "LOTA17");
+	    var TASKKY = gridList.getColData("gridList", rowNum, "TASKKY");
+ 	    var TASKIT = gridList.getColData("gridList", rowNum, "TASKIT");
+ 	    var LOTNUM = gridList.getColData("gridList", rowNum, "LOTNUM");
+	    var LOCASR = gridList.getColData("gridList", rowNum, "LOCASR");
+	    var LASTOB = gridList.getColData("gridList", rowNum, "LASTOB");
+	    var DPTNKY = gridList.getColData("gridList", rowNum, "DPTNKY");
+	    
+	    
+	    var param = inputList.setRangeParam("searchArea"); 
+	    param.put("SKUKEY", SKUKEY);
+	    param.put("LOTA01", LOTA01);
+		param.put("LOTA02", LOTA02);
+		param.put("LOTA03", LOTA03);
+		param.put("LOTA07", LOTA07);
+		param.put("LOTA08", LOTA08);
+	    param.put("LOTA09", LOTA09);
+	    param.put("LOTA16", LOTA16);
+	    //param.put("LOTA17", LOTA17);
+	    
+	    param.put("TASKKY", TASKKY);
+	    param.put("TASKIT", TASKIT);
+	    param.put("LOTNUM", LOTNUM);
+	    param.put("LOCASR", LOCASR);	    	    
+	    param.put("DPTNKY", DPTNKY);
+	    
+	    
+	    if(locaky){
+	    	param.put("LOCAKY", locaky);	
+	    }
+	    
+	    
+	    if(LASTOB == 'V'){
+	    	
+    	//작업문서번호, 작업번호순번, 출고문서번호, 출고문서아이템번호, 그리드 데이터 
+		var json = netUtil.sendData({
+			url : "/wms/outbound/json/DL06MAXLOTA11.data",
+			param : param
+		});		
+	    
+		if(json && json.data){
+				    	
+	    	param.put("LASTOB", LASTOB);
+	    	param.put("LLOTA11", json.data.LLOTA11);
+	    	
+			}
+	    }
+	    
+	    gridList.gridList({
+	        id : "gridListSub",
+	        command : "DL06POPD",
+	        param : param
+	    });
+	
+	    headFocusNum = rowNum;
+	    dblIdx = rowNum;
+	    subIdx = rowNum;
+	    	   
+	} 
+	 
+	
+	function fn_closing(){
+		this.close();
+	}
+
+	function fn_reflect(){
+		if(gridList.validationCheck("gridList", "modify")){
+			
+			if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){ //저장하시겠습니까?
+				return;
+			}
+			
+			var cnt = gridList.getModifyRowCount("gridList");
+			if(cnt < 1){
+				commonUtil.msgBox("MASTER_M0545"); //변경된 데이터가 없습니다.
+				return;
+			}
+			
+			var headData = inputList.setRangeParam("dl06POP");
+			var list = gridList.getGridData("gridList");
+			var param = inputList.setRangeParam("searchArea")
+			
+			var totalInputQtt = 0;
+			for(var i = 0; i < list.length; i++){
+				totalInputQtt += (Number)(list[i].get("QTSPUT"));
+			}
+			
+			if(totalInputQtt > (Number)(headData.get("QTCOMP"))){
+				var index = 0;
+				for(var i = 0; i < list.length; i++){
+					if(gridList.getRowState("gridList", i) == "U"){
+						index = i;
+						break;
+					}
+				}
+				
+				//입력가능수량보다 입력수량이 더 클수 없음
+				commonUtil.msgBox("OUT_M0136"); //지시수량보다 할당수량이 클 수 없습니다.
+				setTimeout(function(){
+					gridList.setColFocus("gridList", index, "QTSPUT");
+				}, 1);
+				return;
+			}
+			
+			for(var i = 0; i < list.length; i++) {
+				list[i].put("TASKKY", headData.get("TASKKY")); //작업문서번호
+				list[i].put("TASKIT", headData.get("TASKIT")); //작업번호순번
+			}
+			
+			param.put("list", list);
+			param.put("headData", headData);
+			param.put("SHPOKY", headData.get("SHPOKY"));
+			param.put("SHPOIT", headData.get("SHPOIT"));
+			
+			
+			//작업문서번호, 작업번호순번, 출고문서번호, 출고문서아이템번호, 그리드 데이터 
+			var json = netUtil.sendData({
+				url : "/wms/outbound/json/DL06StockValidation.data",
+				param : param
+			});
+			
+			if(json.data != "OK"){
+				var msgList = json.data.split("†");
+				var msgTxt = commonUtil.getMsg(msgList[0], (msgList.length > 1 ? msgList[1].split("/") : null));
+				commonUtil.msg(msgTxt);
+				return;
+			}
+			
+			var json = netUtil.sendData({
+				url : "/wms/outbound/json/DL06POPSave.data",
+				param : param
+			});
+			
+			if(json && json.data){
+				var data = page.getLinkPopData();
+				page.linkPopClose(param);
+			}
+		}
+	}
+	
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+		
+		if(gridId == "gridListSub" && colName == "QTSPUT"){
+			
+			var HeadRowNum=gridList.getFocusRowNum("gridList");	
+			
+			var qtsPUT = new Number(gridList.getColData(gridId, rowNum, colName));
+			var useQty = new Number(gridList.getColData(gridId, rowNum, "USEQTY"));
+			var qtcomp = new Number(gridList.getColData("gridList", HeadRowNum, "QTCOMP"));;
+			
+		}
+	}
+	
+	function commonBtnClick(btnName){
+		if(btnName == "SAVE"){
+			saveData();
+		}else if(btnName == "Search"){
+			var locaky;
+			
+			if($.trim($('input[name="S.LOCAKY"]').val()) != ''){
+				locaky = $('input[name="S.LOCAKY"]').val();
+			}
+						
+			searchSubItemList(0, locaky);
+	    }
+	    	 
+	}
+	
+	function saveData() {
+						
+		var head = gridList.getSelectData("gridList");
+	    var list = gridList.getSelectData("gridListSub");	    	    		
+	    var rowNum=gridList.getFocusRowNum("gridList");	    	    	    
+	    
+			if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){ //저장하시겠습니까?
+				return;
+			}								
+			
+			if(head.length == 0){
+		        commonUtil.msgBox("VALID_M0006"); //선택된 데이터가 없습니다.
+		        return;
+		    }
+		    
+		    if(list.length == 0){
+		        commonUtil.msgBox("OUT_M0045");  //처리를 위한 아이템이 존재하지 않습니다.
+		        return;
+		    }
+		    
+			var totalInputQtt = 0;
+			var useInputQtt = new Number(gridList.getColData("gridList", 0, "QTCOMP"));
+			
+			for(var i = 0; i < list.length; i++){
+				
+				totalInputQtt += (Number)(list[i].get("QTSPUT"));				
+				
+			}
+		
+			if(totalInputQtt > useInputQtt){
+				
+				commonUtil.msgBox("OUT_M0230"); //입력수량이 입력가능수량보다 더 많습니다.
+				return;
+			}
+			
+			
+			
+	    var param = new DataMap();
+	    param.put("head", head[rowNum]);
+	    param.put("list", list);
+        param.put("SHPOKY", head[rowNum].get("SHPOKY"));
+        param.put("SHPOIT", head[rowNum].get("SHPOIT"));
+        param.put("TASKKY", head[rowNum].get("TASKKY"));
+	            
+        json = netUtil.sendData({
+	        url : "/wms/outbound/json/DL06POPSave.data",
+	        param : param
+	    });
+	    
+	    if(json && json.data){
+	    	
+	    	
+	        gridList.resetGrid("gridList");
+	        gridList.resetGrid("gridListSub");
+	        commonUtil.msgBox("COOMON_M0463"); //저장이 완료되었습니다.
+	        //searchList();
+	        callback();
+	    }	
+	}
+	
+	function callback () {
+		
+		window.opener.DocPopCallback();
+		self.close();
+		
+	}
+	
+	function searchHelpEventOpenBefore(searchCode, gridType, obj, rowNum){
+		
+		if(searchCode == "SHLOCMA"){
+			var param = new DataMap();
+			var WAREKY = gridList.getColData("gridList", 0, "WAREKY");
+			if(!WAREKY) {
+				var label = commonLabel.getLabel("STD_WAREKY", 1);
+				commonUtil.msgBox("VALID_required",[label]); // {0} 은(는) 필수 입력항목입니다.
+				return false;
+			}
+			param.put("WAREKY", WAREKY);
+			return param;
+        }
+	}
+	
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+	<div class="content_inner">
+		<%@ include file="/common/include/webdek/title.jsp" %>
+		<div class="content_serch" id="searchArea">
+			<div class="btn_wrap">
+				<div class="fl_l">
+					<input type="button" CB="SAVE SAVE BTN_SAVE" />		
+				</div>
+				<div class="fl_r">			      
+				</div>
+			</div>			
+		</div>
+        <div class="search_next_wrap">
+			<div class="content_layout tabs top_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-1"><span CL="STD_PRINT16">피킹리스트</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+				</ul>								
+				
+				<div class="table_box section" id="tab1-1">
+					<div class="table_list01">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridList">
+									<tr CGRow="true">
+										<td GH="40"                 GCol="rownum">1</td>	                                    
+										<td GH="100 STD_TASKIT"     GCol="text,TASKIT">아이템번호</td>
+	                                    <td GH="100 STD_TASKTY"     GCol="text,STATITNM">아이템상태</td>	                                    
+	                                    <td GH="100 STD_SKUKEY"     GCol="text,SKUKEY">품목코드</td>
+	                                    <td GH="100 STD_DESC01"     GCol="text,DESC01">품목명</td>
+
+	                                    <td GH="100 STD_QTJCMP"     GCol="text,QTCOMP" GF="N 20,3">피킹가능수량</td>	                                    
+	                                    <td GH="100 STD_UOMKEY"     GCol="text,SUOMKY">단위</td>
+	                                    
+	                                    <td GH="100 STD_LOCASR"     GCol="text,LOCASR">FROM로케이션</td>	                                    
+	                                    <td GH="100 STD_LOCATG"     GCol="text,LOCATG">TO로케이션</td>
+	                                    <td GH="100 STD_LOTA14"     GCol="text,LOTA14" >제조LOT</td>	                                                                    
+	                                    
+	                                    <td GH="100 STD_TOTWG" 		GCol="text,TOT" GF="N 20,3">총중량</td>
+										<td GH="100 STD_BAGQT" 		GCol="text,BAG" GF="N 20,3">EA/BAG</td>
+										<td GH="100 STD_BOXQT" 		GCol="text,BOX" GF="N 20,3">BAG/BOX</td>
+										<td GH="100 STD_PLTQT" 		GCol="text,PLT" GF="N 20,3">BOX/Pallet</td>												
+										<td GH="100 STD_SOKQT" 		GCol="text,SOK" GF="N 20,3">속(개/BALE)</td>
+										<td GH="100 STD_EAQTY" 		GCol="text,EA" GF="N 20,3">매(sheet/속)</td>
+												
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+					<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+				</div>
+			</div>
+			
+			<div class="content_layout tabs bottom_layout">
+				<ul class="tab tab_style02">
+					<li><a href="#tab1-2"><span CL="STD_STOCKLIST">재고 리스트</span></a></li>
+					<li class="btn_zoom_wrap">
+						<ul>
+							<li><button class="btn btn_bigger"><span>확대</span></button></li>
+						</ul>
+					</li>
+					
+                    <li id="tab2_area">
+                    	&nbsp;
+                    	<font CL="STD_LOCAKY3" style="display:inline-block;margin-top: 12px;"></font>
+                    	<span style="display:inline-block;margin-top: 6px;">
+                    	<input type="text" class="input" name="S.LOCAKY" id="S.LOCAKY" UIInput="S,SHLOCMA"/>                    	
+						</span>
+						<input type="button" CB="Search SEARCH BTN_DISPLAY" style="display:inline-block;margin-top: 6px;"/>
+                    </li>
+                    
+				</ul>
+				
+				<div class="btn_wrap" >
+					<div class="fl_l" id="tab1_btn_03">
+					</div>
+				</div>
+				
+				<div class="table_box section" id="tab1-2">
+					<div class="table_list01" style="overflow:unset;">
+						<div class="scroll">
+							<table class="table_c">
+								<tbody id="gridListSub">
+									<tr CGRow="true">
+	                                    <td GH="40"                 GCol="rownum">1</td>
+	                                    <td GH="40"                 GCol="rowCheck"></td>                               
+	                                    <td GH="100 STD_STOKKY"     GCol="text,STOKKY">재고키</td>
+	                                    <td GH="100 STD_LOCAKY3"     GCol="text,LOCAKY">로케이션</td>
+	                                    
+			                            <td GH="100 STD_USEQTY"     GCol="text,USEQTY" GF="N 20,3">가용수량</td>
+			                            <td GH="100"     GCol="input,QTSPUT" GF="N 20,3">입력수량</td>        	                                    
+	                                    <td GH="100 STD_UOMKEY"     GCol="text,UOMKEY">단위</td>
+	                                    
+	                                    <td GH="100 STD_LOTA02" 	GCol="text,LOTA02">플랜트</td>
+	                                    <td GH="110 STD_PLNTNM" 	GCol="text,LOTA02NM">플랜트명</td>
+										<td GH="100 STD_LOTA01" 	GCol="text,LOTA01">저장위치</td>
+										<td GH="130 STD_LOTA01NM" 	GCol="text,LOTA01NM">저장위치명</td>
+										<td GH="100 STD_LOTA03" 	GCol="text,LOTA03">공급업체코드</td>
+										<td GH="100 STD_LOTA09NM" 	GCol="text,LOTA09NM">거래처코드MTO</td>
+	                                    <td GH="100 STD_LOTA11"     GCol="text,LOTA11" GF="C">제조일자</td>
+	                                    <td GH="100 STD_LOTA12"     GCol="text,LOTA12" GF="C">입고일자</td>	                                    
+	                                    <td GH="100 STD_LOTA13" 	GCol="text,LOTA13" GF="C">유통기한</td>
+	                                    <td GH="100 STD_LOTA14"     GCol="text,LOTA14" >제조LOT</td>
+	                                    <td GH="100 STD_LOTA15"     GCol="text,LOTA15" >SAP 배치번호</td>
+	                                    
+	                                    <td GH="100 STD_TOTWG" 		GCol="text,TOT" GF="N 20,3">총중량</td>
+										<td GH="100 STD_BAGQT" 		GCol="text,BAG" GF="N 20,3">EA/BAG</td>
+										<td GH="100 STD_BOXQT" 		GCol="text,BOX" GF="N 20,3">BAG/BOX</td>
+										<td GH="100 STD_PLTQT" 		GCol="text,PLT" GF="N 20,3">BOX/Pallet</td>												
+										<td GH="100 STD_SOKQT" 		GCol="text,SOK" GF="N 20,3">속(개/BALE)</td>
+										<td GH="100 STD_EAQTY" 		GCol="text,EA" GF="N 20,3">매(sheet/속)</td>                                    
+	                                    										
+									</tr>
+								</tbody>
+							</table>
+						</div>
+						<div class="btn_lit tableUtil">
+						<button type='button' GBtn="find"></button>
+						<button type='button' GBtn="sortReset"></button>
+						<button type='button' GBtn="total"></button>
+						<button type='button' GBtn="layout"></button>
+						<button type='button' GBtn="excel"></button>
+						<span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+					</div>
+					</div>					
+				</div>
+		</div>
+	</div>
+		<!-- //contentContainer -->
+	</div>	
+</div>
+<!-- //content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

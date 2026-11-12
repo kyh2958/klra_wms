@@ -1,0 +1,14 @@
+#SSO ProductId
+sso.product_id=PRO_000622
+#SSO login
+sso.login.url=https://wms.kleannara.com/sso/ssoLogin.page
+#SSO logout
+sso.logout.url=https://wms.kleannara.com/sso/ssoLogout.page
+
+#SSO DOMAIN
+sso.ep.domain=https://sso.kleannara.com/
+#SSO WMS
+sso.wms.url=https://wms.kleannara.com/sso/assertionConsumer.page
+#SSO Entriy ID
+sso.wms.entityId=wms.kleannara.com
+

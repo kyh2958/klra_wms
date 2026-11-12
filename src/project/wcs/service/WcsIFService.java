@@ -1,0 +1,60 @@
+package project.wcs.service;
+
+import java.sql.SQLException;
+import java.util.List;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import project.common.bean.DataMap;
+import project.common.dao.WcsDAO;
+import project.common.util.Util;
+import project.wcs.dao.WcsIFDAO;
+
+@Service
+public class WcsIFService {
+
+	private static Logger log = Logger.getLogger(WcsIFService.class);
+	
+	@Autowired
+	public WcsIFDAO dao;
+	
+	@Autowired
+	public WcsDAO commonDao;
+		
+//	@Autowired
+//	private SqlSession sqlSession;
+
+	//240129 신규 util 기능 추가(mapToJSON 함수 등 사용 목적)
+	private Util util;
+	
+	public List<DataMap> getList(DataMap map) throws SQLException {
+		return dao.getList(map);
+	}
+	public List<DataMap> getList(String module, String command) throws SQLException {
+		DataMap map = new DataMap(module, command);
+		return dao.getList(map);
+	}	
+	public DataMap getMap(DataMap map) throws SQLException {
+		return dao.getMap(map);
+	}
+	public Object getObj(DataMap map) throws SQLException {
+		return dao.getObj(map);
+	}
+	public Object insert(DataMap map) throws SQLException {
+		return dao.insert(map);
+	}
+	public int update(DataMap map) throws SQLException {
+		return dao.update(map);
+	}
+	public int delete(DataMap map) throws SQLException {
+		return dao.delete(map);
+	}
+	public String getListString(DataMap map) throws SQLException{
+		return dao.getListString(map);
+	}
+	public String getJdbcData(DataMap map) throws SQLException {
+		return dao.getJdbcData(map);
+	}
+}

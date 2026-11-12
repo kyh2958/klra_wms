@@ -1,0 +1,377 @@
+package project.wms.controller;
+
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.controller.BaseController;
+import project.common.dao.CommonDAO;
+import project.wms.service.IFService;
+import project.wms.service.InboundService;
+import project.wms.service.OutboundServiceDL082;
+
+@Controller
+public class IFController extends BaseController {
+	private static Logger log = Logger.getLogger(IFController.class);
+	
+	@Autowired
+	private IFService service;	
+	
+	@Autowired
+	private InboundService inboundService;
+	
+	@Autowired
+	private OutboundServiceDL082 outboundServiceDL082;
+	
+	@Autowired
+	public CommonDAO commonDao;
+	
+	@RequestMapping("/IF/list/json/{command}.*")
+	public String list(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("Erpif", command);
+		
+		List<DataMap> list = service.getList(map);
+		
+		model.put("data", list);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/IF/map/json/{command}.*")
+	public String map(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("Erpif", command);
+		
+		DataMap data = service.getMap(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/IF/insert/json/{command}.*")
+	public String insert(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("IF", command);
+
+		Object data = service.insert(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/IF/update/json/{command}.*")
+	public String update(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("IF", command);
+
+		int rs = service.update(map);
+		
+		model.put("data", rs);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/IF/delete/json/{command}.*")
+	public String delete(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("IF", command);
+
+		int rs = service.delete(map);
+		
+		model.put("data", rs);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/IF/{module}/excel/{command}.*")
+	public String excel(HttpServletRequest request, @PathVariable String module, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand(module, command);
+
+		String data = service.getListString(map);
+		
+		return excelView(map, model, data);
+	}
+
+	@RequestMapping(value = "/common/api/json/{module}/{id}.*", method=RequestMethod.GET)
+	public String selectIF(@PathVariable String module, @PathVariable String id, Map<String, Object> model) throws SQLException {
+		Map<String, String> list = new HashMap<>();
+		
+		list.put("module", module);
+		list.put("id", id);
+		model.putAll(list);
+		
+		return JSON_VIEW;
+	}
+
+	@RequestMapping(value = "/common/api/json/{ifid}/{comm}.*", method=RequestMethod.POST)
+	public String recieveRESTFUL(@PathVariable String ifid, @PathVariable String comm, HttpServletRequest request, Map<String, Object> model) throws SQLException {
+		// RESTFUL 데이터 수신
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Map<String, String> list = new HashMap<>();
+		String data = null;
+		
+		// 임시 품질대상->결과 변경
+		if(       ifid.equals("WMS_IF_208")) { ifid = "WMS_IF_209";
+		} else if(ifid.equals("WMS_IF_212")) { ifid = "WMS_IF_213";
+		}
+		// 임시 품질대상->결과 변경
+		
+		DataMap logMap = new DataMap();
+		logMap.setModuleCommand("Erpif", "IFWMSLOG");
+		logMap.put("IFID", ifid);
+		logMap.put("COMSTAT", "C");
+		logMap.put(CommonConfig.SES_USER_ID_KEY, ifid);
+		commonDao.insert(logMap);
+		
+		String logseqno = logMap.get("SEQNO").toString();
+		map.put("IFID", ifid);
+		map.put("LOGSEQNO", logseqno);
+
+		try {
+			data = service.receiveRESTFUL(request, map);
+		} catch (Exception e) {
+		}
+		
+		list.put("IFID", ifid);
+		list.put("result", data); // 성공 : SUCCESS, 그외 오류내용
+		
+		model.putAll(list);
+		
+		// 수신결과 리턴 (처리결과 전송)
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/erpif/json/receiveIF.*")
+	public String receiveIF(HttpServletRequest request, Map<String, Object> model) throws SQLException{
+		// 엑셀 업로드
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+
+		String data = null;
+		String ifid   = map.get("IFID").toString();
+
+		DataMap logMap = new DataMap();
+		logMap.setModuleCommand("Erpif", "IFWMSLOG");
+		logMap.put("IFID", ifid);
+		logMap.put("COMSTAT", "C");
+		logMap.put("REMARK", "EXCEL");
+		logMap.put(CommonConfig.SES_USER_ID_KEY, map.get(CommonConfig.SES_USER_ID_KEY));
+		commonDao.insert(logMap);
+		
+		String logseqno = logMap.get("SEQNO").toString();
+		map.put("LOGSEQNO", logseqno);
+		map.put("REMARK", "EXCEL");
+		
+		try {
+			data = service.receive_IF(map);
+			
+//			if(!data.equals("SUCCESS")) {
+//				logMap.put("COMSTAT", "E");
+//				logMap.put("ERRTXT", data);
+//				commonDao.update(logMap);
+//			}
+		} catch (Exception e) {
+//			logMap.put("COMSTAT", "E");
+//			logMap.put("ERRTXT", e);
+//			commonDao.update(logMap);
+		}
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/erpif/json/dataInsertIF.*")
+	public String dataInsertIF(HttpServletRequest request, Map<String, String> model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		String data = null;
+		
+		data = service.dataInsertIF(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/erpif/json/sendIF.*")
+	public String sendIF(HttpServletRequest request, Map<String, String> model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		String data = null;
+		
+		data = service.sendIF(map);
+		
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/erpif/json/controlIF.*")
+	public String controlIF(HttpServletRequest request, Map<String, Object> model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+
+		Object rs = service.controlIF(map);
+		
+		model.put("data", rs);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/erpif/json/saveIF.*")
+	public String saveIF(HttpServletRequest request, Map<String, Object> model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+
+		Object rs = service.saveIF(map);
+		
+		model.put("data", rs);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/rfc/json/rfcCall.*")
+	public String rfcCall(HttpServletRequest request, Map<String, Object> model) throws Exception {
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		
+		DataMap result = new DataMap();
+		result = service.receive_START(map);
+
+		model.put("data", result.get("data"));
+		model.put("row_count", result.get("row_count"));
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping(value = "/common/omsApi/json/{ifid}/{type}.*", method=RequestMethod.POST)
+	public String recieveOmsRESTFUL(@PathVariable String ifid, @PathVariable String type, HttpServletRequest request, Map<String, Object> model) throws SQLException {
+		
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+	    DataMap resultMap = new DataMap();
+	    model.put("IFID", ifid);
+	    model.put("MSG", "요청이 실패 하였습니다.");
+	    model.put("result", "FAIL");
+
+	    // 1. IFID 유효성 검증
+	    List<String> validIfids = Arrays.asList("OMS_IF_308", "OMS_IF_216", "OMS_IF_2041");
+	    if (!validIfids.contains(ifid)) {
+	    	model.put("MSG", "유효하지 않은 IFID 요청");
+	        return JSON_VIEW;
+	    }
+
+	    // 2. 기본값 세팅 (삭제여부 검토)
+	    map.put("I_GUBUN", type);
+	    map.put("ifid", ifid);
+	    map.put(CommonConfig.SES_USER_ID_KEY, "OMSAPI");
+		
+	    System.out.println("=== [OMS API 수신 요청] ======================================");
+	    System.out.println("IFID : " + ifid + " / TYPE : " + type);
+	    System.out.println("요청 파라미터 (OMS): " + map.toString());
+	    log.debug("요청 파라미터 : " + map.toString());
+	    System.out.println("============================================================");
+
+	    // 3. IFID별 처리
+	    if ("OMS_IF_216".equals(ifid)) { // 입고 (판매, 이송)
+	    	resultMap = service.getWmsGRList(map);
+	    	
+	    } else if ("OMS_IF_308".equals(ifid)) { // 출고 (판매, 이송)
+	    	resultMap = service.getWmsGIList(map);
+	        
+	    } else if ("OMS_IF_2041".equals(ifid)) { // 임가공 입고
+	    	resultMap = service.getWmsGRTollPList(map);
+	    }
+	    
+	    // resultMap의 내용을 model에 병합
+	    if (resultMap != null && !resultMap.isEmpty()) {
+	        model.putAll(resultMap);
+	    }
+
+	    // 4. 결과 반환
+	    System.out.println("=== [OMS API 응답 결과] ======================================");
+	    System.out.println(model.toString());
+	    System.out.println(resultMap.toString());
+	    System.out.println("============================================================");
+
+	    return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping(value = "/common/tmsApi/json/{ifid}.*", method=RequestMethod.POST)
+	public String recieveTmsRESTFUL(@PathVariable String ifid, HttpServletRequest request, Map<String, Object> model) throws SQLException {
+		
+		DataMap map = (DataMap) request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+	    DataMap resultMap = new DataMap();
+	    model.put("IFID", ifid);
+	    model.put("MSG", "요청이 실패 하였습니다.");
+	    model.put("result", "FAIL");
+
+	    // 1. IFID 유효성 검증
+	    // WMS_IFC301	출고예정정보(주문)_신규
+	    // WMS_IFC302	출고예정정보(이송)_신규
+	    // WMS_IFB301	출고예정정보(주문)_수정
+	    // WMS_IFB302	출고예정정보(이송)_수정
+	    List<String> validIfids = Arrays.asList("WMS_IFC301", "WMS_IFC302", "WMS_IFC302", "WMS_IFB302");
+	    if (!validIfids.contains(ifid)) {
+	    	model.put("MSG", "유효하지 않은 IFID 요청");
+	        return JSON_VIEW;
+	    }
+
+	    // 2. 기본값 세팅 (삭제여부 검토)
+	    map.put("IFID", ifid);
+	    map.put("IFTBL", "IFWMS113");
+    	map.put("RFCFN", "Z_WMS_DELIVERY_TYPE_INFO_2");
+    	map.put("RFCTBL", "T_DELINFO");
+    	map.put("OWNRKY", "KN");
+    	//map.put("RFCP1", " ");
+    	//map.put("RFCP2", " ");
+    	//map.put("WERKS", "");
+    	//map.put("VBELN", "");
+	    map.put(CommonConfig.SES_USER_ID_KEY, "TMSAPI");
+		
+	    System.out.println("=== [TMS API 수신 요청] ======================================");
+	    System.out.println("IFID : " + ifid);
+	    System.out.println("요청 파라미터 : " + map.toString());
+	    log.debug("요청 파라미터 (TMS) : " + map.toString());
+	    System.out.println("============================================================");
+
+	    // 3. IFID별 처리
+	    // 출고예정정보(주문)_신규/수정
+	    if ("WMS_IFC301".equals(ifid) || "WMS_IFB301".equals(ifid)) {
+	    	map.put("BWART", "201,208,206");
+	
+    	// 출고예정정보(이송)_신규/수정
+	    } else if ("WMS_IFC302".equals(ifid) || "WMS_IFB302".equals(ifid)) {
+	    	map.put("BWART", "221");
+	    } 
+	    // 반품포함 3회 호출 필요 또는 통합 처리 가능할지 확인
+	    
+	    resultMap = service.receive_START(map);
+	    
+	    if (resultMap != null && !resultMap.isEmpty()) {
+	    	model.put("result", "SUCCESS");
+	    	model.put("MSG", resultMap.get("row_count"));
+		    //model.put("data", resultMap.get("data"));
+	    }
+
+	    // 4. 결과 반환
+	    System.out.println("=== [TMS API 응답 결과] ======================================");
+	    System.out.println(model.toString());
+	    System.out.println(resultMap.toString());
+	    System.out.println("============================================================");
+
+	    return JSON_VIEW;
+	}
+}

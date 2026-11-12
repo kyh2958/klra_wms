@@ -1,0 +1,2932 @@
+<?xml version="1.0" encoding="UTF-8"?><!--Converted at: Wed Feb 23 09:50:06 KST 2022-->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="WmsMobileInboundGoodsReceipt">
+	<!--
+		Sorry, I can`t migrate	DataMap
+		See console output for further details 
+	-->
+	<!--
+		Sorry, I can`t migrate	StringMap
+		See console output for further details 
+	-->
+	<!-- ================================================================================================= -->
+	<!-- PDGR01 ASN바코드에 대한 데이터 BEGIN-->
+	<!-- ================================================================================================= -->
+	<select id="GR01ITEMLIST_LIST" parameterType="Map" resultType="DataMap">
+		SELECT ROW_NUMBER() OVER(ORDER BY AI.ASNDIT) AS RNUM
+		     , AI.ASNDKY AS ASNDKY 
+		     , AI.ASNDIT AS ASNDIT 
+		     , AI.SKUKEY AS SKUKEY 
+		     , NVL(TRIM(AI.LOCARV),SW.LOCARV) AS LOCAKY
+		     , SUM(AI.QTYASN) AS QTYASN
+		     , (AI.QTYASN-AI.QTYRCV) AS QTYRCV
+		     , AI.UOMKEY AS UOMKEY
+		     , AI.DESC01 AS DESC01
+		     , AI.EANCOD AS EANCOD
+		     , '99991231' AS RCVLMT
+		     , AI.LOTA11 AS LOTA11
+		     , AI.LOTA13 AS LOTA13
+		     , (AI.QTYASN-AI.QTYRCV) AS ASNQTY
+		     , 0 AS QTYBOX
+		     , 0 AS QTYRMN
+		     , NVL(MI.QTPUOM,0) AS QTIPSU
+		     , AI.QTYRCV AS QTYRCV1
+		     , SUM(AI.QTYASN - AI.QTYRCV) AS QTABLE
+
+		FROM ASNDI AI INNER JOIN ASNDH AH ON AH.ASNDKY = AI.ASNDKY
+		LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = AH.OWNRKY AND SM.SKUKEY = AI.SKUKEY
+		LEFT OUTER JOIN SKUWC SW ON SW.WAREKY = AH.WAREKY AND SW.OWNRKY = AH.OWNRKY AND SW.SKUKEY = AI.SKUKEY
+		LEFT OUTER JOIN MEASI MI ON MI.WAREKY = AH.WAREKY AND MI.MEASKY = SW.MEASKY AND MI.UOMKEY = 'BOX'
+		WHERE AI.ASNDKY = #{ASNDKY}
+
+		GROUP BY AI.QTYASN
+		       , AI.QTYRCV
+		       , MI.QTPUOM
+		       , AI.LOTA13
+		       , AI.LOTA11
+		       , AI.EANCOD
+		       , AI.UOMKEY
+		       , AI.LOCARV
+		       , SW.LOCARV
+		       , AI.SKUKEY
+		       , AI.ASNDIT
+		       , AI.ASNDKY
+		       , AI.DESC01
+	</select>	
+	
+	<select id="GR01SKULIST_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		FROM ASNDI AI
+		INNER JOIN ASNDH AH ON AH.ASNDKY = AI.ASNDKY
+		WHERE 1= 1
+		AND (AH.ASNDKY = #{ASNDKY} OR AI.ASNDKY||AI.ASNDIT = #{ASNDKY})
+		AND SKUKEY = #{SKUKEY}
+	</select>
+	<!-- ================================================================================================= -->
+	<!-- PDGR01 ASN바코드에 대한 데이터 : END-->
+	<!-- ================================================================================================= -->
+	
+	<!-- <select id="RCPTTYCOMBOGR01_LIST" parameterClass="Map" resultClass="DataMap">
+		SELECT DOCUTY AS VALUE_COL
+		     , SHORTX AS TEXT_COL
+		  FROM DOCTM
+		 WHERE 1 = 1
+		   AND DOCCAT = '100'
+		   AND DOCUTY IN ('112')
+	</select> -->
+	
+	<select id="RCPTTYCOMBOPDGR01_LIST" parameterType="Map" resultType="DataMap">
+		SELECT DOCUTY AS VALUE_COL
+		     , SHORTX AS TEXT_COL
+		  FROM DOCTM
+		 WHERE 1 = 1
+		   AND DOCCAT = '100'
+		   AND DOCUTY = '112'
+	</select>
+	
+	<select id="ASNCOUNT_112_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		 WHERE AH.WAREKY = #{SES_WAREKY}
+		   AND AH.OWNRKY = #{SES_OWNER}
+		   <if test="ASNINV != null and ASNINV != ''">
+			AND (AH.ASNDKY = #{ASNINV} OR AI.ASNDKY||AI.ASNDIT = #{ASNINV})
+		   </if>
+		   AND AI.QTYASN - AI.QTYRCV &gt; 0
+		   AND AH.ASNTTY = '051'
+		   <if test="ASNDAT != null and ASNDAT != ''">
+		       AND AH.ASNDAT = #{ASNDAT}
+		   </if>
+	</select>
+	
+	<select id="ASNCOUNT_113_MAP" parameterType="Map" resultType="DataMap">
+		SELECT *
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		 WHERE AH.WAREKY = #{SES_WAREKY}
+		   AND AH.OWNRKY = #{SES_OWNER}
+		   AND AH.ASNDKY = #{ASNINV}
+		   AND AI.QTYASN - AI.QTYRCV &gt; 0
+		   AND AH.ASNTTY = '051'
+		   <if test="ASNDAT != null and ASNDAT != ''">
+		       AND AH.ASNDAT = #{ASNDAT}
+		   </if>
+	</select>	
+	
+	<select id="PDGR01_MAP" parameterType="Map" resultType="DataMap">
+		SELECT * FROM
+		(SELECT AH.ASNDKY, AI.ASNDIT
+		     , #{BARCOD} AS BARCOD
+		     , NVL(TRIM(AI.LOCARV),SW.LOCARV) AS LOCAKY
+		     , '112' AS ASNTTY
+		     , AH.ASNDKY AS REFDKY
+			 , AI.ASNDIT AS REFDIT
+			 , '100' AS REFCAT
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS REFDAT
+			    , AI.SEBELN AS SEBELN
+			 , AI.SEBELP AS SEBELP
+		     , DT.SHORTX AS ASNTTYNM
+		     , AH.DPTNKY AS PTNRKY
+		     , AI.SKUKEY
+		     , SM.EANCOD
+		     , SM.DESC01
+		     , SM.ASKU01
+		     , ' ' AS LOTA10
+		     , AI.LOTA11 AS LOTA11
+		     , TO_CHAR(SYSDATE, 'YYYYMMDD') AS LOTA12
+		     , AI.LOTA13 AS LOTA13
+		     , ' ' AS TRNUID
+		     , SM.DUOMKY AS UOMKEY
+		     , SW.MEASKY
+		     , SUM(AI.QTYASN) AS QTYASN
+		     , SUM(AI.QTYASN - AI.QTYRCV) AS QTABLE
+		     , NVL(MI.QTPUOM,0) AS QTIPSU
+		     , (AI.QTYASN-AI.QTYRCV) AS QTYRCV
+		     , AI.QTYRCV AS QTYRCV1
+		     , 0 AS QTYBOX
+		     , 0 AS QTYRMN
+		     , SM.INDBZL
+		     , NVL(SM.QTYMON,1) AS EXPIRED_LIMIT
+		     , NVL(SM.QTYSTD,1) AS WARNING_LIMIT
+		     , '99991231' AS RCVLMT
+		     , AH.DOCTXT AS DOCKNO
+		     , AH.DRELIN   
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		       INNER JOIN SKUMA SM ON SM.OWNRKY = AH.OWNRKY AND SM.SKUKEY = AI.SKUKEY
+		       INNER JOIN SKUWC SW ON SW.WAREKY = AH.WAREKY AND SW.OWNRKY = AH.OWNRKY AND SW.SKUKEY = AI.SKUKEY
+		       LEFT OUTER JOIN MEASI MI ON MI.WAREKY = AH.WAREKY AND MI.MEASKY = SW.MEASKY AND MI.UOMKEY = 'BOX'
+		       INNER JOIN DOCTM DT ON DT.DOCUTY = AH.ASNTTY
+		       LEFT OUTER JOIN WAHMA WF ON WF.WAREKY = AH.DPTNKY
+		<!--       LEFT OUTER JOIN SKUWC SW ON SW.WAREKY = AH.WAREKY AND SW.OWNRKY = AH.OWNRKY AND SW.SKUKEY = AI.SKUKEY-->
+		 WHERE AH.WAREKY = #{SES_WAREKY}
+		   AND AH.OWNRKY = #{SES_OWNER}
+		<!--    AND AI.QTYASN > AI.QTYRCV -->
+		   <if test="ASNINV != null and ASNINV != ''">
+			   AND (AH.ASNDKY = #{ASNINV} OR AI.ASNDKY || AI.ASNDIT = #{ASNINV})
+		   </if>
+		   <if test="SKUKEY != null and SKUKEY != ''">
+		   	   AND AI.SKUKEY = #{SKUKEY}
+		   </if>
+		   <if test="BARCOD != null and BARCOD != ''">
+		       AND (AI.SKUKEY = #{BARCOD} OR (AI.ASNDKY = SUBSTR(#{BARCOD},1,10) AND AI.ASNDIT = SUBSTR(#{BARCOD},11,6)) )
+		   </if>
+		  GROUP BY AH.ASNDKY
+		     , AI.ASNDIT
+		     , AH.ASNTTY
+		     , AH.DOCCAT
+		     , AI.SEBELN
+		     , AI.SEBELP
+		     , AH.DPTNKY
+		     , DT.SHORTX
+		     , AI.SKUKEY
+		     , SM.DESC01
+		     , SM.ASKU01
+		     , SM.DUOMKY
+		     , SW.MEASKY
+		     , MI.QTPUOM
+		     , SM.INDBZL
+             , SM.EANCOD
+             , SM.GTINCD 
+             , SM.ASKU05
+             , SM.QTYMON
+             , SM.QTYSTD
+             , AI.QTYRCV
+             , AI.LOTA11
+             , AI.LOTA13
+		     , AH.DOCTXT 
+		     , AH.WAREKY 
+		     , AI.LOTA10
+		     , AH.DRELIN
+		     , AI.LOCARV
+		     , SW.LOCARV
+		     , AI.QTYASN
+		)
+		WHERE ROWNUM = 1
+	</select>
+	
+	<select id="PDGR01_RE_MAP" parameterType="Map" resultType="DataMap">
+		SELECT '' AS ASNINV
+		     , '' AS BARCOD
+		     , '' AS ASNTTY
+		     , '' AS ASNTTYNM
+		     , '' AS WAREFR
+		     , '' AS SELLER
+		     , '' AS SELLERNM
+		     , '' AS SKUKEY
+		     , '' AS DESC01
+		     , '' AS ASKU01
+		     , '' AS LOTA11 /* 제조일자*/
+		     , '' AS LOTA13 /* 유통기한*/
+		     , '' AS RCVLMT
+		     , '' AS LOT1113
+		     , '' AS TRNUID
+		     , '' AS UOMKEY
+		     , '' AS MEASKY
+		     , '' AS QTYASN
+		     , '' AS QTABLE
+		     , '' AS QTYRCV
+		     , '' AS QTIPSU
+		     , '' AS QTYBOX
+		     , '' AS QTYRMN
+		     , '' AS INDBZL
+		  FROM DUAL
+	</select>
+	
+	<select id="ASN_BARCOD_COUNT_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		       INNER JOIN SKUMA SM ON SM.OWNRKY = AH.OWNRKY AND SM.SKUKEY = AI.SKUKEY
+		 WHERE AH.WAREKY = #{SES_WAREKY}
+		   AND AH.OWNRKY = #{SES_OWNER}
+		   <if test="ASNINV != null and ASNINV != ''">
+			   AND (AH.ASNDKY = #{ASNINV} OR AI.ASNDKY || AI.ASNDIT = #{ASNINV})
+		   </if>
+		   <if test="BARCOD != null and BARCOD != ''">
+			   AND (AI.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD} OR (AI.ASNDKY = SUBSTR(#{BARCOD},1,10) AND AI.ASNDIT = SUBSTR(#{BARCOD},11,6))) 
+		   </if>
+		<!--    AND AI.QTYASN - AI.QTYRCV > 0 -->
+	</select>
+	
+	<select id="PDGR01_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT CASE WHEN (SUM(STD.QTYRCV) + SUM(AI.QTYRCV)) &gt; SUM(AI.QTYASN) THEN 'VALID_M1722' 
+		            WHEN SM.SKUKEY IS NULL THEN 'MASTER_M0669' || '†' || STD.SKUKEY
+		            WHEN SW.IBPROT = 'V' THEN 'VALID_M1559' || '†' || SW.IBPROT      
+		            WHEN BZ.PROCHA = 'V' THEN 'VALID_M1559' || '†' || BZ.PROCHA     
+		            WHEN BZ.PTNRKY IS NULL THEN 'VALID_M1558' || '†' || STD.PTNRKY 
+		            WHEN LM.LOCAKY IS NULL THEN 'OUT_M0070' || '†' || STD.LOCAKY
+		            WHEN TRIM(STD.LOTA13) IS NULL THEN 'VALID_M1604' || '†' || STD.SKUKEY  
+		            WHEN TO_DATE(REPLACE(STD.LOTA12,'-',''), 'YYYYMMDD') &gt; TO_DATE(REPLACE(STD.RCVLMT,'-',''), 'YYYYMMDD') THEN 'VALID_M1582' 
+		            WHEN TRIM(BZ.PROCHA) IS NOT NULL THEN 'IN_M0143'
+		            WHEN AI.QTYASN =  0  THEN 'VALID_M1589'    
+		            WHEN AI.QTYASN &lt;= AI.QTYRCV THEN 'VALID_M1589'
+		            ELSE 'OK'
+		         END AS MSG
+		  FROM ( 
+		         ${VALIDATION_SQL} 
+		       ) STD 
+               LEFT OUTER JOIN ASNDI AI
+                            ON AI.ASNDKY = STD.ASNDKY
+                           AND AI.SKUKEY = STD.SKUKEY
+		       LEFT OUTER JOIN SKUMA SM 
+		                    ON SM.OWNRKY = #{SES_OWNER} 
+		                   AND SM.SKUKEY = STD.SKUKEY
+		       LEFT OUTER JOIN SKUWC SW	
+		                    ON SW.WAREKY = STD.WAREKY 
+		                   AND SW.OWNRKY = STD.OWNRKY 
+		                   AND SW.SKUKEY = STD.SKUKEY
+		       LEFT OUTER JOIN BZPTN BZ 
+		                    ON BZ.OWNRKY = STD.OWNRKY 
+		                   AND BZ.PTNRKY = STD.PTNRKY 
+		                   AND BZ.PTNRTY = 'VD'
+		       LEFT OUTER JOIN LOCMA LM
+		                    ON LM.WAREKY = STD.WAREKY 
+		                   AND LM.LOCAKY = STD.LOCAKY
+		 GROUP BY AI.QTYRCV 
+		        , SM.SKUKEY
+		        , STD.SKUKEY
+		        , SW.IBPROT
+		        , SW.IBPROT      
+		        , BZ.PROCHA
+		        , BZ.PROCHA     
+		        , BZ.PTNRKY
+		        , STD.PTNRKY 
+		        , LM.LOCAKY
+		        , STD.LOCAKY
+		        , STD.LOTA12
+		        , STD.RCVLMT  
+		        , BZ.PROCHA
+		        , AI.QTYASN 
+		        , AI.QTYASN 
+		        , SM.ASKU01
+		        , STD.LOTA13 
+	</select>
+	
+	<insert id="PDGR01_H_INSERT" parameterType="Map">
+			INSERT INTO RECDH
+		(
+		    RECVKY
+		  , WAREKY
+		  , RCPTTY
+		  , STATDO
+		  , DOCDAT
+		  , DOCCAT
+		  , DPTNKY
+		  , ARCPTD
+		  , OWNRKY
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		)
+		SELECT #{RECVKY}
+		     , #{WAREKY}
+		     , #{RCPTTY}
+		     , 'NEW'
+		     , TO_CHAR(SYSDATE,'YYYYMMDD')
+		     , '100'
+		     , AH.DPTNKY
+		     , TO_CHAR(SYSDATE,'YYYYMMDD')
+		     , #{OWNRKY}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		 WHERE AH.ASNDKY = #{ASNDKY}
+		   AND ROWNUM = 1
+	</insert>
+	
+	<insert id="PDGR01_I_INSERT" parameterType="Map">
+		INSERT INTO RECDI
+		(
+		    RECVKY, RECVIT, STATIT, SKUKEY
+		  , LOTNUM, AREAKY, LOCAKY, TRNUID
+		  , QTYRCV, QTYUOM
+		  , MEASKY, UOMKEY, QTPUOM, DUOMKY, QTDUOM
+
+		  , LOTA01, LOTA02, LOTA03, LOTA04, LOTA05
+		  , LOTA06, LOTA07, LOTA08, LOTA09, LOTA10
+		  , LOTA11, LOTA12, LOTA13, LOTA14, LOTA15
+		  , LOTA16, LOTA17, LOTA18, LOTA19, LOTA20
+		
+		  , AWMSNO, REFDKY, REFDIT, REFCAT, REFDAT
+		  , DESC01, DESC02
+		  , ASKU01, ASKU02, ASKU03, ASKU04, ASKU05
+		  , EANCOD, GTINCD
+		  , SKUG01, SKUG02, SKUG03, SKUG04, SKUG05
+		  , GRSWGT, NETWGT, WGTUNT
+		  , LENGTH, WIDTHW, HEIGHT, CUBICM, CAPACT
+		  , QTYORG
+		
+		  , SMANDT, SEBELN, SEBELP, SZMBLNO, SZMIPNO
+		  , STRAID, SVBELN, SPOSNR, STKNUM, STPNUM
+		  , SWERKS, SLGORT, SDATBG, STDLNR
+		  , SSORNU, SSORIT
+		  , SMBLNR, SZEILE, SMJAHR, SXBLNR
+		  , SBKTXT
+		
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		)
+		SELECT #{RECVKY}, TRIM(TO_CHAR(ROWNUM * 10, '000000')) AS RECVIT, ' ', AI.SKUKEY
+		     , ' ' AS LOTNUM, ' ' AS AREAKY, #{LOCAKY} AS LOCAKY, NVL(TRIM(#{TRNUID}), ' ') AS TRNUID		                              
+		     , #{QTYRCV} AS QTYRCV, 0
+		     , SW.MEASKY, SM.DUOMKY AS UOMKEY, 1 AS QTPUOM, SM.DUOMKY AS DUOMKY, 1 AS QTDUOM
+		
+		     , NVL(#{LOTA01},' '), NVL(#{LOTA02},' '), NVL(#{LOTA03},' '), NVL(#{LOTA04},' '), NVL(#{LOTA05},' ')
+		     , '00' AS LOTA06, NVL(#{LOTA07},' '), NVL(#{LOTA08},' '), NVL(#{LOTA09},' '), NVL(#{LOTA10},' ')
+		     , NVL(TRIM(#{LOTA11}), '10000101') AS LOTA11, TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA12, NVL(#{LOTA13},'99991231'), ' ' AS LOTA14, ' ' AS LOTA15
+		     , 0 AS LOTA16, 0 AS LOTA17, 0 AS LOTA18, 0 AS LOTA19, 0 AS LOTA20
+		
+		     , AI.AWMSNO
+		     , AH.ASNDKY AS REFDKY
+		     , AI.ASNDIT AS REFDIT
+		     , '050' AS REFCAT
+		     , TO_CHAR(SYSDATE,'YYYYMMDD') AS REFDAT
+		
+		     , SM.DESC01, SM.DESC02
+		     , SM.ASKU01, SM.ASKU02, SM.ASKU03, SM.ASKU04, SM.ASKU05
+		     , SM.EANCOD, SM.GTINCD
+		     , SM.SKUG01, SM.SKUG02, SM.SKUG03, SM.SKUG04, SM.SKUG05
+		     , SM.GRSWGT, SM.NETWGT, SM.WGTUNT
+		     , SM.LENGTH, SM.WIDTHW, SM.HEIGHT, SM.CUBICM, SM.CAPACT
+		     , AI.QTYASN AS QTYORG
+		
+		     , AI.SMANDT, AI.SEBELN, AI.SEBELP, AI.SZMBLNO, AI.SZMIPNO
+		     , AI.STRAID, AI.SVBELN, AI.SPOSNR, AI.STKNUM, AI.STPNUM
+		     , AI.SWERKS, AI.SLGORT, AI.SDATBG, AI.STDLNR
+		     , AI.SSORNU, AI.SSORIT
+		     , AI.SMBLNR, AI.SZEILE, AI.SMJAHR, AI.SXBLNR
+		     , ' ' AS SBKTXT
+		
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		       INNER JOIN SKUMA SM ON SM.OWNRKY = AH.OWNRKY AND SM.SKUKEY = AI.SKUKEY
+		       INNER JOIN SKUWC SW ON SW.WAREKY = AH.WAREKY AND SW.OWNRKY = AH.OWNRKY AND SW.SKUKEY = AI.SKUKEY
+		       LEFT OUTER JOIN MEASI MI ON MI.WAREKY = AH.WAREKY AND MI.MEASKY = SW.MEASKY AND MI.UOMKEY = 'BOX'
+		       INNER JOIN DOCTM DT ON DT.DOCUTY = AH.ASNTTY
+		       LEFT OUTER JOIN WAHMA WF ON WF.WAREKY = AH.DPTNKY
+		 WHERE AH.WAREKY = #{WAREKY}
+		   AND AH.OWNRKY = #{OWNRKY}
+		   AND AH.ASNDKY = #{ASNDKY}
+		   AND AI.ASNDIT = #{ASNDIT}
+		   AND (AI.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD})
+		   AND AI.QTYASN - AI.QTYRCV &gt; 0
+	</insert> 
+	
+	
+	
+	<insert id="PDGR01_POP_I_INSERT" parameterType="Map">
+		INSERT INTO RECDI
+		(
+		    RECVKY, RECVIT, STATIT
+		
+		  , SKUKEY, LOTNUM, AREAKY, LOCAKY, TRNUID
+		  , QTYRCV, QTYUOM
+		  , MEASKY, UOMKEY, QTPUOM, DUOMKY, QTDUOM
+
+		  , LOTA01, LOTA02, LOTA03, LOTA04, LOTA05
+		  , LOTA06, LOTA07, LOTA08, LOTA09, LOTA10
+		  , LOTA11, LOTA12, LOTA13, LOTA14, LOTA15
+		  , LOTA16, LOTA17, LOTA18, LOTA19, LOTA20
+		
+		  , AWMSNO, REFDKY, REFDIT, REFCAT, REFDAT
+		  , DESC01, DESC02
+		  , ASKU01, ASKU02, ASKU03, ASKU04, ASKU05
+		  , EANCOD, GTINCD
+		  , SKUG01, SKUG02, SKUG03, SKUG04, SKUG05
+		  , GRSWGT, NETWGT, WGTUNT
+		  , LENGTH, WIDTHW, HEIGHT, CUBICM, CAPACT
+		  , QTYORG
+		
+		  , SMANDT, SEBELN, SEBELP, SZMBLNO, SZMIPNO
+		  , STRAID, SVBELN, SPOSNR, STKNUM, STPNUM
+		  , SWERKS, SLGORT, SDATBG, STDLNR
+		  , SSORNU, SSORIT
+		  , SMBLNR, SZEILE, SMJAHR, SXBLNR
+		  , SBKTXT
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		)
+		SELECT #{RECVKY}, #{RECVIT}, ' ', AI.SKUKEY
+		     , ' ' AS LOTNUM, ' ' AS AREAKY, #{LOCAKY} AS LOCAKY, NVL(TRIM(#{TRNUID}), ' ') AS TRNUID		                              
+		     , #{QTYRCV} AS QTYRCV, 0
+		     , SW.MEASKY, SM.DUOMKY AS UOMKEY, 1 AS QTPUOM, SM.DUOMKY AS DUOMKY, 1 AS QTDUOM
+		
+		     , NVL(#{LOTA01},' '), NVL(#{LOTA02},' '), NVL(#{LOTA03},' '), NVL(#{LOTA04},' '), NVL(#{LOTA05},' ')
+		     , '00' AS LOTA06, NVL(#{LOTA07},' '), NVL(#{LOTA08},' '), NVL(#{LOTA09},' '), NVL(#{LOTA10},' ')
+		     , NVL(TRIM(#{LOTA11}), '10000101') AS LOTA11, TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA12, NVL(#{LOTA13},'99991231'), ' ' AS LOTA14, ' ' AS LOTA15
+		     , 0 AS LOTA16, 0 AS LOTA17, 0 AS LOTA18, 0 AS LOTA19, 0 AS LOTA20
+		
+		     , AI.AWMSNO
+		     , AH.ASNDKY AS REFDKY
+		     , AI.ASNDIT AS REFDIT
+		     , '050' AS REFCAT
+		     , TO_CHAR(SYSDATE,'YYYYMMDD') AS REFDAT
+		
+		     , SM.DESC01, SM.DESC02
+		     , SM.ASKU01, SM.ASKU02, SM.ASKU03, SM.ASKU04, SM.ASKU05
+		     , SM.EANCOD, SM.GTINCD
+		     , SM.SKUG01, SM.SKUG02, SM.SKUG03, SM.SKUG04, SM.SKUG05
+		     , SM.GRSWGT, SM.NETWGT, SM.WGTUNT
+		     , SM.LENGTH, SM.WIDTHW, SM.HEIGHT, SM.CUBICM, SM.CAPACT
+		     , AI.QTYASN AS QTYORG
+		
+		     , AI.SMANDT, AI.SEBELN, AI.SEBELP, AI.SZMBLNO, AI.SZMIPNO
+		     , AI.STRAID, AI.SVBELN, AI.SPOSNR, AI.STKNUM, AI.STPNUM
+		     , AI.SWERKS, AI.SLGORT, AI.SDATBG, AI.STDLNR
+		     , AI.SSORNU, AI.SSORIT
+		     , AI.SMBLNR, AI.SZEILE, AI.SMJAHR, AI.SXBLNR
+		     , ' ' AS SBKTXT
+		
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		  FROM ASNDH AH
+		       INNER JOIN ASNDI AI ON AI.ASNDKY = AH.ASNDKY
+		       INNER JOIN SKUMA SM ON SM.OWNRKY = AH.OWNRKY AND SM.SKUKEY = AI.SKUKEY
+		       INNER JOIN SKUWC SW ON SW.WAREKY = AH.WAREKY AND SW.OWNRKY = AH.OWNRKY AND SW.SKUKEY = AI.SKUKEY
+		       LEFT OUTER JOIN MEASI MI ON MI.WAREKY = AH.WAREKY AND MI.MEASKY = SW.MEASKY AND MI.UOMKEY = 'BOX'
+		       INNER JOIN DOCTM DT ON DT.DOCUTY = AH.ASNTTY
+		       LEFT OUTER JOIN WAHMA WF ON WF.WAREKY = AH.DPTNKY
+		 WHERE AH.WAREKY = #{WAREKY}
+		   AND AH.OWNRKY = #{OWNRKY}
+		   AND AH.ASNDKY = #{ASNDKY}
+		   AND AI.ASNDIT = #{ASNDIT}
+		   AND (AI.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD})
+		   AND AI.QTYASN - AI.QTYRCV &gt; 0
+	</insert>
+	
+	<select id="PDGR01_POP_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT CASE WHEN (#{QTY} + SUM(AI.QTYRCV)) &gt; SUM(AI.QTYASN) THEN 'VALID_M1722' 
+		            ELSE 'OK'
+		         END AS MSG
+		  FROM ASNDI AI
+         WHERE ASNDKY = #{ASNDKY}
+           AND SKUKEY = #{SKUKEY}
+	</select>
+	
+	<select id="PDGR01_POP_STLKY_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SLM.WAREKY
+		     , SLM.STLNM
+		     , SLM.STLKY
+		     , MAX(SLM.WMSMAK) AS WMSMAK
+		FROM STLMA SLM
+		WHERE SLM.OWNRKY = #{OWNRKY}
+		  AND SLM.WAREKY = #{WAREKY}
+		  AND SLM.PLNTKY IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND SLM.WMSMAK = 'V'
+		  <if test="STLKY != null and STLKY != ''">AND SLM.STLKY = #{STLKY}</if>
+		GROUP BY SLM.WAREKY, SLM.STLKY, SLM.STLNM
+		ORDER BY SLM.STLKY
+	</select>
+	
+	<select id="PDGR01_POP_STLKYINFO_MAP" parameterType="Map" resultType="DataMap">
+		  SELECT SLM.WAREKY
+		     , SLM.STLNM
+		     , SLM.STLKY
+		     , MAX(SLM.WMSMAK) AS WMSMAK
+		FROM STLMA SLM
+		WHERE SLM.OWNRKY = #{OWNRKY}
+		  AND SLM.WAREKY = #{WAREKY}
+		  AND SLM.PLNTKY IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND SLM.WMSMAK = 'V'
+		  AND SLM.STLKY = #{LOTA01}
+		  AND ROWNUM = 1
+		GROUP BY SLM.WAREKY, SLM.STLKY, SLM.STLNM
+	</select>
+	
+	<select id="PDGR01_EBELN_LIST" parameterType="Map" resultType="DataMap">
+	    SELECT PO.WERKS AS OWNRKY
+			 , PO.EBELN AS SEBELN
+			 , PO.EBELN
+			 , PO.WAREKY
+			 , PO.BWART AS RCPTTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS RCPTNM
+			 , PO.EINDT AS ASNDAT
+			 , PO.ORDCAT AS DOCCAT
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS DOCDAT
+			 , PO.LIFNR AS DPTNKY
+			 , MAX(BZ.NAME01) AS DPTNNM
+			 , PO.BWART AS DOCUTY
+			 --, DECODE(SUM( CASE WHEN PO.IFFLG != 'Y' THEN 1 ELSE 0 END ), 0, 'FRV', 'NEW')  AS STATDO
+			 , MAX(CASE WHEN  EXISTS (SELECT MAX(RECVKY) ,STATIT FROM RECDI re WHERE re.SEBELN = po.EBELN AND re.SEBELP = po.EBELP GROUP BY STATIT HAVING STATIT = 'FRV'  ) THEN 'FRV' ELSE 'NEW'  END) AS STATDO
+			 ,  ' ' AS DOCTXT
+			 , PO.PTNRTY
+			 , PO.BEDAT
+			 , PO.IFID AS IFID_RECV
+             , PO.MRFLG
+             , PO.BWARTSAP
+             , PO.DLEFLG
+             , MAX(PO.AR_NO) AS AR_NO
+     		 , MAX(PO.AR_REV) AS AR_REV
+             , 'V' AS SAPIFYN
+             , MAX(SLM.WMSMAK) AS WMSMAK
+		  FROM IFWMS103 PO
+		  LEFT OUTER JOIN BZPTN BZ ON BZ.PTNRKY = PO.LIFNR AND BZ.OWNRKY = #{OWNRKY} AND BZ.PTNRTY = PO.PTNRTY
+		  LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = PO.SKUKEY
+	 	  LEFT OUTER JOIN DOCTM DT ON DT.DOCUTY = PO.BWART
+		  LEFT OUTER JOIN LOTAT LT ON LT.LOTNUM = PO.LOTNUM
+		  LEFT OUTER JOIN SKUPLT SLT ON SLT.OWNRKY = #{OWNRKY} AND SLT.WAREKY = #{WAREKY} AND SLT.PLNTKY = PO.LOTA02 AND SLT.SKUKEY = PO.SKUKEY
+		  LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = PO.LOTA02 AND SLM.STLKY  = NVL(TRIM(LT.LOTA01), NVL(TRIM(PO.LOTA01),SLT.STLKY)) AND SLM.WMSMAK = 'V' 
+		 WHERE PO.WAREKY = #{WAREKY}
+		   AND PO.WERKS  = #{OWNRKY} 
+		   AND PO.STATUS IN ('U','C')
+		   AND PO.IFFLG = 'N'
+		   AND PO.DLEFLG = 'N'
+		   AND PO.PRCFLG = 'C'
+		   AND (PO.MRFLG != 'S0' 
+		   		OR ( PO.MRFLG  = 'S0' 
+		   			 AND PO.LOTA01 NOT IN ('2400', '3000')
+		   			 AND PO.LOTA02 LIKE CASE WHEN PO.BWART = '121' THEN '%' ELSE 'P100' END 
+		   		   )
+		   		)
+		   AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		   AND EXISTS (
+                        SELECT 'X'
+                          FROM DOCPG X
+                         WHERE X.PROGID = #{PROGID}
+                           AND X.DOCUTY = PO.BWART
+                      )
+		  <if test="BEDAT != null and BEDAT != ''">
+			AND PO.BEDAT = #{BEDAT}
+		  </if>
+		  <if test="BWART != null and BWART != ''">
+			AND PO.BWART = #{BWART}
+		  </if>
+		  <if test="LOTA02 != null and LOTA02 != ''">
+			AND PO.LOTA02 = #{LOTA02}
+		  </if>
+		  <if test="REGN01 != null and REGN01 != ''">
+			AND PO.LOTA01 = #{REGN01}
+		  </if>
+		 GROUP BY PO.WERKS,
+				  PO.EBELN,
+				  PO.WAREKY,
+				  PO.BWART,
+				  PO.EINDT,
+				  PO.LIFNR,
+			      PO.LGORT,
+			      PO.BEDAT, 
+			      PO.ORDCAT,
+			      DT.SYSLOC,
+			      PO.PTNRTY, 
+			      PO.IFID,
+			      PO.MRFLG,
+			      PO.BWARTSAP,
+			      PO.DLEFLG
+		 ORDER BY PO.EBELN DESC
+	</select>
+	
+	<select id="PDGR01_DEADLINE_LIST" parameterType="Map" resultType="DataMap">
+	    SELECT PO.WERKS AS OWNRKY
+			 , PO.EBELN AS SEBELN
+			 , PO.EBELN
+			 , PO.WAREKY
+			 , PO.BWART AS RCPTTY
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS DOCDAT
+			 , PO.LIFNR AS DPTNKY
+			 , MAX(BZ.NAME01) AS DPTNNM
+			 ,  ' ' AS DOCTXT
+			 , PO.PTNRTY
+			 , PO.BEDAT
+             , PO.DLEFLG
+             , PO.AR_NO
+			 , PO.AR_REV
+             <choose>
+			    <when test="BARCOD != null and BARCOD != ''"> 
+			  		, 'V' AS CHECKYN
+			  	</when>
+				<otherwise>
+					, ' ' AS CHECKYN 
+				</otherwise>
+			  </choose>
+		FROM IFWMS103 PO
+		  LEFT OUTER JOIN BZPTN BZ ON BZ.PTNRKY = PO.LIFNR AND BZ.OWNRKY = #{OWNRKY} AND BZ.PTNRTY = PO.PTNRTY
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS  = #{OWNRKY} 
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG IN ('N','Y')
+		  AND PO.DLEFLG = 'N'
+		  AND PO.PRCFLG = 'C'
+		  AND PO.MRFLG != 'S0'
+		  AND PO.BWART = '111'
+		  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART
+                     )
+		  <if test="BEDAT != null and BEDAT != ''">
+			AND PO.BEDAT = #{BEDAT}
+		  </if>
+		  <if test="BARCOD != null and BARCOD != ''">
+		  	AND PO.LOTA14 = #{BARCOD}
+		  </if>
+		GROUP BY PO.WERKS,
+				 PO.EBELN,
+				 PO.WAREKY,
+				 PO.BWART,
+				 PO.LIFNR,
+			     PO.BEDAT, 
+			     PO.PTNRTY, 
+			     PO.DLEFLG, 
+			     PO.AR_NO, 
+			     PO.AR_REV
+		ORDER BY PO.EBELN DESC
+	</select>
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR01 ASN입고 : END-->
+	<!-- ================================================================================================== -->
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR02 입고 : BEGIN-->
+	<!-- ================================================================================================== -->
+
+	<select id="GR02SAMELIST_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		FROM IFWMS103 PO
+		WHERE 1= 1
+		AND (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		AND SKUKEY = #{SKUKEY}
+	</select>
+
+	<select id="GR02ITEMLIST_LIST" parameterType="Map" resultType="DataMap">
+		SELECT PO.SKUKEY
+		    ,  SM.DESC01 
+		    ,  SW.LOCARV AS LOCAKY
+		    ,  ' ' AS TRNUID
+		    ,  PO.MENGE AS QTYORD
+		    ,  PO.MEINS AS UOMKEY
+		    ,  PO.MENGE_R AS MENGER
+		    ,  (PO.MENGE - PO.MENGE_R) AS QTYRCV
+		    ,  '00' AS LOTA06
+		    ,  TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA11
+		    ,  '99991231' AS LOTA13
+		    ,  PO.EBELN AS SEBELN
+		    ,  PO.EBELP AS SEBELP
+		    ,  SM.EANCOD AS EANCOD
+		FROM IFWMS103 PO
+		LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = 'HNW' AND SM.SKUKEY = PO.SKUKEY
+		LEFT OUTER JOIN SKUWC SW ON SW.WAREKY = PO.WAREKY AND SW.OWNRKY = PO.WERKS AND SW.SKUKEY = PO.SKUKEY
+		WHERE PO.WAREKY = #{SES_WAREKY}
+		AND PO.WERKS = #{SES_OWNER} 
+		AND (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		AND (PO.MENGE - PO.MENGE_R) &gt; 0
+		AND PO.STATUS IN ('U','C')
+		AND PO.IFFLG IN ('N')
+	</select>
+	
+	<select id="RCPTTYCOMBOPDGR02_LIST" parameterType="Map" resultType="DataMap">
+		SELECT DOCUTY AS VALUE_COL
+		     , SHORTX AS TEXT_COL
+		  FROM DOCTM
+		 WHERE 1 = 1
+		   AND DOCCAT = '100'
+		   AND DOCUTY = '101'
+	</select>
+
+	<select id="IFWMS103COUNT_101_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+	      FROM IFWMS103
+	     WHERE WAREKY = #{SES_WAREKY}
+	       AND WERKS  = #{SES_OWNER}
+	       AND BWART  = '101'
+	       AND (EBELN = #{SEBELN} OR EBELN||EBELP = #{SEBELN})
+	       AND (MENGE - MENGE_R - MENGE_B) &gt; 0
+	       AND STATUS IN ('A','C')
+	       AND IFFLG  IN ('N')
+	</select>
+	
+	<select id="IFWMS103_BARCOD_COUNT_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		  FROM IFWMS103 PO
+		       INNER JOIN SKUMA SM 
+		       		   ON SM.OWNRKY = PO.WERKS
+		       		  AND SM.SKUKEY = PO.SKUKEY
+		 WHERE PO.WAREKY = #{SES_WAREKY}
+		   AND PO.WERKS  = #{SES_OWNER}
+		   AND (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		   AND (PO.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD}) 
+		   AND (PO.MENGE - PO.MENGE_R) &gt; 0
+	       AND PO.STATUS IN ('U','C')
+	       AND PO.IFFLG  IN ('N')
+	</select>
+	
+	<select id="PDGR02_MAP" parameterType="Map" resultType="DataMap">
+		SELECT * FROM
+		(SELECT PO.WAREKY AS WAREKY
+		      , NVL((SELECT NAME01 FROM WAHMA WHERE WAREKY = PO.WAREKY),' ') AS WARENM
+		        , PO.WERKS  AS OWNRKY
+		        , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = PO.WERKS),' ') AS OWNRNM
+		        , PO.LGORT  AS AREAKY
+		        , NVL((SELECT SHORTX FROM AREMA WHERE WAREKY = PO.WAREKY AND AREAKY = PO.LGORT),' ') AS AREANM
+		        , PO.EBELN  AS EBELN
+		        , PO.EBELP  AS SEBELP
+		        , 'NEW'     AS STATDO
+		        , NVL((SELECT CDESC1 FROM CMCDV WHERE CMCDKY = 'STATDO' AND CMCDVL = 'NEW'),' ') AS STATDONM
+		        , PO.BWART  AS RCPTTY
+		        , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS RCPTNM
+		        , NVL((SELECT DOCCAT FROM DOCTM WHERE DOCUTY = PO.BWART),'100') AS DOCCAT
+		        , PO.BWART  AS DOCUTY
+		        , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS DOCTNM
+		        , TO_CHAR(SYSDATE,'YYYYMMDD') AS DOCDAT
+		        , PO.EINDT  AS ASNDAT
+		        , PO.LIFNR  AS PTNRKY
+		        , BZ.NAME01 AS PTNRNM
+		        , SM.EANCOD AS EANCOD
+                , SM.GTINCD AS GTINCD
+		        , PO.SKUKEY AS SKUKEY
+		        , SM.DESC01 AS DESC01
+		        , SM.DESC02 AS DESC02
+		        , SW.LOCARV AS LOCAKY
+		        , ' '       AS TRNUID
+		        , PO.SEQNO  AS SEQNO
+		        , PO.MANDT  AS MANDT
+		        , SW.MEASKY AS MEASKY 
+		        , PO.MENGE  AS QTYORD
+		        , PO.MEINS  AS UOMKEY
+		        , PO.MENGE_R AS MENGER
+		        , (PO.MENGE - PO.MENGE_R) AS QTYRCV1
+		        , (PO.MENGE - PO.MENGE_R) AS QTYRCV
+		        , ' '  AS LOTA01
+		        , ' '  AS LOTA02
+		        , ' '  AS LOTA03
+		        , ' '  AS LOTA04
+		        , ' '  AS LOTA05
+		        , '00' AS LOTA06
+		        , ' '  AS LOTA07
+		        , ' '  AS LOTA08
+		        , ' '  AS LOTA09
+		        , PO.C00101 AS LOTA10
+		        , TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA11
+		        , TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA12
+		        , '99991231' AS LOTA13
+		        , ' '  AS LOTA14
+		        , ' '  AS LOTA15
+		        , ' '  AS LOTA16
+		        , ' '  AS LOTA17
+		        , ' '  AS LOTA18
+		        , ' '  AS LOTA19
+		        , ' '  AS LOTA20
+		        , ' '  AS RECVKY
+		        , ' '  AS RECVIT
+		  FROM  IFWMS103 PO
+		        LEFT OUTER JOIN SKUMA SM 
+		                     ON SM.OWNRKY = PO.WERKS
+		                    AND SM.SKUKEY = PO.SKUKEY
+		        LEFT OUTER JOIN SKUWC SW 
+		                     ON SW.WAREKY = PO.WAREKY
+		                    AND SW.OWNRKY = PO.WERKS
+		                    AND SW.SKUKEY = PO.SKUKEY
+		        LEFT OUTER JOIN BZPTN BZ
+		                     ON BZ.PTNRKY = PO.LIFNR
+		                    AND BZ.OWNRKY = PO.WERKS
+		                    AND BZ.PTNRTY = DECODE(SUBSTR(PO.BWART,0,2), '13', 'CT', 'VD')
+		 WHERE  PO.WAREKY = #{SES_WAREKY}
+		  AND  PO.WERKS  = #{SES_OWNER}
+		  AND  PO.BWART  = #{RCPTTY}
+		  AND  (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		<if test="BARCOD != null and BARCOD != ''">
+		  AND (PO.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD}) 
+		</if>
+		  AND  (PO.MENGE - PO.MENGE_R) &gt; 0
+		  AND  PO.STATUS IN ('U','C')
+		  AND  PO.IFFLG  IN ('N')
+		)
+		WHERE  ROWNUM = 1
+	</select>
+	
+	<select id="PDGR02_RE_MAP" parameterType="Map" resultType="DataMap">
+		SELECT '' AS SEBELN
+		     , '' AS BARCOD
+		     , '' AS SEBELP
+		     , '' AS EANCOD
+		     , '' AS SKUKEY
+		     , '' AS DESC01
+		     , '' AS LOCAKY
+		     , '' AS TRNUID
+		     , '' AS LOTA11 /* 제조일자*/
+		     , '' AS LOTA13 /* 유통기한*/
+		     , '' AS LOTA06
+		     , '' AS UOMKEY
+		     , '' AS QTYRCV
+		     , '' AS QTYORD
+		     , '' AS MENGER
+		  FROM DUAL
+
+	</select>
+	
+	<select id="PDGR02_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT CASE WHEN (STD.QTYRCV + SUM(PO.MENGE_R)) &gt; SUM(PO.MENGE) THEN 'IN_M0078' 
+					WHEN SM.SKUKEY IS NULL THEN 'MASTER_M0669' || '†' || STD.SKUKEY
+					WHEN SW.IBPROT = 'V' THEN 'VALID_M1559' || '†' || SW.IBPROT
+					WHEN BZ.PROCHA = 'V' THEN 'VALID_M1559' || '†' || BZ.PROCHA 
+					WHEN LM.LOCAKY IS NULL THEN 'OUT_M0070' || '†' || STD.LOCAKY
+					WHEN TRIM(STD.LOTA13) IS NULL THEN 'VALID_M1604' || '†' || STD.SKUKEY
+					WHEN TRIM(BZ.PROCHA) IS NOT NULL THEN 'IN_M0143'
+					WHEN (PO.MENGE - PO.MENGE_R) =  0  THEN 'VALID_M1589'
+					WHEN PO.MENGE &lt; (PO.MENGE_R + STD.QTYRCV) THEN 'VALID_M1589'
+					ELSE 'OK'
+					END AS MSG
+		  FROM (
+				${VALIDATION_SQL} 
+				) STD 
+				LEFT OUTER JOIN IFWMS103 PO
+							ON PO.SKUKEY = STD.SKUKEY
+							AND PO.EBELN = STD.SEBELN
+				LEFT OUTER JOIN SKUMA SM 
+							ON SM.OWNRKY = #{SES_OWNER} 
+							AND SM.SKUKEY = STD.SKUKEY
+				LEFT OUTER JOIN SKUWC SW	
+							ON SW.WAREKY = STD.WAREKY 
+							AND SW.OWNRKY = STD.OWNRKY 
+							AND SW.SKUKEY = STD.SKUKEY
+				LEFT OUTER JOIN BZPTN BZ 
+							ON BZ.OWNRKY = STD.OWNRKY 
+							AND BZ.PTNRTY = 'VD'
+				LEFT OUTER JOIN LOCMA LM
+							ON LM.WAREKY = STD.WAREKY 
+							AND LM.LOCAKY = STD.LOCAKY
+		 GROUP BY SM.SKUKEY
+				, STD.SKUKEY
+				, SW.IBPROT
+				, BZ.PROCHA
+				, LM.LOCAKY
+				, STD.LOCAKY
+				, SM.ASKU01
+				, STD.LOTA13
+				, PO.MENGE
+				, PO.MENGE_R
+				, STD.QTYRCV
+	</select>
+	
+	<insert id="PDGR02_INSERT" parameterType="Map">
+			INSERT INTO RECDH
+		(
+		    RECVKY
+		  , WAREKY
+		  , RCPTTY
+		  , STATDO
+		  , DOCDAT
+		  , DOCCAT
+		  , DPTNKY
+		  , ARCPTD
+		  , OWNRKY
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		  , UPDCHK
+		)
+		SELECT #{RECVKY}
+		     , #{WAREKY}
+		     , #{RCPTTY}
+		     , 'NEW'
+		     , TO_CHAR(SYSDATE,'YYYYMMDD')
+		     , '100'
+		     , PO.LIFNR
+		     , TO_CHAR(SYSDATE,'YYYYMMDD')
+		     , #{OWNRKY}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , 0
+		  FROM IFWMS103 PO
+		 WHERE (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		   AND ROWNUM = 1
+	</insert>
+	
+	<insert id="PDGR02Sub_INSERT" parameterType="Map">
+		INSERT INTO RECDI
+		(
+		    RECVKY, RECVIT, STATIT, SKUKEY
+		  , LOTNUM, AREAKY, LOCAKY, TRNUID
+		  , QTYRCV, QTYUOM
+		  , MEASKY, UOMKEY, QTPUOM, DUOMKY, QTDUOM
+
+		  , LOTA01, LOTA02, LOTA03, LOTA04, LOTA05
+		  , LOTA06, LOTA07, LOTA08, LOTA09, LOTA10
+		  , LOTA11, LOTA12, LOTA13, LOTA14, LOTA15
+		  , LOTA16, LOTA17, LOTA18, LOTA19, LOTA20
+		
+		  , AWMSNO, REFDKY, REFDIT, REFCAT, REFDAT
+		  , DESC01, DESC02
+		  , ASKU01, ASKU02, ASKU03, ASKU04, ASKU05
+		  , EANCOD, GTINCD
+		  , SKUG01, SKUG02, SKUG03, SKUG04, SKUG05
+		  , GRSWGT, NETWGT, WGTUNT
+		  , LENGTH, WIDTHW, HEIGHT, CUBICM, CAPACT
+		  , QTYORG
+		
+		  , SMANDT, SEBELN, SEBELP, SZMBLNO, SZMIPNO
+		  , STRAID, SVBELN, SPOSNR, STKNUM, STPNUM
+		  , SWERKS, SLGORT, SDATBG, STDLNR
+		  , SSORNU, SSORIT
+		  , SMBLNR, SZEILE, SMJAHR, SXBLNR
+		  , SBKTXT
+		
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		)
+		SELECT #{RECVKY}, TRIM(TO_CHAR(ROWNUM * 10, '000000')) AS RECVIT, ' ', PO.SKUKEY
+		     , ' ' AS LOTNUM, ' ' AS AREAKY, #{LOCAKY} AS LOCAKY, NVL(TRIM(#{TRNUID}), ' ') AS TRNUID
+		     , #{QTYRCV} AS QTYRCV, 0
+		     , SW.MEASKY, SM.DUOMKY AS UOMKEY, 1 AS QTPUOM, SM.DUOMKY AS DUOMKY, 1 AS QTDUOM
+		
+		     , NVL(TRIM(#{LOTA01}), ' ') AS LOTA01, NVL(TRIM(#{LOTA02}), ' ') AS LOTA02, NVL(TRIM(#{LOTA03}), ' ') AS LOTA03, NVL(TRIM(#{LOTA04}), ' ') AS LOTA04, NVL(TRIM(#{LOTA05}), ' ') AS LOTA05
+		     , '00' AS LOTA06, NVL(TRIM(#{LOTA07}), ' ') AS LOTA07, NVL(TRIM(#{LOTA08}), ' ') AS LOTA08, NVL(TRIM(#{LOTA09}), ' ') AS LOTA09, NVL(TRIM(#{LOTA10}), ' ') AS LOTA10
+		     , NVL(TRIM(#{LOTA11}), '10000101') AS LOTA11, TO_CHAR(SYSDATE,'YYYYMMDD') AS LOTA12, NVL(#{LOTA13},'99991231'), NVL(TRIM(#{LOTA14}), ' ') AS LOTA14, NVL(TRIM(#{LOTA15}), ' ') AS LOTA15
+		     , 0 AS LOTA16, 0 AS LOTA17, 0 AS LOTA18, 0 AS LOTA19, 0 AS LOTA20
+		
+		     , ' ' AS AWMSNO
+		     , ' ' AS REFDKY
+		     , PO.EBELP AS REFDIT
+		     , PO.BWART AS REFCAT
+		     , TO_CHAR(SYSDATE,'YYYYMMDD') AS REFDAT
+		
+		     , SM.DESC01, SM.DESC02
+		     , SM.ASKU01, SM.ASKU02, SM.ASKU03, SM.ASKU04, SM.ASKU05
+		     , SM.EANCOD, SM.GTINCD
+		     , SM.SKUG01, SM.SKUG02, SM.SKUG03, SM.SKUG04, SM.SKUG05
+		     , SM.GRSWGT, SM.NETWGT, SM.WGTUNT
+		     , SM.LENGTH, SM.WIDTHW, SM.HEIGHT, SM.CUBICM, SM.CAPACT
+		     , PO.MENGE AS QTYORG
+		
+		     , PO.MANDT, EBELN AS SEBELN, EBELP AS SEBELP, ' ' AS SZMBLNO, ' ' AS SZMIPNO		     
+		    , ' ' AS STRAID, ' ' AS SVBELN, ' ' AS SPOSNR, ' ' AS STKNUM, ' 'AS STPNUM
+		     , ' ' AS SWERKS, ' ' AS SLGORT, ' ' AS SDATBG, ' ' AS STDLNR
+		     , ' ' AS SSORNU, ' ' AS SSORIT
+		     , ' ' AS SMBLNR, ' ' AS SZEILE, ' ' AS SMJAHR, ' ' AS SXBLNR
+		     , ' ' AS SBKTXT
+		
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		     , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		  FROM IFWMS103 PO
+		       INNER JOIN SKUMA SM ON SM.OWNRKY = PO.WERKS AND SM.SKUKEY = PO.SKUKEY
+		       INNER JOIN SKUWC SW ON SW.WAREKY = PO.WAREKY AND SW.OWNRKY = PO.WERKS AND SW.SKUKEY = PO.SKUKEY
+		       LEFT OUTER JOIN MEASI MI ON MI.WAREKY = PO.WAREKY AND MI.MEASKY = SW.MEASKY AND MI.UOMKEY = 'BOX'
+		       INNER JOIN DOCTM DT ON DT.DOCUTY = PO.BWART
+		       LEFT OUTER JOIN WAHMA WF ON WF.WAREKY = PO.WERKS
+		 WHERE PO.WAREKY = #{WAREKY}
+		   AND PO.WERKS = #{OWNRKY}
+		   AND PO.BWART = #{RCPTTY}
+		   AND (PO.EBELN = #{SEBELN} OR PO.EBELN||PO.EBELP = #{SEBELN})
+		   AND (PO.SKUKEY = #{BARCOD} OR SM.EANCOD = #{BARCOD} OR SM.GTINCD = #{BARCOD})
+		   AND (PO.MENGE - PO.MENGE_R) &gt; 0
+	</insert> 
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR02 입고 : END-->
+	<!-- ================================================================================================== -->
+	
+	
+	
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR01 입고(자재,상품) : START-->
+	<!-- ================================================================================================== -->
+	<select id="GR_CURDATE_MAP" parameterType="Map" resultType="DataMap">
+		SELECT F_SET_DATE(SYSDATE) AS DOCDAT
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS ORDDAT
+		     , TO_CHAR(SYSDATE,'YYYY.MM.DD') AS DOCDAT_DOT
+		     , TO_CHAR(SYSDATE,'YYYY') AS DOCDAT_YYYY
+		     , TO_CHAR(SYSDATE,'MM') AS DOCDAT_MM
+		     , TO_CHAR(SYSDATE,'DD') AS DOCDAT_DD
+		FROM DUAL
+	</select>
+	
+	<select id="EBELNCOMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT EBELN AS VALUE_COL
+		     , EBELN AS TEXT_COL
+		FROM IFWMS103 PO
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS = #{OWNRKY}
+		  AND (PO.MENGE - PO.MENGE_R) &gt; 0
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG IN ('N','Y')
+		  AND PO.LOTA02 = #{LOTA02}
+		  AND PO.MRFLG != 'S0'
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART                       
+                     )
+		GROUP BY EBELN
+		ORDER BY EBELN DESC
+	</select>
+	
+	<select id="PDGR01_LIST" parameterType="Map" resultType="DataMap">
+        SELECT T1.WERKS AS OWNRKY
+             , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = #{OWNRKY}), ' ') AS OWNRNM
+			 , T1.WAREKY
+			 , T1.EBELN
+			 , T1.EBELN AS SEBELN
+			 , T1.BWART AS RCPTTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = T1.BWART),' ') AS RCPTNM
+			 , T1.SKUKEY
+			 , SM.DESC01
+			 , T1.MEINS
+			 , T1.LOTA01
+			 , SLM.STLNM -- 저장위치명
+			 , T1.LOTA02
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA02', T1.LOTA02) AS PLNTNM -- 플랜트명
+			 , T1.LOTA06
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA06', T1.LOTA06) AS LOTA06NM
+			 , T1.MENGE
+			 , T1.MENGE_R
+			 , T1.QTYRCV1
+			 , T1.BWART
+			 , MI.UOMKEY AS MUOMKEY
+			 , SZF_GET_DEFAULT_QTY(T1.WAREKY, T1.SKUKEY, T1.QTYRCV1, T1.MEINS) AS UOMQTY
+			 , T1.DLEFLG
+			 , T1.AR_NO
+	 		 , T1.AR_REV
+	 		 , T1.LIFNR AS PTNRKY
+	 		 , T1.PTNRTY
+        FROM (
+	        WITH TDI_T AS (
+			    SELECT IWM103.EBELN
+				     , IWM103.EBELP
+				     , TI.OWNRKY
+				     , TI.LOTA11
+				     , TI.LOTA14
+				     , TI.LOTA15
+				     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, IWM103.SKUKEY, SUM(TI.QTCOMP), TI.AUOMKY, IWM103.MEINS)),'0.000') AS QTCOMP
+				     , SK.LOTNUM
+				     , LA.LOTA21
+				     , LA.LOTA22
+				     , LA.LOTA23
+				     , LA.LOTA24
+				     , IWM103.IFFLG
+				FROM IFWMS103 IWM103
+				  INNER JOIN SHPDI SI
+				          ON SI.SVBELN = IWM103.EBELN
+	                     AND SI.SPOSNR = IWM103.EBELP
+				  INNER JOIN TASDI TI
+				          ON TI.OWNRKY = IWM103.WERKS
+				         AND TI.SHPOKY = SI.SHPOKY
+				         AND TI.SHPOIT = SI.SHPOIT
+				         AND TI.LOTA15 = IWM103.LOTA15
+				         AND TI.LOTA15 != ' '
+				         AND TI.STATIT IN ('FPC', 'PPC')
+				         AND TI.LOTA14 = #{LOTA14}
+				  INNER JOIN TASDR TR
+				          ON TR.TASKKY = TI.TASKKY 
+				         AND TR.TASKIT = TI.TASKIT 
+				         AND TR.TASKIR = (
+				                            SELECT MIN(X.TASKIR)
+				                            FROM TASDR X
+				                            WHERE X.TASKKY = TR.TASKKY 
+				                              AND X.TASKIT = TR.TASKIT
+				                            GROUP BY X.TASKKY, X.TASKIT
+				                         )
+				  INNER JOIN STKKY SK
+				          ON SK.STOKKY = TR.STOKKY
+				  INNER JOIN LOTAT LA
+				          ON LA.LOTNUM = SK.LOTNUM
+				WHERE IWM103.BWART = '121'
+				  AND IWM103.WERKS = #{OWNRKY}
+				  AND (IWM103.MRFLG != 'S0' 
+				  	   OR ( IWM103.MRFLG  = 'S0' 
+				  	        AND IWM103.LOTA01 NOT IN ('2400', '3000')
+				  	        AND IWM103.LOTA02 LIKE CASE WHEN IWM103.BWART = '121' THEN '%' ELSE 'P100' END 
+				  	       )
+				  	   )
+				  <if test="EBELN != null and EBELN != ''">
+				    AND IWM103.EBELN = #{EBELN} 
+				  </if>
+				  <if test="BEDATFROM != null and BEDATFROM != ''">
+					AND IWM103.BEDAT >= #{BEDATFROM}
+				  </if>
+				  AND EXISTS (
+				               SELECT 'X'
+				               FROM STLMA X
+				               WHERE X.OWNRKY = #{OWNRKY} 
+				                 AND X.WAREKY = (
+				                                  SELECT MAX(SA.WAREKY)
+				                                  FROM STLMA SA
+				                                  WHERE SA.OWNRKY = #{OWNRKY} 
+				                                    AND SA.PLNTKY = IWM103.FLOTA02 
+				                                    AND SA.STLKY = IWM103.FLOTA01
+				                                )
+				                 AND X.WMSMAK = 'V'
+				                 AND X.OWNRKY = IWM103.WERKS
+	                 			 AND X.PLNTKY = IWM103.FLOTA02
+	                 			 AND X.STLKY = IWM103.FLOTA01
+				             )
+				GROUP BY IWM103.EBELN, IWM103.EBELP, TI.LOTA14, TI.LOTA15, TI.OWNRKY
+			     , TI.LOTA11, SK.LOTNUM, LA.LOTA21, LA.LOTA22, LA.LOTA23
+			     , LA.LOTA24, IWM103.SKUKEY, IWM103.IFFLG, TI.AUOMKY, IWM103.MEINS
+			),
+			RICNT_T AS (
+				SELECT RI.SEBELN, RI.SEQNO, RI.LOTA14, COUNT(1) AS CNT
+				FROM RECDI RI
+				WHERE EXISTS (
+				                SELECT 'X'
+				                FROM TDI_T X
+				                WHERE X.EBELN = RI.SEBELN
+				             )
+				  AND EXISTS (
+				                SELECT 'X'
+				                FROM RECDH RH
+				                WHERE RH.RECVKY = RI.RECVKY
+				                  AND RH.STATDO != 'RCN'
+				             )
+				GROUP BY RI.SEBELN, RI.SEQNO, RI.LOTA14
+			)
+			
+			-- 첫 번째 조건(IFWMS103 개별바코드 조회): PO.LOTA14 = '개별바코드'
+	        SELECT PO.WERKS
+				 , PO.WAREKY
+				 , PO.EBELN
+				 , PO.BWART
+				 , PO.SKUKEY
+				 , PO.MEINS
+				 , PO.LOTA01
+				 , PO.LOTA02
+				 , PO.LOTA06
+				 , PO.LIFNR
+				 , PO.PTNRTY
+				 , SUM(PO.MENGE) AS MENGE
+				 , SUM(PO.MENGE_R) AS MENGE_R
+		         , (SUM(PO.MENGE) - SUM(PO.MENGE_R)) AS QTYRCV1
+		         , MAX(PO.DLEFLG) AS DLEFLG
+		         , MAX(PO.AR_NO) AS AR_NO
+         		 , MAX(PO.AR_REV) AS AR_REV
+			FROM IFWMS103 PO
+			  LEFT OUTER JOIN TDI_T TI_T ON TI_T.EBELN = PO.EBELN AND TI_T.EBELP = PO.EBELP AND TI_T.IFFLG = PO.IFFLG AND TI_T.LOTA15=PO.LOTA15
+			  LEFT OUTER JOIN RICNT_T RT_T ON RT_T.SEBELN = PO.EBELN AND RT_T.SEQNO = PO.SEQNO AND RT_T.LOTA14 = TI_T.LOTA14
+			WHERE PO.WAREKY = #{WAREKY}
+			  AND PO.WERKS = #{OWNRKY} 
+	          AND PO.STATUS IN ('U','C')
+<!-- 	          AND PO.IFFLG = 'N' -->
+	          AND DECODE(NVL(TRIM(RT_T.CNT),'0'), '0', PO.IFFLG, 'Y' ) = 'N'
+	          AND PO.DLEFLG = 'N'
+	          AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+	          AND (PO.MRFLG != 'S0' 
+	               OR ( PO.MRFLG  = 'S0' 
+	                    AND PO.LOTA01 NOT IN ('2400', '3000')
+	                    AND PO.LOTA02 LIKE CASE WHEN PO.BWART = '121' THEN '%' ELSE 'P100' END 
+	                  )
+	               )
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM DOCPG X
+	                       WHERE X.PROGID = #{PROGID}
+	                         AND X.DOCUTY = PO.BWART
+	                     )
+	          <if test="EBELN != null and EBELN != ''">
+			    AND PO.EBELN = #{EBELN} 
+			  </if>
+			  <if test="BEDATFROM != null and BEDATFROM != ''">
+				AND PO.BEDAT >= #{BEDATFROM}
+			  </if>
+			  <if test="LOTA14 != null and LOTA14 != ''">
+			    AND PO.LOTA14 = #{LOTA14}
+			  </if>
+			GROUP BY PO.WERKS, PO.WAREKY, PO.EBELN, PO.BWART, PO.SKUKEY, PO.MEINS, PO.LOTA01, PO.LOTA02, PO.LOTA06, PO.LIFNR, PO.PTNRTY
+			
+			UNION 
+			
+			-- 두 번째 조건(이송입고인 경우 TASDI 개별바코드 조회): PO.BWART = '121' AND TI_T.LOTA14 = '개별바코드'
+			SELECT PO.WERKS
+				 , PO.WAREKY
+				 , PO.EBELN
+				 , PO.BWART
+				 , PO.SKUKEY
+				 , PO.MEINS
+				 , PO.LOTA01
+				 , PO.LOTA02
+				 , PO.LOTA06
+				 , PO.LIFNR
+				 , PO.PTNRTY
+				 , SUM(PO.MENGE) AS MENGE
+				 , SUM(PO.MENGE_R) AS MENGE_R
+		         , (SUM(PO.MENGE) - SUM(PO.MENGE_R)) AS QTYRCV1
+		         , MAX(PO.DLEFLG) AS DLEFLG
+		         , MAX(PO.AR_NO) AS AR_NO
+         		 , MAX(PO.AR_REV) AS AR_REV
+			FROM IFWMS103 PO
+			  LEFT OUTER JOIN TDI_T TI_T ON TI_T.EBELN = PO.EBELN AND TI_T.EBELP = PO.EBELP AND TI_T.IFFLG = PO.IFFLG AND TI_T.LOTA15=PO.LOTA15
+			  LEFT OUTER JOIN RICNT_T RT_T ON RT_T.SEBELN = PO.EBELN AND RT_T.SEQNO = PO.SEQNO AND RT_T.LOTA14 = TI_T.LOTA14
+			WHERE PO.WAREKY = #{WAREKY}
+			  AND PO.WERKS = #{OWNRKY} 
+	          AND PO.STATUS IN ('U','C')
+<!-- 	          AND PO.IFFLG = 'N' -->
+	          AND DECODE(NVL(TRIM(RT_T.CNT),'0'), '0', PO.IFFLG, 'Y' ) = 'N'
+	          AND PO.DLEFLG = 'N'
+	          AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+	          AND (PO.MRFLG != 'S0' 
+	               OR ( PO.MRFLG  = 'S0' 
+	                    AND PO.LOTA01 NOT IN ('2400', '3000')
+	                    AND PO.LOTA02 LIKE CASE WHEN PO.BWART = '121' THEN '%' ELSE 'P100' END 
+	                  )
+	               )
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM DOCPG X
+	                       WHERE X.PROGID = #{PROGID}
+	                         AND X.DOCUTY = PO.BWART
+	                     )
+	          <if test="EBELN != null and EBELN != ''">
+			    AND PO.EBELN = #{EBELN} 
+			  </if>
+			  <if test="BEDATFROM != null and BEDATFROM != ''">
+				AND PO.BEDAT >= #{BEDATFROM}
+			  </if>
+			  AND PO.BWART = '121' 
+			  <if test="LOTA14 != null and LOTA14 != ''">
+			    AND TI_T.LOTA14 = #{LOTA14}
+			  </if>
+			GROUP BY PO.WERKS, PO.WAREKY, PO.EBELN, PO.BWART, PO.SKUKEY, PO.MEINS, PO.LOTA01, PO.LOTA02, PO.LOTA06, PO.LIFNR, PO.PTNRTY
+		) T1
+		LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = T1.SKUKEY
+		LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = T1.LOTA02 AND SLM.STLKY  = T1.LOTA01
+		LEFT OUTER JOIN MEASI MI ON MI.WAREKY = T1.WAREKY AND MI.MEASKY = T1.SKUKEY AND MI.INDDFU = 'V'
+        ORDER BY T1.SKUKEY  
+	</select>
+	
+	
+	<select id="PDGR122_LIST" parameterType="Map" resultType="DataMap">
+			 
+		 SELECT BWART
+		 , PO.IFFLG 
+		 , PO.EBELN
+		 , PO.EBELP
+		 , PO.SKUKEY
+		 , PO.MENGE
+		 , '0.000' AS PALQTY
+		 , PO.MEINS 
+		 , po.LOTA02
+		 , po.LOTA01
+		 , PO.N00101 -- 임가공 (완제품가공비)
+		 , PO.C00101 -- 임가공 (통화)
+		 , PO.C00102 -- 임가공 (구성품 자재코드)
+		 , PO.FLOTA02 -- 임가공 (구성품 출고플랜트)
+		 , PO.FLOTA01 -- 임가공 (구성품 저장위치)
+		 , PO.N00102 -- 임가공 (구성품 출고수량)
+		 , PO.C00104 -- 임가공 (구성품 자재단위)
+		 , PO.C00103 -- 임가공 (구성품 배치번호)
+		 , PO.VBELV	 -- MTO 주문번호
+		 , PO.POSNV  -- MTO 아이템번호
+		FROM IFWMS103 PO 
+		WHERE PO.STATUS != 'D' 
+		AND PO.BWART = '122' 
+		AND PO.IFFLG != 'Y'
+		<if test="LOTA02 != null and LOTA02 != ''">
+		    AND PO.LOTA02 = #{LOTA02}
+		  </if>
+	  	<choose>
+       		<when test="EBELN != null and EBELN != ''">
+       			AND PO.EBELN = #{EBELN} 
+		 	</when>
+	   		<otherwise>
+	   			AND 1 = 0
+         	</otherwise>
+	 	</choose>
+
+	</select>
+	
+	
+	<select id="PDGR01_POP_MAP" parameterType="Map" resultType="DataMap">
+		SELECT T1.WERKS AS OWNRKY
+             , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = #{OWNRKY}), ' ') AS OWNRNM
+			 , T1.WAREKY
+			 , T1.EBELN
+			 , T1.BWART AS RCPTTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = T1.BWART),' ') AS RCPTNM
+			 , T1.SKUKEY
+			 , SM.DESC01
+			 , SM.SKUG01
+			 , T1.MEINS
+			 , T1.LOTA01
+			 , SLM.STLNM AS LOTA01NM
+			 , T1.LOTA02
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA02', T1.LOTA02) AS LOTA02NM
+			 , T1.LOTA06
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA06', T1.LOTA06) AS LOTA06NM
+			 , T1.MENGE
+			 , T1.MENGE_R
+			 , T1.QTYRCV1
+			 , MI.UOMKEY AS MUOMKEY
+			 , SZF_GET_DEFAULT_QTY(T1.WAREKY, T1.SKUKEY, T1.QTYRCV1, T1.MEINS) AS UOMQTY
+			 , BT.PTNL01
+			 , (CASE WHEN T1.PRCCNT>0 THEN 'Y' ELSE 'N' END ) AS PRCPYN
+			 , NVL((SELECT MAX(LOTA11) FROM stkky WHERE SKUKEY = T1.SKUKEY),' ') AS LASTDAT 
+        FROM (
+	        <include refid="WmsInbound.INBOUND_SUB_WITH_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_WITH_TRANS_SQL"/>
+	        SELECT PO.WERKS
+				 , PO.WAREKY
+				 , PO.EBELN
+				 , PO.BWART
+				 , PO.SKUKEY
+				 , PO.MEINS
+				 , PO.LOTA01
+				 , PO.LOTA02
+				 , PO.LOTA06
+				 , PO.LIFNR
+				 , PO.PTNRTY
+				 , SUM(PO.MENGE) AS MENGE
+				 , SUM(PO.MENGE_R) AS MENGE_R
+				 <choose>
+		       		<when test="RCPTTY != null and RCPTTY == '121'">
+				 , SUM( CASE WHEN PO.DLEFLG = 'Y' OR PO.IFFLG = 'Y' THEN 0 ELSE DECODE(TI_T.EBELN, NULL, (PO.MENGE - PO.MENGE_R), TI_T.QTCOMP ) END ) AS QTYRCV1
+				 	</when>
+			   		<otherwise>
+		         , (SUM(PO.MENGE) - SUM(PO.MENGE_R)) AS QTYRCV1
+		         	</otherwise>
+			 	</choose>
+		         , SUM( CASE WHEN PO.IFFLG='N' AND PO.DLEFLG != 'Y' THEN 1 ELSE 0 END ) AS PRCCNT
+			FROM IFWMS103 PO
+			<include refid="WmsInbound.INBOUND_SUB_FROM_TRANS_SQL"/>
+			WHERE PO.WAREKY = #{WAREKY}
+			  AND PO.WERKS = #{OWNRKY} 
+			  AND PO.SKUKEY = #{SKUKEY}
+			  AND PO.EBELN = #{SEBELN}
+			  AND PO.LOTA01 = #{LOTA01}
+			  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+			  AND PO.LOTA06 = #{LOTA06}
+			  AND PO.BWART = #{BWART}
+	          AND (PO.MENGE - PO.MENGE_R) &gt; 0
+	          AND PO.STATUS IN ('U','C')
+	          <choose>
+		       	<when test="RCPTTY != null and RCPTTY == '121'">
+	          AND DECODE(NVL(TRIM(RT_T.CNT),'0'), '0', PO.IFFLG, 'Y' ) = 'N'
+	          	</when>
+			   	<otherwise>
+			  AND PO.IFFLG = 'N'
+			  	</otherwise>
+			  </choose> 		
+	          AND PO.MRFLG != 'S0'
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM DOCPG X
+	                       WHERE X.PROGID = #{PROGID}
+	                         AND X.DOCUTY = PO.BWART                       
+	                     )
+			GROUP BY PO.WERKS, PO.WAREKY, PO.EBELN, PO.BWART, PO.SKUKEY, PO.MEINS, PO.LOTA01, PO.LOTA02, PO.LOTA06, PO.LIFNR, PO.PTNRTY
+		) T1
+		  LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = T1.SKUKEY
+		  LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = T1.LOTA02 AND SLM.STLKY  = T1.LOTA01
+		  LEFT OUTER JOIN MEASI MI ON MI.WAREKY = T1.WAREKY AND MI.MEASKY = T1.SKUKEY AND MI.INDDFU = 'V'
+		  LEFT OUTER JOIN BZPTN BT ON BT.OWNRKY = 'KN' AND BT.PTNRKY = T1.LIFNR  AND BT.PTNRTY = T1.PTNRTY
+		WHERE ROWNUM=1
+	</select>
+	
+	<select id="PDGR01_POP_LIST" parameterType="Map" resultType="DataMap">
+		SELECT '0' AS QTYRCV
+		     , '0' AS BOX
+		     , A.*
+		FROM (
+			<include refid="WmsInbound.INBOUND_SUB_WITH_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_WITH_TRANS_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_TOP_SQL"/>
+			 , ' ' AS LOTA41
+			 , ' ' AS LOTA42
+			 , ' ' AS LOTA43
+			 , ' ' AS LOTA44
+			 , ' ' AS LOTA45
+			 , '0' AS LOTA46
+			 , '0' AS LOTA47
+			 , '0' AS LOTA48
+			 , ' ' AS LOTA49
+			 , SLM.WMSMAK AS WMSMAK_ORG
+			 , SLM.WMSMAK AS WMSMAK_AF
+			<include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_FROM_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_FROM_TRANS_SQL"/>
+			<include refid="WmsInbound.INBOUND_SUB_WHERE_SQL"/>
+			AND PO.EBELN = #{SEBELN}
+			AND PO.SKUKEY = #{SKUKEY}
+			AND PO.LOTA01 = #{LOTA01}
+			AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+			AND PO.LOTA06 = #{LOTA06}
+			AND PO.BWART = #{BWART}
+			AND PO.DLEFLG = 'N'
+			<choose>
+		       <when test="RCPTTY != null and RCPTTY == '121'">
+			    AND DECODE(NVL(TRIM(RT_T.CNT),'0'), '0', PO.IFFLG, 'Y' ) = 'N'
+			    AND DECODE(TI_T.EBELN, NULL, PO.LOTA14, TI_T.LOTA14 ) != ' '
+			   </when>
+			   <otherwise>
+			    AND PO.IFFLG = 'N'
+			    AND PO.LOTA14 != ' '
+			   </otherwise>
+			 </choose>
+			AND PO.MRFLG != 'S0'
+			<include refid="WmsInbound.INBOUND_SUB_SORT_SQL"/>
+		) A
+	</select>
+
+	<select id="PDGR01_POP_HEAD_LIST" parameterType="Map" resultType="DataMap">
+		SELECT PO.WERKS AS OWNRKY
+			 , PO.EBELN AS SEBELN
+			 , PO.EBELN AS DOCKEY
+			 , PO.WAREKY
+			 , PO.BWART AS RCPTTY
+			 , PO.EINDT AS ASNDAT
+			 , PO.ORDCAT AS DOCCAT
+			 , NVL(TRIM(#{DOCDAT}),TO_CHAR(SYSDATE,'YYYYMMDD')) AS DOCDAT
+			 , (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC ) AS AREAKY
+			 , PO.LIFNR AS DPTNKY
+			 , PO.BWART AS DOCUTY
+             , (
+			     CASE WHEN PO.IFFLG = 'N'
+			            THEN 'NEW'
+			          WHEN PO.IFFLG = 'Y'
+			            THEN 'FRV'
+			          ELSE 'NEW'
+			     END
+			   )  AS STATDO
+			 , ' ' AS DOCTXT
+			 , PO.PTNRTY
+			 , PO.BEDAT
+			 , 'V' AS SAPIFYN
+		FROM IFWMS103 PO
+			 LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = PO.SKUKEY
+			 LEFT OUTER JOIN DOCTM DT ON DT.DOCUTY = PO.BWART
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS  = #{OWNRKY}
+		  AND PO.BWART =  #{RCPTTY}
+		  AND PO.EBELN =  #{SEBELN}	
+		  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG IN ('N','Y')
+		  AND PO.PRCFLG = 'C'
+		  AND PO.MRFLG != 'S0'
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART
+                     )
+		AND PO.IFFLG = 'N'
+		AND ROWNUM = 1
+	</select>
+	
+	
+	<select id="GET_LOTA_INFO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT A.LOTA11
+		     , A.PALQTY
+		     , A.MUOMKEY
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, B.SKUKEY, A.PALQTY, A.MUOMKEY, B.UOMKEY)),'0.000') AS REUOMQTY
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, B.SKUKEY, 1, B.UOMKEY, A.MUOMKEY)),'0.000') AS BAUOMQTY
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, B.SKUKEY, NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, B.SKUKEY, A.PALQTY, A.MUOMKEY, B.UOMKEY)),'0.000'), B.UOMKEY, 'BOX')),'0.000') AS BOX
+		     , B.*
+		FROM (
+			SELECT SZF_GET_DOM ( #{PTNRKY}, #{SKUG01}, #{LOTA11}, #{BARCOD} ) AS LOTA11
+		         , ( SELECT MIP.QTPUOM FROM MEASI MIP WHERE MIP.WAREKY = #{WAREKY} AND MIP.MEASKY = #{SKUKEY} AND MIP.UOMKEY = 'PAL' AND ROWNUM=1 ) AS PALQTY
+		         , ( SELECT MI.UOMKEY FROM MEASI MI WHERE MI.WAREKY = #{WAREKY} AND MI.MEASKY = #{SKUKEY} AND MI.INDDFU = 'V' AND ROWNUM=1 ) AS MUOMKEY
+			FROM DUAL
+		) A
+		  LEFT OUTER JOIN (
+		                    <include refid="WmsInbound.INBOUND_SUB_WITH_SQL"/>
+		                    <include refid="WmsInbound.INBOUND_SUB_WITH_TRANS_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_TOP_SQL"/>
+							 , ' ' AS LOTA41
+							 , ' ' AS LOTA42
+							 , ' ' AS LOTA43
+							 , ' ' AS LOTA44
+							 , ' ' AS LOTA45
+							 , '0' AS LOTA46
+							 , '0' AS LOTA47
+							 , '0' AS LOTA48
+							 , ' ' AS LOTA49
+							<include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_FROM_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_FROM_TRANS_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_WHERE_SQL"/>
+							AND PO.EBELN = #{SEBELN}
+							AND PO.SKUKEY = #{SKUKEY}
+							AND PO.LOTA01 = #{LOTA01}
+							AND PO.LOTA02 = #{LOTA02}
+							AND PO.LOTA06 = #{LOTA06}
+							AND PO.BWART = #{BWART}
+							AND (PO.MENGE - PO.MENGE_R) &gt; 0
+							<if test='LOTA14NULLYN != null and LOTA14NULLYN != "Y"'>
+							AND PO.LOTA14 = ' '
+							</if>
+							
+							<choose>
+					          <when test="RCPTTY != null and RCPTTY == '121'">
+							  AND DECODE(TI_T.EBELN, NULL, PO.LOTA14, TI_T.LOTA14 ) = ' '		
+						      </when>
+						      <otherwise>
+						      AND PO.LOTA14 = ' '
+						      </otherwise>
+						    </choose>
+							
+							AND ROWNUM = 1
+		                  ) B
+		             ON 1=1
+	</select>
+	
+	<select id="PDGR01_WMSMAK_MAP" parameterType="Map" resultType="DataMap">
+		SELECT SLM.WMSMAK
+		FROM STLMA SLM
+		WHERE SLM.OWNRKY = #{OWNRKY}
+		  AND SLM.PLNTKY = #{PLNTKY}
+		  AND SLM.STLKY = #{STLKY}
+	</select>
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR01 입고(자재,상품) : END-->
+	<!-- ================================================================================================== -->
+	
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR05 수입밀롤입고 : BEGIN-->
+	<!-- ================================================================================================== -->
+	
+	<select id="GR05_EBELNCOMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT EBELN AS VALUE_COL
+		     , EBELN AS TEXT_COL
+		FROM IFWMS103 PO
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS = #{OWNRKY}
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG = 'N'
+		  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND PO.MRFLG = 'S0'
+		  AND PO.LOTA02 IN ('P100', 'P400')
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART                       
+                     )
+          AND EXISTS (
+                       SELECT 'X'
+                       FROM ROLLMA RLM
+                       WHERE RLM.CONTNO = PO.SIGNI
+                     )
+		GROUP BY EBELN
+		ORDER BY EBELN DESC
+	</select>
+	
+	<select id="GR05_SIGNICOMBO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SIGNI AS VALUE_COL
+		     , MAX(TO_CHAR(TO_DATE(BEDAT, 'YYYYMMDD'), ' YYYY.MM.DD')) AS TEXT_COL
+		FROM IFWMS103 PO
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS = #{OWNRKY}
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG = 'N'
+		  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND PO.MRFLG = 'S0'
+		  AND PO.LOTA02 IN ('P100', 'P400')
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART                       
+                     )
+          AND EXISTS (
+                       SELECT 'X'
+                       FROM ROLLMA RLM
+                       WHERE RLM.CONTNO = PO.SIGNI
+                     )
+		GROUP BY SIGNI
+		ORDER BY SIGNI DESC
+	</select>
+	
+	<select id="GET_SIGNI_TO_EBELN_MAP" parameterType="Map" resultType="DataMap">
+		SELECT PO.EBELN
+		FROM IFWMS103 PO
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS = #{OWNRKY}
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG = 'N'
+		  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+		  AND PO.SIGNI = #{SIGNI}
+		  AND PO.MRFLG = 'S0'
+		  AND PO.LOTA02 IN ('P100', 'P400')
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART                       
+                     )
+          AND EXISTS (
+                       SELECT 'X'
+                       FROM ROLLMA RLM
+                       WHERE RLM.CONTNO = PO.SIGNI
+                     )
+		  AND ROWNUM = 1
+	</select>
+	
+	<select id="PDGR05_POP_MAP" parameterType="Map" resultType="DataMap">
+		SELECT T1.WERKS AS OWNRKY
+             , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = #{OWNRKY}), ' ') AS OWNRNM
+			 , T1.WAREKY
+			 , T1.EBELN
+			 , T1.BWART AS RCPTTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = T1.BWART),' ') AS RCPTNM
+			 , T1.SKUKEY
+			 , SM.DESC01
+			 , SM.SKUG01
+			 , T1.MEINS
+			 , T1.LOTA01
+			 , SLM.STLNM AS LOTA01NM
+			 , T1.LOTA02
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA02', T1.LOTA02) AS LOTA02NM
+			 , T1.LOTA06
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA06', T1.LOTA06) AS LOTA06NM
+			 , T1.MENGE
+			 , T1.MENGE_R
+			 , T1.QTYRCV1
+			 , MI.UOMKEY AS MUOMKEY
+			 , SZF_GET_DEFAULT_QTY(T1.WAREKY, T1.SKUKEY, T1.MENGE, T1.MEINS) AS UOMQTY
+			 , T1.MRFLG
+        FROM (
+	        SELECT PO.WERKS
+				 , PO.WAREKY
+				 , PO.EBELN
+				 , PO.BWART
+				 , PO.SKUKEY
+				 , PO.MEINS
+				 , PO.LOTA01
+				 , PO.LOTA02
+				 , PO.LOTA06
+				 , SUM(PO.MENGE) AS MENGE
+				 , SUM(PO.MENGE_R) AS MENGE_R
+		         , SUM(PO.MENGE - PO.MENGE_R) AS QTYRCV1
+		         , PO.MRFLG
+			FROM IFWMS103 PO
+			WHERE PO.WAREKY = #{WAREKY}
+			  AND PO.WERKS = #{OWNRKY} 
+			  AND PO.SKUKEY = #{SKUKEY}
+			  AND PO.EBELN = #{SEBELN}
+			  AND PO.LOTA01 = #{LOTA01}
+			  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+			  AND PO.LOTA06 = #{LOTA06}
+			  AND PO.BWART = #{BWART}
+	          AND PO.STATUS IN ('U','C')
+	          AND PO.IFFLG = 'N'
+	          AND PO.MRFLG = 'S0'
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM DOCPG X
+	                       WHERE X.PROGID = #{PROGID}
+	                         AND X.DOCUTY = PO.BWART                       
+	                     )
+			GROUP BY PO.WERKS, PO.WAREKY, PO.EBELN, PO.BWART, PO.SKUKEY, PO.MEINS, PO.LOTA01, PO.LOTA02, PO.LOTA06, PO.MRFLG
+		) T1
+		  LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = T1.SKUKEY
+		  LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = T1.LOTA02 AND SLM.STLKY  = T1.LOTA01
+		  LEFT OUTER JOIN MEASI MI ON MI.WAREKY = T1.WAREKY AND MI.MEASKY = T1.SKUKEY AND MI.INDDFU = 'V'
+		WHERE ROWNUM=1
+	</select>
+	
+	<select id="PDGR05_LIST" parameterType="Map" resultType="DataMap">
+        SELECT T1.WERKS AS OWNRKY
+             , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = #{OWNRKY}), ' ') AS OWNRNM
+			 , T1.WAREKY
+			 , T1.EBELN
+			 , T1.BWART AS RCPTTY
+			 , T1.BWART AS DOCUTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = T1.BWART),' ') AS RCPTNM
+			 , T1.SKUKEY
+			 , SM.DESC01
+			 , T1.MEINS
+			 , T1.LOTA01
+			 , SLM.STLNM AS LOTA01NM
+			 , T1.LOTA02
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA02', T1.LOTA02) AS LOTA02NM
+			 , T1.LOTA06
+			 , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA06', T1.LOTA06) AS LOTA06NM
+			 , T1.MENGE
+			 , T1.MENGE_R
+			 , T1.QTYRCV1
+			 , T1.BWART
+			 , MI.UOMKEY AS MUOMKEY
+			 , SZF_GET_DEFAULT_QTY(T1.WAREKY, T1.SKUKEY, T1.MENGE, T1.MEINS) AS UOMQTY
+			 , T1.MRFLG
+			 , T1.SIGNI			 
+        FROM (
+	        SELECT PO.WERKS
+				 , PO.WAREKY
+				 , PO.EBELN
+				 , PO.BWART
+				 , PO.SKUKEY
+				 , PO.MEINS
+				 , PO.LOTA01
+				 , PO.LOTA02
+				 , PO.LOTA06
+				 , PO.SIGNI 
+				 , SUM(PO.MENGE) AS MENGE
+				 , SUM(PO.MENGE_R) AS MENGE_R
+				 , SUM(PO.MENGE - PO.MENGE_R) AS QTYRCV1
+<!-- 		         , SUM( DECODE( RLM.CONTNO, NULL, (PO.MENGE - PO.MENGE_R), ((RLM.NETWT*RLM.WGTMUL)- PO.MENGE_R) ) )  AS QTYRCV1 -->
+		         , PO.MRFLG
+			FROM IFWMS103 PO
+<!-- 			  INNER JOIN ROLLMA RLM ON RLM.CONTNO = PO.SIGNI -->
+			WHERE PO.WAREKY = #{WAREKY}
+			  AND PO.WERKS = #{OWNRKY} 
+	          AND PO.STATUS IN ('U','C')
+	          AND PO.IFFLG = 'N'
+	          AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+	          AND PO.MRFLG = 'S0'
+	          AND PO.LOTA02 IN ('P100', 'P400')
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM DOCPG X
+	                       WHERE X.PROGID = #{PROGID}
+	                         AND X.DOCUTY = PO.BWART
+	                     )
+	          AND EXISTS (
+	                       SELECT 'X'
+	                       FROM ROLLMA RLM
+	                       WHERE RLM.CONTNO = PO.SIGNI
+	                     )
+			    AND PO.EBELN = #{SEBELN} 
+			  <if test="LOTA14 != null and LOTA14 != ''">
+			    AND RLM.BARCNO = #{LOTA14} 
+			  </if>
+			GROUP BY PO.WERKS, PO.WAREKY, PO.EBELN, PO.BWART, PO.SKUKEY, PO.MEINS, PO.LOTA01, PO.LOTA02, PO.LOTA06, PO.SIGNI , PO.MRFLG, PO.BWARTSAP
+		) T1
+		LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = T1.SKUKEY
+		LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = T1.LOTA02 AND SLM.STLKY  = T1.LOTA01
+		LEFT OUTER JOIN MEASI MI ON MI.WAREKY = T1.WAREKY AND MI.MEASKY = T1.SKUKEY AND MI.INDDFU = 'V'
+        ORDER BY T1.SKUKEY  
+	</select>
+	
+	
+	<select id="GR05_HEAD_LIST" parameterType="Map" resultType="DataMap">
+		SELECT PO.WERKS AS OWNRKY
+			 , NVL((SELECT NAME01 FROM OWNER WHERE OWNRKY = PO.WERKS), ' ') AS OWNRNM
+			 , PO.EBELN AS SEBELN
+			 , PO.EBELN AS DOCKEY
+			 , PO.WAREKY
+			 , NVL((SELECT NAME01 FROM WAHMA WHERE WAREKY = PO.WAREKY),' ') AS WARENM
+			 , PO.BWART AS RCPTTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS RCPTNM
+			 , PO.EINDT AS ASNDAT
+			 , PO.ORDCAT AS DOCCAT
+			 , SZF_GET_DOCCAT_TEXT(#{LANGKY}, PO.ORDCAT) AS DOCCATNM
+			 , TO_CHAR(SYSDATE,'YYYYMMDD') AS DOCDAT
+			 , (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC ) AS AREAKY
+			 , NVL((SELECT SHORTX FROM AREMA WHERE WAREKY = PO.WAREKY AND AREAKY = (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC )),' ') AS AREANM
+			 , PO.LIFNR AS DPTNKY
+			 , MAX(BZ.NAME01) AS DPTNNM
+			 , PO.BWART AS DOCUTY
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS DOCTNM
+             , (
+			     CASE WHEN MAX(PO.IFFLG) = 'N'
+			            THEN 'NEW'
+			          WHEN MAX(PO.IFFLG) = 'Y'
+			            THEN 'FRV'
+			          ELSE 'NEW'
+			     END
+			   )  AS STATDO
+             , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'STATDO', (
+															     CASE WHEN MAX(PO.IFFLG) = 'N'
+															            THEN 'NEW'
+															          WHEN MAX(PO.IFFLG) = 'Y'
+															            THEN 'FRV'
+															          ELSE 'NEW'
+															     END
+															  )
+               ) AS STATDONM
+			 ,  ' ' AS DOCTXT
+			 , PO.PTNRTY
+			 , PO.BEDAT
+			 , PO.IFID AS IFID_RECV
+             , (CASE WHEN SUM(CASE WHEN TRIM(PO.LOTA14) IS NULL THEN 1 ELSE 0 END)=0 THEN 'N' ELSE 'Y' END) AS LOTA14_EMPTY_YN
+             , CASE WHEN 0 = (SELECT COUNT(0) FROM COAMA WHERE SEBELN = PO.EBELN) THEN ' ' ELSE 'V' END AS COAYN
+             , PO.MRFLG
+             , PO.BWARTSAP
+             , 'V' AS SAPIFYN
+		FROM IFWMS103 PO
+			 LEFT OUTER JOIN BZPTN BZ ON BZ.PTNRKY = PO.LIFNR AND BZ.OWNRKY = #{OWNRKY} AND BZ.PTNRTY = PO.PTNRTY
+			 LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = PO.SKUKEY
+			 LEFT OUTER JOIN DOCTM DT ON DT.DOCUTY = PO.BWART
+		WHERE PO.WAREKY = #{WAREKY}
+		  AND PO.WERKS  = #{OWNRKY} 
+		  AND PO.EBELN =  #{SEBELN}
+		  AND PO.STATUS IN ('U','C')
+		  AND PO.IFFLG IN ('N','Y')
+		  AND PO.PRCFLG = 'C'
+		  AND PO.MRFLG = 'S0'
+		  AND PO.LOTA02 IN ('P100', 'P400')
+		  AND EXISTS (
+                       SELECT 'X'
+                       FROM DOCPG X
+                       WHERE X.PROGID = #{PROGID}
+                         AND X.DOCUTY = PO.BWART
+                     )
+		AND PO.IFFLG = 'N'
+		GROUP BY PO.WERKS,
+				 PO.EBELN,
+				 PO.WAREKY,
+				 PO.BWART,
+				 PO.EINDT,
+				 PO.LIFNR,
+			     PO.LGORT,
+			     PO.BEDAT, 
+			     PO.ORDCAT,
+			     DT.SYSLOC,
+			     PO.PTNRTY, 
+			     PO.IFID,
+			     PO.MRFLG,
+			     PO.BWARTSAP
+		ORDER BY PO.EBELN DESC
+	</select>
+	
+	
+	<select id="PDGR05_POP_LIST" parameterType="Map" resultType="DataMap">
+		SELECT NVL(TRIM(LOTA11),SZF_GET_DOM ( A.LOTA42, A.SKUG01, A.LOTA11, A.LOTA14 )) AS LOTA11
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, A.SKUKEY, A.QTYRCV, A.MUOMKEY, 'BOX')),'0.000') AS BOX
+		     , A.*
+		FROM (
+			SELECT PO.WERKS AS OWNRKY
+				 , (SELECT NAME01 FROM OWNER OW WHERE OW.OWNRKY = #{OWNRKY}) AS OWNRNM
+			     , PO.WAREKY
+			     , NVL((SELECT NAME01 FROM WAHMA WHERE WAREKY = #{WAREKY}),' ') AS WARENM
+				 , NVL(MIP.QTPUOM,'0.000') AS PALQTY
+				 , PO.SKUKEY
+			     , SM.DESC01 
+			     , SM.DESC02
+			     , DT.SYSLOC AS LOCAKY
+			     , ' ' AS TRNUID
+			     , PO.MENGE
+			     , PO.MEINS AS UOMKEY
+			     , PO.MENGE_R
+			     , PO.PTNRTY
+			     , DECODE(PO.LOTA01, ' ', SLT.STLKY, PO.LOTA01) AS LOTA01
+			     , PO.LOTA02
+			     , PO.LOTA03
+			     , PO.LOTA04
+			     , PO.LOTA05
+			     , PO.LOTA06
+			     , PO.LOTA07
+			     , PO.LOTA08
+			     , PO.LOTA09
+			     , PO.LOTA10
+			     , PO.LOTA11
+			     , NVL(TRIM(PO.LOTA12),TO_CHAR(SYSDATE,'YYYYMMDD')) AS LOTA12
+			     , PO.LOTA13
+			     , DECODE( RLM.CONTNO, NULL, PO.LOTA14, NVL(RLM.BARCNO,' ') ) AS LOTA14
+			     , DECODE( RLM.CONTNO, NULL, PO.LOTA15, NVL(RLM.BARCNO,' ') ) AS LOTA15
+			     , PO.LOTA16
+			     , PO.LOTA17
+			     , PO.LOTA18
+			     , PO.LOTA19
+			     , PO.LOTA20
+			     , PO.EBELN  AS SEBELN
+			     , PO.EBELP  AS SEBELP
+			     , ' '       AS RECVKY
+			     , ' '       AS RECVIT
+			     , PO.MANDT
+			     , PO.SEQNO
+			     , PO.EBELN
+			     , PO.EBELP
+			     , PO.BEDAT
+			     , PO.BWART
+			     , PO.BWART AS DOCUTY
+			     , PO.SIGNI
+			     , PO.VGBEL
+			     , PO.VGPOS
+			     , PO.RTNRSN AS RSNCOD
+			     , SZF_GET_RSNCOD_TEXT(#{LANGKY}, #{OWNRKY}, NVL(DT.DOCCAT, '100'), PO.BWART, PO.RTNRSN) AS RSNCODNM
+		         , PO.RTNTXT AS RCPRSN
+			     , SM.ASKU05
+			     , SW.MEASKY 
+			     , SM.EANCOD
+			     , MI.UOMKEY AS MUOMKEY
+				 , (RLM.NETWT*RLM.WGTMUL) AS QTYRCV1
+			     , (RLM.NETWT*RLM.WGTMUL) AS QTYRCV
+			     , NVL(TRIM(SZF_GET_DEFAULT_QTY(#{WAREKY}, PO.SKUKEY, (RLM.NETWT*RLM.WGTMUL), PO.MEINS)),'0.000') AS UOMQTY			     
+			     , PO.LOTA21
+		         , PO.LOTA22
+		         , PO.LOTA23
+		         , PO.LOTA24
+				 , PO.CREDAT
+			 	 , PO.CRETIM
+			 	 , PO.CREUSR
+			 	 , PO.LMODAT
+			 	 , PO.LMOTIM
+			 	 , PO.LMOUSR
+			 	 , PO.INDBZL
+			 	 , PO.INDARC
+			 	 , PO.UPDCHK
+			 	 , NVL((SELECT X.NMLAST FROM USRMA X WHERE X.USERID = PO.CREUSR),' ') AS CUSRNM
+			 	 , NVL((SELECT X.NMLAST FROM USRMA X WHERE X.USERID = PO.LMOUSR),' ') AS LUSRNM
+			 	 , SLM.STLNM AS LOTA01NM
+			 	 , (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC ) AS AREAKY
+				 , NVL((SELECT SHORTX FROM AREMA WHERE WAREKY = PO.WAREKY AND AREAKY = (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC )),' ') AS AREANM
+				 , 'FRV' AS STATIT
+				 , SM.SKUG01
+				 , SM.SKUG02
+				 , SM.SKUG03
+				 , NVL((SELECT X.USARG1 FROM CMCDV X WHERE X.CMCDKY = 'SKUG05' AND X.CMCDVL=SM.SKUG05),SM.SKUG04) AS SKUG04
+				 , SM.SKUG05
+				 , SM.SKUG05 AS SKUG05_1
+				 , SLT.QRTAYN
+				 , SLT.SHTAYN
+				 , SLM.WMSMAK
+				 , PO.BWART AS RCPTTY
+				 , PO.LIFNR AS DPTNKY
+				 , PO.ZEKKO_AEDAT
+				 , PO.EINDT AS ASNDAT
+				 , 'NEW' AS STATDO
+				 , NVL(#{DOCDAT},TO_CHAR(SYSDATE,'YYYYMMDD')) AS DOCDAT
+				 , NVL((SELECT DOCCAT FROM DOCTM WHERE DOCUTY = PO.BWART), '100') AS DOCCAT
+				 , DECODE( RLM.CONTNO, NULL, ' ', NVL(RLM.CONTNO,' ') ) AS LOTA41
+				 , DECODE( RLM.CONTNO, NULL, ' ', NVL(RLM.PTNRKY,' ') ) AS LOTA42
+				 , ' ' AS LOTA43
+				 , ' ' AS LOTA44
+				 , ' ' AS LOTA45
+				 , 0 AS LOTA46
+				 , 0 AS LOTA47
+				 , 0 AS LOTA48
+				 , ' ' AS LOTA49				 
+				 , PO.MRFLG
+				 
+				 , RLM.PTNRKY
+			     , BPN.NAME01 AS PTNRKYNM
+			     , RLM.CONTNO
+			     , RLM.BARCNO
+			     , RLM.ZFBLNO
+			     , RLM.ROLLID
+			     , RLM.MATNR
+			     , RLM.MRGSM
+			     , RLM.LENGTH
+			     , RLM.NETWT
+			     , RLM.WGTMUL
+			     , RLM.COREDI
+			     , RLM.KUNIT
+			     , RLM.CPCOD
+			     , RLM.TBRGEW
+			     , RLM.RBRGEW
+			     , RLM.LUNIT
+			     , RLM.DESCRI
+			     , RLM.WEIGHT
+			     , RLM.RMK1
+			     , RLM.RMK2
+			     , RLM.RMK3
+			     , RLM.RMK4
+			     , RLM.RMK5
+			     , RLM.SEQ
+			     , RLM.ITEMNO
+			     , RLM.PTNRPO
+			     , RLM.INVONO
+			     , RLM.PREFIX
+			     , RLM.RECYN
+			     , RLM.ITFCNT
+			     , RLM.ITFFLG
+			     , RLM.ITFETX
+			     , RLM.ITFDAT
+			     , RLM.ITFTIM
+			     , RLM.PRCCNT
+			     , RLM.PRCFLG
+			     , RLM.PRCETX
+			     , RLM.PRCDAT
+			     , RLM.PRCTIM
+				 , 'V' AS SAPIFYN
+				<include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+				<include refid="WmsInbound.INBOUND_SUB_FROM_SQL"/>
+				  INNER JOIN ROLLMA RLM ON RLM.CONTNO = PO.SIGNI AND RLM.MATNR = PO.MATNR
+				  LEFT OUTER JOIN BZPTN BPN
+							   ON BPN.OWNRKY = #{OWNRKY} 
+							  AND BPN.PTNRKY = RLM.PTNRKY
+							  AND BPN.PTNRTY = 'VD'
+				<include refid="WmsInbound.INBOUND_SUB_WHERE_SQL"/>
+				  AND PO.EBELN = #{SEBELN}
+				  AND PO.LOTA01 = #{LOTA01}
+				  AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+				  AND PO.LOTA06 = #{LOTA06}
+				  AND PO.BWART = #{BWART}
+				  AND PO.IFFLG = 'N' 
+				  AND PO.STATUS != 'D' 
+				  AND PO.MRFLG = 'S0'
+				  AND NOT EXISTS (
+				                   SELECT 'X'
+				                   FROM RECDI RI
+				                   WHERE RI.SEBELN = #{SEBELN}
+				                     AND RI.LOTA15 = RLM.BARCNO
+				                     AND RI.STATIT != 'FCV'
+				                 )
+			 UNION ALL
+			 SELECT PO.WERKS AS OWNRKY	 
+				 , (SELECT NAME01 FROM OWNER OW WHERE OW.OWNRKY = #{OWNRKY}) AS OWNRNM
+			     , PO.WAREKY     
+			     , NVL((SELECT NAME01 FROM WAHMA WHERE WAREKY = #{WAREKY}),' ') AS WARENM
+				 , NVL(MIP.QTPUOM,'0.000') AS PALQTY
+			     , PO.SKUKEY
+			     , SM.DESC01 
+			     , SM.DESC02
+			     , DT.SYSLOC AS LOCAKY
+			     , ' ' AS TRNUID
+			     , PO.MENGE
+			     , PO.MEINS AS UOMKEY
+			     , PO.MENGE_R
+			     , PO.PTNRTY
+			     , RI.LOTA01
+			     , RI.LOTA02
+			     , RI.LOTA03
+			     , RI.LOTA04
+			     , RI.LOTA05
+			     , RI.LOTA06
+			     , RI.LOTA07
+			     , RI.LOTA08
+			     , RI.LOTA09
+			     , RI.LOTA10
+			     , RI.LOTA11
+			     , RI.LOTA12
+			     , RI.LOTA13
+			     , RI.LOTA14
+			     , RI.LOTA15 
+			     , RI.LOTA16
+			     , RI.LOTA17
+			     , RI.LOTA18
+			     , RI.LOTA19
+			     , RI.LOTA20
+			     , RI.SEBELN
+			     , RI.SEBELP
+			     , RI.RECVKY
+			     , RI.RECVIT
+			     , PO.MANDT
+			     , PO.SEQNO
+			     , PO.EBELN
+			     , PO.EBELP
+			     , PO.BEDAT
+			     , PO.BWART
+			     , PO.BWART AS DOCUTY 
+			     , PO.SIGNI 
+			     , PO.VGBEL
+			     , PO.VGPOS
+			     , PO.RTNRSN AS RSNCOD
+			     , SZF_GET_RSNCOD_TEXT(#{LANGKY}, #{OWNRKY}, NVL(DT.DOCCAT, '100'), PO.BWART, PO.RTNRSN) AS RSNCODNM
+			     , PO.RTNTXT AS RCPRSN
+			     , SM.ASKU05
+			     , SW.MEASKY 
+			     , SM.EANCOD
+			     , MI.UOMKEY AS MUOMKEY 
+			     , (RLM.NETWT*RLM.WGTMUL) AS QTYRCV1
+			     , RI.QTYRCV 
+			     , NVL(TRIM(SZF_GET_DEFAULT_QTY(#{WAREKY}, PO.SKUKEY, RI.QTYRCV, PO.MEINS)),'0.000') AS UOMQTY  
+			     , RI.LOTA21
+			     , RI.LOTA22
+			     , RI.LOTA23
+			     , RI.LOTA24 
+			     , RI.CREDAT
+			     , RI.CRETIM
+			     , RI.CREUSR
+			     , RI.LMODAT
+			     , RI.LMOTIM
+			     , RI.LMOUSR
+			     , RI.INDBZL
+			     , RI.INDARC
+			     , RI.UPDCHK
+			     , NVL((SELECT X.NMLAST FROM USRMA X WHERE X.USERID = RI.CREUSR),' ') AS CUSRNM
+			     , NVL((SELECT X.NMLAST FROM USRMA X WHERE X.USERID = RI.LMOUSR),' ') AS LUSRNM
+			     , SLM.STLNM AS LOTA01NM
+			     , (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC ) AS AREAKY
+			     , NVL((SELECT SHORTX FROM AREMA WHERE WAREKY = PO.WAREKY AND AREAKY = (SELECT LM.AREAKY FROM LOCMA LM WHERE WAREKY = #{WAREKY} AND LOCAKY = DT.SYSLOC )),' ') AS AREANM
+			     , 'FRV' AS STATIT
+			     , SM.SKUG01
+			     , SM.SKUG02
+			     , SM.SKUG03
+			     , NVL((SELECT X.USARG1 FROM CMCDV X WHERE X.CMCDKY = 'SKUG05' AND X.CMCDVL=SM.SKUG05),SM.SKUG04) AS SKUG04
+			     , SM.SKUG05
+			     , SM.SKUG05 AS SKUG05_1
+			     , SLT.QRTAYN
+			     , SLT.SHTAYN
+			     , SLM.WMSMAK
+			     , RH.RCPTTY
+			     , RH.DPTNKY
+			     , PO.ZEKKO_AEDAT
+			     , PO.EINDT AS ASNDAT
+			     , 'NEW' AS STATDO
+			     , NVL(#{DOCDAT},TO_CHAR(SYSDATE,'YYYYMMDD')) AS DOCDAT
+			     , NVL((SELECT DOCCAT FROM DOCTM WHERE DOCUTY = PO.BWART), '100') AS DOCCAT
+			     , RI.LOTA41
+			     , RI.LOTA42
+			     , RI.LOTA43
+			     , RI.LOTA44
+			     , RI.LOTA45
+			     , RI.LOTA46
+			     , RI.LOTA47
+			     , RI.LOTA48
+			     , RI.LOTA49
+			     , RH.MRFLG
+			     
+			     , RLM.PTNRKY
+			     , BPN.NAME01 AS PTNRKYNM
+			     , RLM.CONTNO
+			     , RLM.BARCNO
+			     , RLM.ZFBLNO
+			     , RLM.ROLLID
+			     , RLM.MATNR
+			     , RLM.MRGSM
+			     , RLM.LENGTH
+			     , RLM.NETWT
+			     , RLM.WGTMUL
+			     , RLM.COREDI
+			     , RLM.KUNIT
+			     , RLM.CPCOD
+			     , RLM.TBRGEW
+			     , RLM.RBRGEW
+			     , RLM.LUNIT
+			     , RLM.DESCRI
+			     , RLM.WEIGHT
+			     , RLM.RMK1
+			     , RLM.RMK2
+			     , RLM.RMK3
+			     , RLM.RMK4
+			     , RLM.RMK5
+			     , RLM.SEQ
+			     , RLM.ITEMNO
+			     , RLM.PTNRPO
+			     , RLM.INVONO
+			     , RLM.PREFIX
+			     , RLM.RECYN
+			     , RLM.ITFCNT
+			     , RLM.ITFFLG
+			     , RLM.ITFETX
+			     , RLM.ITFDAT
+			     , RLM.ITFTIM
+			     , RLM.PRCCNT
+			     , RLM.PRCFLG
+			     , RLM.PRCETX
+			     , RLM.PRCDAT
+			     , RLM.PRCTIM
+			     , 'V' AS SAPIFYN
+			     <include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+			FROM RECDH RH
+			  INNER JOIN RECDI RI 
+			          ON RI.RECVKY = RH.RECVKY 
+			         AND RI.SEBELN = #{SEBELN} 
+			         AND RI.STATIT = 'FTV' 
+			         AND RI.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE}) 
+			  INNER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = RI.SKUKEY
+			  INNER JOIN SKUWC SW ON SW.WAREKY = #{WAREKY} AND SW.OWNRKY = #{OWNRKY} AND SW.SKUKEY = RI.SKUKEY
+			  INNER JOIN DOCTM DT ON DT.DOCUTY = RH.RCPTTY
+			  INNER JOIN IFWMS103 PO 
+			          ON PO.SEQNO = RI.SEQNO 
+			         AND PO.EBELN = #{SEBELN} 
+			         AND PO.EBELN = RI.SEBELN 
+			         AND PO.EBELP = RI.SEBELP
+				     AND PO.LOTA01 = #{LOTA01}
+				     AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+				     AND PO.LOTA06 = #{LOTA06}
+				     AND PO.BWART = #{BWART}
+				     AND PO.IFFLG = 'N'
+				     AND PO.MRFLG = 'S0' 
+				     AND PO.STATUS != 'D'
+			        
+			  LEFT OUTER JOIN BZPTN BZ ON BZ.PTNRKY = RH.DPTNKY AND BZ.OWNRKY = #{OWNRKY} AND BZ.PTNRTY = RH.PTNRTY
+			  LEFT OUTER JOIN MEASI MI ON MI.WAREKY = #{WAREKY} AND MI.MEASKY = RI.SKUKEY AND MI.INDDFU = 'V'
+			  LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = RI.LOTA02 AND SLM.STLKY  = RI.LOTA01
+			  LEFT OUTER JOIN SKUPLT SLT ON SLT.OWNRKY = #{OWNRKY} AND SLT.WAREKY = #{WAREKY} AND SLT.PLNTKY = RI.LOTA02 AND SLT.SKUKEY = RI.SKUKEY
+			  LEFT OUTER JOIN MEASI MIP ON MIP.WAREKY = #{WAREKY} AND MIP.MEASKY = RI.SKUKEY AND MIP.UOMKEY = 'PAL'
+			  LEFT OUTER JOIN BZPTN BPN ON BPN.OWNRKY = #{OWNRKY}  AND BPN.PTNRKY = RI.LOTA42 AND BPN.PTNRTY = 'VD'
+			  LEFT OUTER JOIN ROLLMA RLM ON RLM.CONTNO = RI.LOTA41 AND RLM.BARCNO = RI.LOTA15 AND RLM.PTNRKY = RI.LOTA42 AND RLM.MATNR = RI.SKUKEY
+			WHERE RH.OWNRKY = #{OWNRKY}
+			  AND RH.WAREKY = #{WAREKY}
+	    ) A
+		ORDER BY A.LOTA15, A.SEBELN, A.SEBELP
+	</select>
+	
+	<select id="PDGR05_RECVKY_MAP" parameterType="Map" resultType="DataMap">
+		SELECT A.RECVKY
+		     , TO_NUMBER(A.RECVIT) AS RECVIT
+		FROM (
+			SELECT RI.RECVKY
+			     , MAX(RECVIT) AS RECVIT
+			FROM RECDI RI
+	        WHERE RI.SEBELN = #{SEBELN}
+	          AND RI.STATIT != 'FCV'
+	        GROUP BY RI.RECVKY
+        ) A WHERE ROWNUM = 1 
+	</select>
+	
+	<select id="PDGR05_RECDI_ITEMCNT_MAP" parameterType="Map" resultType="DataMap">
+		SELECT COUNT(1) AS CNT
+		     , MAX(RH.RECVKY) AS RECVKY
+		FROM RECDH RH
+		WHERE EXISTS (
+		                SELECT 'X'
+		                FROM RECDI RI
+		                WHERE RI.SEBELN = #{SEBELN}
+		                  AND RI.STATIT != 'FCV'
+		                  AND RI.RECVKY = RH.RECVKY
+		             )
+	</select>
+	
+	<select id="PDGR05_POP_PTNRTY_LIST" parameterType="Map" resultType="DataMap">
+		SELECT OWNRKY     
+		     , PTNRTY     
+		     , PTNRKY
+		     , NAME01
+		     , NATNKY
+		     , DELMAK
+		FROM BZPTN
+		WHERE OWNRKY = #{OWNRKY}
+		  <if test="PTNRTY != null and PTNRTY != ''">AND PTNRTY = #{PTNRTY}</if>
+		  <if test="PTNRKY != null and PTNRKY != ''">AND PTNRKY = #{PTNRKY}</if>
+		  
+	</select>
+	
+	
+	<select id="PDGR05_LOTA_INFO_LIST" parameterType="Map" resultType="DataMap">
+		SELECT SZF_GET_DOM ( B.PTNRKY, #{SKUG01}, #{LOTA11}, #{BARCOD} ) AS LOTA11
+		     , A.PALQTY
+		     , A.MUOMKEY
+		     , B.*
+		FROM (
+			SELECT ( SELECT MIP.QTPUOM FROM MEASI MIP WHERE MIP.WAREKY = #{WAREKY} AND MIP.MEASKY = #{SKUKEY} AND MIP.UOMKEY = 'PAL' AND ROWNUM=1 ) AS PALQTY
+		         , ( SELECT MI.UOMKEY FROM MEASI MI WHERE MI.WAREKY = #{WAREKY} AND MI.MEASKY = #{SKUKEY} AND MI.INDDFU = 'V' AND ROWNUM=1 ) AS MUOMKEY
+			FROM DUAL
+		) A
+		  LEFT OUTER JOIN (
+		                    <include refid="WmsInbound.INBOUND_SUB_WITH_SQL"/>
+		                    <include refid="WmsInbound.INBOUND_SUB_WITH_TRANS_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_TOP_SQL"/>
+							 , ' ' AS LOTA41
+							 , ' ' AS LOTA42
+							 , ' ' AS LOTA43
+							 , ' ' AS LOTA44
+							 , ' ' AS LOTA45
+							 , '0' AS LOTA46
+							 , '0' AS LOTA47
+							 , '0' AS LOTA48
+							 , ' ' AS LOTA49
+							 , RLM.PTNRKY
+						     , BPN.NAME01 AS PTNRKYNM
+						     , RLM.CONTNO
+						     , ' ' AS BARCNO
+						     , ' ' AS ZFBLNO
+						     , ' ' AS ROLLID
+						     , PO.SKUKEY AS MATNR
+						     , ' ' AS MRGSM
+						     , ' ' AS LENGTH
+						     , ' ' AS NETWT
+						     , ' ' AS WGTMUL
+						     , ' ' AS COREDI
+						     , 'KG' AS KUNIT
+						     , ' ' AS CPCOD
+						     , ' ' AS TBRGEW
+						     , ' ' AS RBRGEW
+						     , ' ' AS LUNIT
+						     , SM.ASKL02 AS DESCRI
+						     , SM.ASKL03 AS WEIGHT
+						     , ' ' AS RMK1
+						     , ' ' AS RMK2
+						     , ' ' AS RMK3
+						     , ' ' AS RMK4
+						     , ' ' AS RMK5
+						     , ' ' AS SEQ
+						     , ' ' AS ITEMNO
+						     , ' ' AS PTNRPO
+						     , ' ' AS INVONO
+						     , ' ' AS PREFIX
+						     , ' ' AS RECYN
+						     , '0' AS ITFCNT
+						     , 'N' AS ITFFLG
+						     , ' ' AS ITFETX
+						     , ' ' AS ITFDAT
+						     , ' ' AS ITFTIM
+						     , '0' AS PRCCNT
+						     , 'N' AS PRCFLG
+						     , ' ' AS PRCETX
+						     , ' ' AS PRCDAT
+						     , ' ' AS PRCTIM
+							<include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+							<include refid="WmsInbound.INBOUND_SUB_FROM_SQL"/>
+							  INNER JOIN ROLLMA RLM ON RLM.CONTNO = PO.SIGNI
+							  LEFT OUTER JOIN BZPTN BPN
+										   ON BPN.OWNRKY = #{OWNRKY} 
+										  AND BPN.PTNRKY = RLM.PTNRKY
+										  AND BPN.PTNRTY = 'VD'
+							<include refid="WmsInbound.INBOUND_SUB_WHERE_SQL"/>
+							AND PO.EBELN = #{SEBELN}
+							AND PO.SKUKEY = #{SKUKEY}
+							AND PO.LOTA01 = #{LOTA01}
+							AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+							AND PO.LOTA06 = #{LOTA06}
+							AND PO.BWART = #{BWART}
+							AND PO.IFFLG = 'N'
+							<if test='LOTA14NULLYN != null and LOTA14NULLYN != "Y"'>
+							AND PO.LOTA14 = ' '
+							</if>
+							AND ROWNUM = 1
+		                  ) B
+		             ON 1=1
+	</select>
+	
+	<update id="PDGR05_RECDI_UPDATE" parameterType="Map">
+		UPDATE RECDI SET LMODAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+		               , LMOTIM = TO_CHAR(SYSDATE, 'HH24MISS')
+		               , LMOUSR = #{SES_USER_ID}
+		             <if test="LOTA11 != null and LOTA11 != ''">
+		               , LOTA11 = #{LOTA11}
+		             </if>
+		             <if test="QTYRCV != null and QTYRCV != ''">
+		               , QTYRCV = #{QTYRCV}
+		             </if>
+		             <if test="LOTA41 != null and LOTA41 != ''">
+		               , LOTA41 = #{LOTA41}
+		             </if>
+		             <if test="LOTA42 != null and LOTA42 != ''">
+		               , LOTA42 = #{LOTA42}
+		             </if>
+		             <if test="LOTA43 != null and LOTA43 != ''">
+		               , LOTA43 = #{LOTA43}
+		             </if>
+		             <if test="LOTA44 != null and LOTA44 != ''">
+		               , LOTA44 = #{LOTA44}
+		             </if>
+		             <if test="LOTA45 != null and LOTA45 != ''">
+		               , LOTA45 = #{LOTA45}
+		             </if>
+		             <if test="LOTA46 != null and LOTA46 != ''">
+		               , LOTA46 = #{LOTA46}
+		             </if>
+		             <if test="LOTA47 != null and LOTA47 != ''">
+		               , LOTA47 = #{LOTA47}
+		             </if>
+		             <if test="LOTA48 != null and LOTA48 != ''">
+		               , LOTA48 = #{LOTA48}
+		             </if>
+		             <if test="LOTA49 != null and LOTA49 != ''">
+		               , LOTA49 = #{LOTA49}
+		             </if>
+		WHERE RECVKY = #{RECVKY}
+		  AND RECVIT = #{RECVIT}
+	</update>
+	
+	<update id="PDGR05_RECDH_COMPLETE_UPDATE" parameterType="Map">
+		UPDATE RECDH RH SET LMODAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+		                  , LMOTIM = TO_CHAR(SYSDATE, 'HH24MISS')
+		                  , LMOUSR = #{SES_USER_ID}
+		                  , STATDO = 'FRV'
+		                  <if test="DOCDAT != null and DOCDAT != ''">
+						  , DOCDAT = #{DOCDAT}
+						  </if>
+		WHERE EXISTS( SELECT 'X' FROM RECDI X WHERE X.RECVKY=RH.RECVKY AND SEBELN = #{SEBELN} ) 
+		  AND RH.RECVKY = #{RECVKY}
+	</update>
+	
+	<update id="PDGR05_RECDI_COMPLETE_UPDATE" parameterType="Map">
+		UPDATE RECDI SET LMODAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+		               , LMOTIM = TO_CHAR(SYSDATE, 'HH24MISS')
+		               , LMOUSR = #{SES_USER_ID}
+		               , STATIT = 'FRV'
+		WHERE RECVKY = #{RECVKY}
+		  AND RECVIT = #{RECVIT}
+		  AND STATIT = 'FTV'
+	</update>
+	
+	<update id="PDGR05_IF_COMPLETE_UPDATE" parameterType="Map">
+		UPDATE IFWMS103 SET LMODAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+		                  , LMOTIM = TO_CHAR(SYSDATE, 'HH24MISS')
+		                  , LMOUSR = #{SES_USER_ID}
+		                  , IFFLG = 'Y'
+		WHERE EBELN = #{SEBELN}
+	</update>
+	
+	<insert id="PDGR05_ROLLMA_MERGE_INSERT" parameterType="Map">
+		MERGE INTO ROLLMA A
+		USING (
+		         	SELECT #{PTNRKY} AS PTNRKY
+			             , #{CONTNO} AS CONTNO
+			             , #{BARCNO} AS BARCNO
+			             , #{ZFBLNO} AS ZFBLNO
+			             , #{ROLLID} AS ROLLID
+			             , #{MATNR} AS MATNR
+			             , #{DESCRI} AS DESCRI
+					     , #{MRGSM}  AS MRGSM
+					     , #{LENGTH} AS LENGTH
+					     , #{NETWT}  AS NETWT
+					     , #{WGTMUL} AS WGTMUL
+					     , #{COREDI} AS COREDI
+					     , #{KUNIT}  AS KUNIT
+					     , #{CPCOD}  AS CPCOD
+					     , #{WEIGHT} AS WEIGHT
+					     , NVL(TRIM(#{TBRGEW}),'0') AS TBRGEW
+					     , #{RBRGEW} AS RBRGEW
+					     , #{LUNIT}  AS LUNIT
+					     , #{RMK1}   AS RMK1
+					     , #{RMK2}   AS RMK2
+					     , #{RMK3}   AS RMK3
+					     , #{RMK4}   AS RMK4
+					     , #{RMK5}   AS RMK5
+					     , #{SES_USER_ID} AS SES_USER_ID
+					     , '0' AS SEQ
+					     , '0' AS ITEMNO
+	                     , ' ' AS PTNRPO
+	                     , ' ' AS INVONO
+	                     , ' ' AS PREFIX
+	                     , ' ' AS RECYN
+	                     , '0' AS ITFCNT
+	                     , 'N' AS ITFFLG
+	                     , ' ' AS ITFETX
+	                     , ' ' AS ITFDAT
+	                     , ' ' AS ITFTIM
+	                     , '0' AS PRCCNT
+	                     , 'N' AS PRCFLG
+	                     , ' ' AS PRCETX
+	                     , ' ' AS PRCDAT
+					     , ' ' AS PRCTIM 
+					     , 'V' AS ADDDAT
+		         	FROM DUAL
+		      ) B
+		ON (A.CONTNO = B.CONTNO AND A.BARCNO = B.BARCNO AND A.PTNRKY = B.PTNRKY)
+		WHEN MATCHED THEN
+			UPDATE SET A.ROLLID = B.ROLLID
+			         , A.DESCRI = B.DESCRI
+					 , A.MRGSM  = B.MRGSM
+					 , A.LENGTH = B.LENGTH
+					 , A.NETWT  = B.NETWT
+					 , A.WGTMUL = B.WGTMUL
+					 , A.COREDI = B.COREDI
+					 , A.KUNIT  = B.KUNIT
+					 , A.CPCOD  = B.CPCOD
+					 , A.WEIGHT = B.WEIGHT
+					 , A.RBRGEW = B.RBRGEW
+					 , A.LUNIT  = B.LUNIT
+					 , A.RMK1   = B.RMK1
+					 , A.RMK2   = B.RMK2
+					 , A.RMK3   = B.RMK3
+					 , A.RMK4   = B.RMK4
+					 , A.RMK5   = B.RMK5
+					 , A.PRCCNT = B.PRCCNT
+					 , A.RECYN  = B.RECYN
+					 , A.PRCFLG = B.PRCFLG
+					 , A.PRCDAT = B.PRCDAT
+					 , A.PRCTIM = B.PRCTIM	
+					 , A.LMODAT = TO_CHAR(SYSDATE, 'YYYYMMDD')
+					 , A.LMOTIM = TO_CHAR(SYSDATE, 'HH24MISS')
+					 , A.LMOUSR = B.SES_USER_ID
+		WHEN NOT MATCHED THEN
+			INSERT (
+			     	  PTNRKY, CONTNO, BARCNO, ZFBLNO, ROLLID
+	                , MATNR,  MRGSM,  LENGTH, NETWT,  WGTMUL
+	                , COREDI, KUNIT,  CPCOD,  TBRGEW, RBRGEW
+	                , LUNIT,  DESCRI, WEIGHT, RMK1,   RMK2
+	                , RMK3,   RMK4,   RMK5,   SEQ,    ITEMNO
+	                , PTNRPO, INVONO, PREFIX, RECYN,  ITFCNT
+	                , ITFFLG, ITFETX, ITFDAT, ITFTIM, PRCCNT
+	                , PRCFLG, PRCETX, PRCDAT, PRCTIM, CREDAT
+	                , CRETIM, CREUSR, LMODAT, LMOTIM, LMOUSR
+	                , ADDDAT
+			) VALUES (
+				      B.PTNRKY, B.CONTNO, B.BARCNO, B.ZFBLNO, B.ROLLID
+	                , B.MATNR,  B.MRGSM,  B.LENGTH, B.NETWT,  B.WGTMUL
+	                , B.COREDI, B.KUNIT,  B.CPCOD,  B.TBRGEW, B.RBRGEW
+	                , B.LUNIT,  B.DESCRI, B.WEIGHT, B.RMK1,   B.RMK2
+	                , B.RMK3,   B.RMK4,   B.RMK5,   B.SEQ,    B.ITEMNO
+	                , B.PTNRPO, B.INVONO, B.PREFIX, B.RECYN,  B.ITFCNT
+	                , B.ITFFLG, B.ITFETX, B.ITFDAT, B.ITFTIM, B.PRCCNT
+	                , B.PRCFLG, B.PRCETX, B.PRCDAT, B.PRCTIM, TO_CHAR(SYSDATE, 'YYYYMMDD')
+	                , TO_CHAR(SYSDATE, 'HH24MISS'), B.SES_USER_ID, TO_CHAR(SYSDATE, 'YYYYMMDD'), TO_CHAR(SYSDATE, 'HH24MISS'), B.SES_USER_ID
+	                , B.ADDDAT
+			)
+	</insert>
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR05 수입밀롤입고 : END-->
+	<!-- ================================================================================================== -->
+	
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR07 입고(생산) : START-->
+	<!-- *_ORG: 유효성 검증시 사용되는 컬럼 원본 데이터 -->
+	<!-- UOMKEY_DISP: 노출 목적 변환 단위값 (HL 품목중 KG단위인 경우 BOX변환없이 노출)-->
+	<!-- ================================================================================================== -->
+	<select id="PDGR07_LIST" parameterType="Map" resultType="DataMap">
+<!-- 		<include refid="WmsInbound.INBOUND_SUB_WITH_SQL"/> -->
+<!-- 		<include refid="WmsInbound.INBOUND_SUB_TOP_SQL"/> -->
+		WITH SKUG05_T AS(
+			SELECT CMCDKY
+			     , CMCDVL
+			     , CDESC1 
+			     , CDESC2 
+			     , USARG1 
+			FROM CMCDV
+			WHERE CMCDKY = 'SKUG05'
+		),
+		OE_T AS (
+		    SELECT NVL(OE.NAME01,' ') AS OWNRNM
+		    FROM OWNER OE 
+		    WHERE OE.OWNRKY = #{OWNRKY}
+		),
+		WM_T AS (
+		    SELECT NVL(WM.NAME01,' ') AS WARENM  
+		    FROM WAHMA WM
+		    WHERE WM.WAREKY = #{WAREKY}
+		)
+		SELECT PO.WERKS AS OWNRKY
+			 , (SELECT OWNRNM FROM OE_T) AS OWNRNM
+		     , PO.WAREKY
+		     , (SELECT WARENM FROM WM_T) AS WARENM
+<!-- 			 , NVL(DECODE(SM.SKUG05, '10', ZT.PALCNT, NVL(MIP.QTPUOM,'0.000')), '0.000') AS PALQTY -->
+			 , PO.SKUKEY
+		     , SM.DESC01 
+		     , SM.DESC02
+		     , DT.SYSLOC AS LOCAKY
+		     , ' ' AS TRNUID
+		     , PO.MENGE
+		     , PO.MEINS AS UOMKEY
+		     , PO.MENGE_R
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(PO.WAREKY, PO.SKUKEY, PO.MENGE, PO.MEINS, 'BOX')),'0') AS BOX
+		     , PO.PTNRTY
+		     , NVL(TRIM(LT.LOTA01), NVL(TRIM(PO.LOTA01),SLT.STLKY)) AS LOTA01
+		     , PO.LOTA01 AS LOTA01_ORG
+		     , PO.LOTA02
+		     , PO.LOTA02 AS LOTA02_ORG
+		     , PO.LOTA03
+		     , PO.LOTA03 AS LOTA03_ORG
+		     , PO.LOTA04
+		     , PO.LOTA05		     
+		     , PO.LOTA06
+		     , (
+		     		CASE WHEN PO.BWART='131' AND PO.SOBKZ='E' THEN TRIM(PO.VGBEL)||TRIM(PO.VGPOS)
+		     		 	 ELSE PO.LOTA07
+		     		END
+		        ) AS LOTA07
+		     , PO.LOTA07 AS LOTA07_ORG
+		     , PO.LOTA08
+		     , PO.LOTA08 AS LOTA08_ORG
+		     , PO.LOTA09
+		     , PO.LOTA10
+		     , NVL(TRIM(PO.LOTA12),TO_CHAR(SYSDATE,'YYYYMMDD')) AS LOTA12
+		     , PO.LOTA13
+		     , PO.LOTA15
+		     , PO.LOTA16
+		     , PO.LOTA16 AS LOTA16_ORG
+		     , PO.LOTA17
+		     , PO.LOTA17 AS LOTA17_ORG
+		     , PO.LOTA18
+		     , PO.LOTA19
+		     , PO.LOTA20
+		     , PO.EBELN  AS SEBELN
+		     , PO.EBELP  AS SEBELP
+		     , ' '       AS RECVKY
+		     , ' '       AS RECVIT
+		     , PO.MANDT
+		     , PO.SEQNO
+		     , PO.EBELN
+		     , PO.EBELP
+		     , PO.BEDAT
+		     , PO.BWART
+		     , PO.RTNRSN AS RSNCOD
+             , PO.RTNTXT AS RCPRSN
+		     , SM.ASKU05
+		     , SW.MEASKY AS MEASKY 
+		     , SM.EANCOD
+		     , MI.UOMKEY AS MUOMKEY
+		     
+		     , DECODE(PO.IFFLG, 'Y', '0.000',(PO.MENGE - PO.MENGE_R)) AS QTYRCV1
+			 , DECODE(PO.IFFLG, 'Y', '0.000',TO_CHAR((PO.MENGE - PO.MENGE_R), 'FM99999999999999999990.000')) AS QTYRCV
+			 , PO.LOTA11
+			 , PO.LOTA14
+			 , NVL(TRIM(SZF_GET_DEFAULT_QTY(#{WAREKY}, PO.SKUKEY, DECODE(PO.IFFLG, 'Y', '0.000',(PO.MENGE - PO.MENGE_R)), PO.MEINS)),'0.000') AS UOMQTY
+			 , '' AS TEBELN
+			 , PO.LOTA21
+	         , PO.LOTA22
+	         , PO.LOTA23
+	         , PO.LOTA24
+	         , PO.IFFLG
+			 
+			 , PO.CREDAT
+		 	 , PO.CRETIM
+		 	 , PO.CREUSR
+		 	 , PO.LMODAT
+		 	 , PO.LMOTIM
+		 	 , PO.LMOUSR
+		 	 , PO.INDBZL
+		 	 , PO.INDARC
+		 	 , PO.UPDCHK
+		 	 
+			 , (SELECT LM.AREAKY FROM LOCMA LM WHERE LM.WAREKY = #{WAREKY} AND LM.LOCAKY = DT.SYSLOC ) AS AREAKY
+		 	 , NVL((SELECT AM.SHORTX FROM AREMA AM WHERE AM.WAREKY = PO.WAREKY AND EXISTS ( SELECT 'X' FROM LOCMA LM WHERE LM.WAREKY = #{WAREKY} AND LM.LOCAKY = DT.SYSLOC AND LM.AREAKY = AM.AREAKY )),' ') AS AREANM
+			 , 'FRV' AS STATIT
+			 , SM.SKUG01
+			 , SM.SKUG02
+			 , SM.SKUG03
+			 , NVL((SELECT X.USARG1 FROM SKUG05_T X WHERE X.CMCDVL=SM.SKUG05),SKUG04) AS SKUG04
+			 , SM.SKUG05
+			 , SM.SKUG05 AS SKUG05_1
+			 , SLT.QRTAYN
+			 , SLT.SHTAYN
+			 
+			 , PO.BWART AS RCPTTY
+			 , PO.LIFNR AS DPTNKY
+			 , PO.ZEKKO_AEDAT
+			 , PO.EINDT AS ASNDAT
+			 , 'NEW' AS STATDO
+			 --, NVL('',TO_CHAR(SYSDATE,'YYYYMMDD')) AS DOCDAT
+			 , NVL(#{DOCDAT}, 
+				    CASE 
+				        WHEN PO.CRETIM <![CDATA[<]]>  '070000' THEN TO_CHAR(SYSDATE - 1, 'YYYYMMDD') 
+				        ELSE TO_CHAR(SYSDATE, 'YYYYMMDD') 
+				    END
+				) AS DOCDAT
+			 , NVL((SELECT DOCCAT FROM DOCTM WHERE DOCUTY = PO.BWART), '100') AS DOCCAT
+			 , PO.SIGNI
+			 , DECODE(PO.BWART, '111', PO.SSORNU, PO.VGBEL) AS VGBEL
+			 , DECODE(PO.BWART, '111', PO.SSORIT, PO.VGPOS) AS VGPOS
+			 , PO.MRFLG
+			 , PO.AR_NO
+			 , PO.AR_REV
+			 , PO.AR_LNO
+			 , PO.BWARTSAP
+			 , PO.POREV
+		 	 , PO.SSORNU
+			 , PO.SSORIT
+			 , PO.DLEFLG
+			 , PO.USRID1
+			 , 'V' AS SAPIFYN
+			 
+		     , ' ' AS LOTA41
+			 , ' ' AS LOTA42
+			 , ' ' AS LOTA43
+			 , ' ' AS LOTA44
+			 , ' ' AS LOTA45
+			 , '0' AS LOTA46
+			 , '0' AS LOTA47
+			 , '0' AS LOTA48
+			 , ' ' AS LOTA49
+			 
+			 , SLM.STLNM AS LOTA01NM
+			 , SLM.WMSMAK
+			 , SLM.WMSMAK AS WMSMAK_ORG
+			 , SLM.WMSMAK AS WMSMAK_AF
+<!-- 			 , SLME.WMSMAK AS FWMSMAK -->
+			 , NVL((SELECT SHORTX FROM DOCTM WHERE DOCUTY = PO.BWART),' ') AS RCPTNM
+		     , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA02', PO.LOTA02) AS LOTA02NM
+		     , SZF_GET_CMCDV_CDESC1_TEXT(#{LANGKY}, 'LOTA06', PO.LOTA06) AS LOTA06NM
+		     , NVL(TRIM(SZF_GET_CONVERT_QTY(#{WAREKY}, PO.SKUKEY, (PO.MENGE - PO.MENGE_R), PO.MEINS, 'BOX')),'0.000') AS BOX
+		<include refid="WmsInbound.INBOUND_SUB_IFID_SQL"/>
+<!-- 		<include refid="WmsInbound.INBOUND_SUB_FROM_SQL"/> -->
+		FROM IFWMS103 PO
+		  LEFT OUTER JOIN SKUMA SM ON SM.OWNRKY = #{OWNRKY} AND SM.SKUKEY = PO.SKUKEY
+		  LEFT OUTER JOIN SKUWC SW ON SW.WAREKY = #{WAREKY} AND SW.OWNRKY = #{OWNRKY} AND SW.SKUKEY = PO.SKUKEY
+		  LEFT OUTER JOIN DOCTM DT ON DT.DOCUTY = PO.BWART
+		  LEFT OUTER JOIN LOTAT LT ON LT.LOTNUM = PO.LOTNUM
+<!-- 		  LEFT OUTER JOIN BZPTN BZ ON BZ.PTNRKY = PO.LIFNR AND BZ.OWNRKY = #{OWNRKY} AND BZ.PTNRTY = PO.PTNRTY -->
+		  LEFT OUTER JOIN MEASI MI ON MI.WAREKY = #{WAREKY} AND MI.MEASKY = PO.SKUKEY AND MI.INDDFU = 'V'
+		  LEFT OUTER JOIN SKUPLT SLT ON SLT.OWNRKY = #{OWNRKY} AND SLT.WAREKY = PO.WAREKY AND SLT.PLNTKY = PO.LOTA02 AND SLT.SKUKEY = PO.SKUKEY
+		  LEFT OUTER JOIN STLMA SLM ON SLM.OWNRKY = #{OWNRKY} AND SLM.PLNTKY = PO.LOTA02 AND SLM.STLKY  = NVL(TRIM(LT.LOTA01), NVL(TRIM(PO.LOTA01),SLT.STLKY))
+<!-- 		  LEFT OUTER JOIN MEASI MIP ON MIP.WAREKY = #{WAREKY} AND MIP.MEASKY = PO.SKUKEY AND MIP.UOMKEY = 'PAL'		   -->
+<!-- 		  LEFT OUTER JOIN ZPPTM ZT ON ZT.LOTA02 = PO.LOTA02 AND ZT.LOTA03 = PO.LOTA03 AND ZT.LOTA09 = PO.LOTA09 AND ZT.LOTA16 = PO.LOTA16 AND ZT.LOTA17 = PO.LOTA17 -->
+<!-- 		  LEFT OUTER JOIN STLMA SLME ON SLME.OWNRKY = #{OWNRKY} AND SLME.PLNTKY = PO.FLOTA02 AND SLME.STLKY = PO.FLOTA01 -->
+		<include refid="WmsInbound.INBOUND_SUB_WHERE_SQL"/> 
+	<if test="BEDATFROM != null and BEDATFROM != ''">
+		AND PO.BEDAT >= #{BEDATFROM}
+	</if>
+		AND PO.LOTA02 IN (SELECT PLNTKY FROM MTPLNT WHERE WAREKY = #{WAREKY} AND MTYPE LIKE #{MTYPE})
+	<if test="LOTA01 != null and LOTA01 != ''">
+		AND PO.LOTA01 = #{LOTA01} 
+	</if>
+	<if test="LOTA02 != null and LOTA02 != ''">
+		AND PO.LOTA02 = #{LOTA02} 
+	</if>
+		AND (PO.MENGE - PO.MENGE_R) &gt; 0 
+	<if test="LOTA04 != null and LOTA04 != ''">
+		AND PO.LOTA04 IN (#{LOTA04}
+		<if test="LOTA04 == 'RT4'">, 'RT5'</if>
+		<if test="LOTA04 == 'SN5'">, 'SN6'</if>
+		)
+	</if>
+	<if test="BWART != null and BWART != ''">
+		AND PO.BWART = #{BWART} 
+	</if>
+		<include refid="WmsInbound.INBOUND_SUB_SORT_SQL"/>
+	</select>
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR07 입고(생산) : END-->
+	<!-- ================================================================================================== -->
+	
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR08 선적개별바코드 : BEGIN-->
+	<!-- ================================================================================================== -->
+	
+	
+	<select id="PDGR08_STKNUM_LIST" parameterType="Map" resultType="DataMap">
+		SELECT '1001383866' AS STKNUM FROM DUAL
+		UNION ALL
+		SELECT '1001383865' AS STKNUM FROM DUAL
+		UNION ALL
+		SELECT '1001383864' AS STKNUM FROM DUAL
+		UNION ALL
+		SELECT '1001383863' AS STKNUM FROM DUAL
+		UNION ALL
+		SELECT '1001383862' AS STKNUM FROM DUAL
+		UNION ALL
+		SELECT '1001383863' AS STKNUM FROM DUAL
+	</select>
+	
+	
+	<select id="PDGR08_LIST" parameterType="Map" resultType="DataMap">
+		SELECT TT.SEQNUM
+             , TT.STKNUM
+             , TT.LOTA14
+             , TT.PRCFLG
+             , TT.DOCTXT
+             , TT.CREDAT
+             , TT.CRETIM
+             , TT.CREUSR
+             , TT.LMODAT
+             , TT.LMOTIM
+             , TT.LMOUSR
+             , TT.SVBELN
+             , TT.SPOSNR
+             , TT.SKUKEY
+		FROM TMP_TRANS TT
+		WHERE 1=1
+		  AND TT.STKNUM = #{STKNUM}
+	</select>
+	
+	<select id="PDGR08_LOTA14_LIST" parameterType="Map" resultType="DataMap">
+		SELECT *
+		FROM LOTAT LA
+		WHERE 1=1
+		  AND LA.LOTA14 = #{LOTA14}
+		  AND ROWNUM = 1
+	</select>
+	
+	<select id="GET_PDGR08_ONE_ADD_ROW_LIST" parameterType="Map" resultType="DataMap">
+		SELECT #{LOTA14} AS LOTA14
+		      , SI.SKUKEY
+		      , SI.STKNUM
+		      , SI.SVBELN
+              , SI.SPOSNR
+		FROM SHPDI SI
+		WHERE SI.STKNUM = #{STKNUM}
+		  AND EXISTS (
+		  				SELECT 1
+		  				FROM LOTAT LA 
+		  				WHERE LA.SKUKEY = SI.SKUKEY 
+		  				AND LA.LOTA14 = #{LOTA14}
+		             )
+	</select>
+	
+	
+	<select id="PDGR08_INT_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT *
+		 FROM (
+		        SELECT CASE 
+		        			<!-- 선적번호[{0}] 개별바코드[{1}]는 이미 등록되어 있습니다. -->
+		        			WHEN  EXISTS ( SELECT '1' FROM TMP_TRANS 
+		        						   WHERE STKNUM = STD.STKNUM 
+		        						   AND LOTA14 = STD.LOTA14
+		        						 )
+		                      THEN 'VALID_M2139†' || STD.STKNUM || '/' || STD.LOTA14
+		                    ELSE 'OK'
+		                END AS RESULTMSG  
+		        FROM ( ${APPEND_QUERY} ) STD
+		      )
+		 WHERE RESULTMSG != 'OK'
+		 AND ROWNUM = 1
+	</select>
+	
+	<insert id="PDGR08_INSERT" parameterType="Map">
+		INSERT INTO TMP_TRANS
+		(
+		    STKNUM
+		  , LOTA14
+		  , SVBELN
+		  , SPOSNR
+		  , SKUKEY
+		  , CREDAT, CRETIM, CREUSR
+		  , LMODAT, LMOTIM, LMOUSR
+		)
+		VALUES
+		(
+			#{STKNUM}
+		  , #{LOTA14}
+		  , #{SVBELN}
+		  , #{SPOSNR}
+		  , #{SKUKEY}
+		  , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		  , TO_CHAR(SYSDATE,'YYYYMMDD'), TO_CHAR(SYSDATE,'HH24MISS'), #{SES_USER_ID}
+		)
+	</insert>
+	
+	<!-- ================================================================================================== -->
+	<!-- PDGR08 선적개별바코드 : END-->
+	<!-- ================================================================================================== -->
+	
+	<select id="COMPLETE_BARCOD_CHECK_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT *
+		FROM (
+			SELECT CASE WHEN EXISTS ( 
+										SELECT '1' FROM RECDI RI 
+		    						  	WHERE RI.LOTA14 = STD.LOTA14
+			              				  AND RI.STATIT = 'FRV'
+		    						)
+		                THEN 'VALID_M2140†' || STD.LOTA14 || '/' || ''
+		                WHEN EXISTS ( 
+										SELECT '1' FROM IFWMS103 PO
+		    						  	WHERE PO.LOTA14 = STD.LOTA14
+			              				  AND PO.STATUS = 'C'
+										  AND PO.IFFLG = 'N'
+										  AND PO.PRCFLG = 'C'
+										  AND (STD.BWART IS NULL OR STD.BWART = PO.BWART)
+										  AND PO.MENGE > 0
+		    						)
+		                THEN 'VALID_M2151†' || STD.LOTA14 || '/' || ''
+		                WHEN EXISTS ( 
+										SELECT '1' FROM IFWMS103 PO
+		    						  	WHERE PO.LOTA14 = STD.LOTA14
+			              				  AND PO.STATUS = 'C'
+										  AND PO.IFFLG IN ('N','Y')
+										  AND PO.PRCFLG = 'C'
+										  AND (STD.BWART IS NULL OR STD.BWART = PO.BWART)
+										  AND PO.MENGE = 0
+		    						)
+		                THEN 'VALID_M2152†' || STD.LOTA14 || '/' || ( 
+																		SELECT PO.EBELN FROM IFWMS103 PO
+										    						  	WHERE PO.LOTA14 = STD.LOTA14
+											              				  AND PO.STATUS = 'C'
+																		  AND PO.IFFLG IN ('N','Y')
+																		  AND PO.PRCFLG = 'C'
+																		  AND PO.MENGE = 0
+																		  AND ROWNUM=1
+										    						)
+		           ELSE 'OK'
+				   END AS RESULTMSG
+			FROM (
+				SELECT #{BARCOD} AS LOTA14
+				     , #{BWART} AS BWART
+				FROM DUAL
+			) STD
+		)
+		WHERE RESULTMSG != 'OK'
+		  AND ROWNUM = 1
+	</select>
+	
+	<select id="COMPLETE_IN_BARCOD_CHECK_VALIDATION" parameterType="Map" resultType="DataMap">
+		SELECT *
+		FROM (
+			SELECT CASE WHEN EXISTS (
+										SELECT '1' FROM RECDI RI 
+		    						  	WHERE RI.STATIT = 'FRV'
+			              				  AND ( STD.LOTA14 IS NULL OR RI.LOTA14 = STD.LOTA14 )
+			              				  AND ( STD.SEBELN IS NULL OR STD.SEBELN = RI.SEBELN )
+			              				  AND ( STD.LOTA14 IS NOT NULL OR STD.SEBELN IS NOT NULL )
+		    						)
+		                THEN 'VALID_M2140†' || STD.LOTA14 || '/' || ''
+		           ELSE 'OK'
+				   END AS RESULTMSG
+			FROM (
+				SELECT #{BARCOD} AS LOTA14
+				     , #{SEBELN} AS SEBELN
+				FROM DUAL
+			) STD
+		)
+		WHERE RESULTMSG != 'OK'
+		  AND ROWNUM = 1
+	</select>
+	
+</mapper>

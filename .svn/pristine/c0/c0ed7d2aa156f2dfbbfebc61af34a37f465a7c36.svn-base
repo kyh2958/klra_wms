@@ -1,0 +1,454 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WMS</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<%
+    User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<%@ page import="project.common.airfw.*"%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+<style>
+    input[type="checkbox"]{height:unset;} 
+</style>
+<script type="text/javascript">
+
+	$(document).ready(function(){
+		gridList.setGrid({
+			id : "gridList",
+			module : "WmsOutbound",
+			command : "DL11"
+		});
+		
+		
+		<%if(plant.equals("")){%>
+        $('select[name="TI.LOTA02"]').multipleSelect('checkAll');
+       <%}else{%>
+         $('select[name="TI.LOTA02"]').multipleSelect('setSelects', ['<%=plant%>']);
+       <%}%>
+       
+        /* 출고유형 전체선택 */
+        var $selRCPTTY = $('select[id="SH.SHPMTY"]');
+        $selRCPTTY.multipleSelect('checkAll');
+        
+        /* 품목구분 전체선택 */
+       /*  var $selSKUL01 = $('select[id="SKUL01"]');
+        $selSKUL01.multipleSelect('checkAll'); */
+        
+	});
+	
+	function searchList(type){
+		if(validate.check("searchArea")){
+			var param = inputList.setRangeParam("searchArea");
+			param.put("LANGKY", "<%=langky%>");
+			param.put("WAREKYS", "'<%= wareky%>'");
+			param.put("SearchType", type);
+			
+			gridList.resetGrid("gridList");
+			
+			gridList.gridList({
+				id : "gridList",
+				param : param
+			});
+		}
+	}
+	
+	
+	
+	function searchHelpEventOpenBefore(searchCode, gridType, $inputObj){
+		var param = new DataMap();
+		if(searchCode == "SHSKUMA"){
+            param.put("OWNRKY", "<%=ownrky%>");
+			return param;
+		}else if(searchCode == "SHBZPTN"){
+			param.put("PTNRTY", "CT");
+			param.put("OWNRKY", "<%=ownrky%>");			
+			return param;
+		}else if(searchCode == "SHSTLMAP"){
+	    	
+	    	var PLNTKY = $('select[name="TI.LOTA02"]').val();
+			
+			if(!PLNTKY) {
+				var label = commonLabel.getLabel("STD_LOTA02", 1);
+				commonUtil.msgBox("VALID_required",[label]); // {0} 은(는) 필수 입력항목입니다.
+				return false;
+			}
+			param.put("PLNTKY", PLNTKY);
+	    	
+	    	return param;
+	    }
+	}
+	
+	function commonBtnClick(btnName){
+		if(btnName == "Search" || btnName == "SearchJR"){
+			var param = new DataMap();
+			param.put("PROGID", "<%= menuId%>");
+			param.put("LGTYPE", "SEARCH");
+			var json = netUtil.sendData({
+				url: "/wms/system/json/saveLog.data",
+				param : param
+			});
+			searchList(btnName);
+		} else if(btnName == "Cancel"){
+			cancelShipment();
+		} else if(btnName == "Print"){
+			PrintList();
+		} 
+	}
+	
+
+	function comboEventDataBindeBefore(comboAtt){
+        if(comboAtt == "Wms,PLNTKYCOMBO"){
+            var param = new DataMap();
+	        param.put("WAREKYS", "'<%= wareky%>'");
+            param.put("OWNRKY", "<%=ownrky%>");
+            param.put("LANGKY", "<%=langky%>");
+            
+            return param;
+        }else if(comboAtt == "WmsOrder,RCPTTYCOMBO"){
+        	
+        	
+            var param = new DataMap();
+
+	 			param.put("PROGID", configData.MENU_ID);
+            
+            return param;
+           
+       }else if(comboAtt == "SKUL01"){
+       	
+       	
+           var param = new DataMap();
+
+	 			param.put("PROGID", configData.MENU_ID);
+           
+           return param;
+          
+      }else if(comboAtt == "Wms,DEPTID"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }else if(comboAtt == "Wms,VTXTK"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }else if(comboAtt == "Wms,KVGR"){
+			var param = new DataMap();
+			param.put("WAREKY", "<%=wareky%>");
+			return param;
+	  }
+    }
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<!-- content -->
+<div class="content_wrap">
+    <div class="content_inner">
+        <%@ include file="/common/include/webdek/title.jsp" %>
+        <div class="content_serch" id="searchArea">
+            <div class="btn_wrap">
+                <div class="fl_l">
+                </div>
+                <div class="fl_r">
+                    <input type="button" CB="Search SEARCH BTN_DISPLAY" />
+                    <input type="button" CB="SearchJR SEARCH BTN_DISPLAYJR" />
+                </div>
+            </div>
+            <div class="search_inner">
+                <div class="search_wrap ">
+                    <input type="hidden" class="input" name="OWNRKY" value="<%=ownrky %>" />
+                    <dl>
+                        <dt CL="STD_LOTA02">플랜트</dt>
+                        <dd>
+                            <select type="text" class="input" Combo="Wms,PLNTKYCOMBO" name="TI.LOTA02" id="TI.LOTA02" ComboType="MS" style="width: 160px;" validate="required">
+                            </select>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_LOTA01">저장위치</dt>
+                        <dd>
+                            <input type="text" class="input" name="TI.LOTA01" UIInput="R,SHSTLMAP" />
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_SKUKEY">품목코드</dt>
+                        <dd>
+                            <input type="text" class="input" name="SI.SKUKEY" UIInput="SR" UIFormat="U"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_DOCDAT">전기일자</dt>
+                        <dd>
+                            <input type="text" class="input" name="DOCDAT" UIFormat="C -7 7" UIInput="R" validate="required"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_RQSHPD">출하요청일자</dt>
+                        <dd>
+                            <input type="text" class="input" name="RQSHPD" UIFormat="C" UIInput="R"/>
+                        </dd>
+                    </dl>
+                    
+                    <dl>
+                        <dt CL="STD_LSHPCD">출하일자</dt>
+                        <dd>
+                            <input type="text" class="input" name="LSHPCD" UIFormat="C" UIInput="R"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_LOTA14">개별바코드</dt>
+                        <dd>
+                            <input type="text" class="input" name="TI.LOTA14" UIInput="SR" UIFormat="U"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_STKNUM">선적번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="SI.STKNUM" UIInput="SR"/>
+                        </dd>
+                    </dl> 
+                    <dl>
+                        <dt CL="STD_SSHTYP">출고유형</dt>
+                        <dd>
+                            <select type="text" class="input" Combo="WmsOrder,RCPTTYCOMBO" name="SH.SHPMTY" id="SH.SHPMTY" ComboType="MS" validate="required">
+							</select>
+                        </dd>
+                    </dl>
+                    <dl>
+                    	<dt CL="STD_SHPOKY">출고문서번호</dt>
+                    	<dd>
+                            <input type="text" class="input" name="SH.SHPOKY" UIInput="SR"/>
+                        </dd>
+                    </dl>                     
+                    <dl>
+                        <dt CL="STD_SVBELN">출고오더번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="SI.SVBELN" UIInput="SR" UIFormat="U"/>
+                        </dd>
+                    </dl>                                                             
+                    <dl>
+                        <dt CL="STD_SAP2">항차번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.SAP2" UIInput="SR" />
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_DPTNKY2">납품처</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.DPTNKY" UIInput="SR,SHBZPTN"/>
+                        </dd>	
+                    </dl>
+                    <dl>
+                        <dt CL="STD_DPTNNM3">납품처명</dt>
+                        <dd>
+                            <input type="text" class="input" name="CT.NAME01" UIInput="SR" />
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_KUNAG">판매처</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.PTRCVR" UIInput="SR,SHBZPTN"/>
+                        </dd>   
+                    </dl>
+                    <dl>
+                        <dt CL="STD_KUNAGNM">판매처명</dt>
+                        <dd>
+                            <input type="text" class="input" name="CT2.NAME01" UIInput="SR" />
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_DESC01">품목명</dt>
+                        <dd>
+                            <input type="text" class="input" name="SI.DESC01" UIInput="SR"/>
+                        </dd>
+                    </dl>
+                    <dl>
+						<dt CL="STD_SKUG01">품목유형</dt>
+						<dd>
+							<select class="input" name="SKUG01" Combo="WmsInventory,SKUG01COMBO"><option value=""/></select>
+						</dd>
+					</dl>
+                    <dl>
+                        <dt CL="STD_SKUL01">품목구분</dt>
+                        <dd>
+                            <select type="text" class="input" CommonCombo="SKUL01" name="SKUL01" id="SKUL01">
+                              <option value=""></option>
+                            </select>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_LOTA15">LOT 번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="TI.LOTA15" UIInput="SR" UIFormat="U"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_BNAME">영업사원명</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.UNAME1" UIInput="SR"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_USRID1">영업사원ID</dt>
+                        <dd>
+                            <input type="text" class="input" name="SH.USRID1" UIInput="SR"/>
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_DEPTID5">사업장ID</dt>
+                        <dd>
+                            <select type="text" class="input" Combo="Wms,DEPTID" name="SH.DEPTID1" id="DEPTID" ComboType="MS">
+                            </select>
+                        </dd>
+                    </dl>                    
+                    <dl>
+                        <dt CL="STD_KDGRP">고객그룹</dt>
+                        <dd>
+                            <input type="text" class="input" Combo="Wms,KDGRP" name="SH.VTXTK" id="VTXTK" ComboType="MS">
+                        </dd>
+                    </dl>
+                    <dl>
+                        <dt CL="STD_KVGR1">고객그룹1</dt>
+                        <dd>
+                            <input type="text" class="input" Combo="Wms,KVGR" name="SH.KVGR1" id="KVGR1" ComboType="MS">
+                        </dd>
+                    </dl>
+        			<dl>
+						<dt CL="STD_SIGNI">컨테이너 NO</dt>
+						<dd>
+							<input type="text" class="input" name="SH.SIGNI" UIInput="R" IAname="Search" UIFormat="U"/>
+						</dd>
+					</dl> 
+                    <dl>
+                        <dt CL="STD_TOTPICKNUM">TOTAL 피킹번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="TP.STKNUM" UIInput="SR"/>
+                        </dd>	
+                    </dl> 
+                    <dl>
+                        <dt CL="STD_WAREKY">거점</dt>
+                        <dd>
+                            <input type="text" class="input" name="WAREKY" name="WAREKY"  value="<%=wareky%>" readonly="readonly" validate="required" />
+                        </dd>
+                    </dl>
+                </div>
+                <div class="btn_tab">
+                    <input type="button" class="btn_more" value="more" onclick="searchMore()"/>
+                </div>
+            </div>
+        </div>
+        <div class="search_next_wrap">
+            <div class="content_layout tabs">
+                <ul class="tab tab_style02">
+                    <li><a href="#tab1-1"><span CL="STD_LIST">리스트</span></a></li>
+                    <li class="btn_zoom_wrap">
+                        <ul>
+                            <li><button class="btn btn_bigger"><span>확대</span></button></li>
+                        </ul>
+                    </li>
+                </ul>
+                <div class="table_box section" id="tab1-1">
+                    <div class="table_list01">
+                        <div class="scroll">
+                            <table class="table_c">
+                                <tbody id="gridList">
+                                    <tr CGRow="true">
+                                        <td GH="40" GCol="rownum">1</td>                                        
+	                                    <td GH="100 STD_LOTA15"     GCol="text,LOTA15" >LOT번호</td>     
+	                                    <td GH="100 STD_JRLOT"     	GCol="text,JRLOT" >점보롤 LOT</td>                                   
+                                        <td GH="100 STD_LOTA14"     GCol="text,LOTA14" >제조LOT</td>
+                                        <td GH="100 STD_SHPOKY"     GCol="text,SHPOKY">출고문서번호</td>
+                                        <td GH="100 STD_STKNUM"     GCol="text,STKNUM">선적번호</td>
+                                        <td GH='100 STD_SAP2' 		GCol="text,SAP2">항차번호</td>
+                                        <!-- <td GH="100 STD_TOTPICKNUM" GCol="text,TOTPICKNUM">	TOTAL 피킹번호</td> -->
+                                        <td GH="100 STD_SHPOIT"     GCol="text,SHPOIT">아이템번호</td>
+                                        <td GH="100 STD_CTODDT"     GCol="text,RQARRD" GF="D">오더일자</td>
+                                        <td GH="100 STD_RQSHPD"     GCol="text,RQSHPD" GF="D">출하예정일자</td>
+                                        <td GH="100 STD_DOCDAT"     GCol="text,DOCDAT" GF="D">전기일자</td>
+                                        <td GH="100 STD_DOCUTY"     GCol="text,DOCUTY">문서유형</td>
+                                        <td GH="100 STD_DOCUTYNM"   GCol="text,DOCUTYNM">문서유형명</td>
+                                        <td GH="100 STD_STATDONM"   GCol="text,STATNM">문서상태명</td>
+
+                                        <td GH="100 STD_DPTNKY2"    GCol="text,DPTNKY">납품처</td>
+                                        <td GH="100 STD_DPTNNM3"    GCol="text,DPTNNM">납품처명</td>
+                                        <td GH="100 STD_KUNAG"     	GCol="text,PTRCVR">판매처</td>
+                                        <td GH="100 STD_KUNAGNM"    GCol="text,KUNAGNM">판매처명</td>
+                                        <td GH="100 STD_AREAKY"     GCol="text,AREAKY">영역</td>
+                                        <td GH="100 STD_ZONEKY"     GCol="text,ZONEKY">구역</td>
+                                        <td GH="100 STD_LOCAKY"     GCol="text,LOCAKY">로케이션</td>
+                                        <td GH="100 STD_SKUKEY"     GCol="text,SKUKEY">품목코드</td>
+	                                    <td GH="100 STD_DESC01"     GCol="text,DESC01">품목명</td>	                                   	                                   	                                    
+	                                    <td GH="100 STD_QTSHPD"     GCol="text,QTCOMP" GF="N 20,3">출고수량</td>
+
+	                                    <!-- <td GH="100 STD_UOMKEY"     GCol="text,UOMKEY">단위</td> --> 
+	                                    <td GH="100 STD_SDUOKY"     GCol="text,DUOMKY">기본단위</td>                                                          	                                    
+	                                    <td GH="100 STD_LOTA02" 	GCol="text,LOTA02">플랜트</td>
+	                                    <td GH="110 STD_PLNTNM" 	GCol="text,LOTA02NM">플랜트명</td>
+										<td GH="100 STD_LOTA01" 	GCol="text,LOTA01">저장위치</td>
+										<td GH="130 STD_LOTA01NM" 	GCol="text,LOTA01NM">저장위치명</td>
+										<td GH="100 STD_LOTA03" 	GCol="text,LOTA03">포장타입</td>
+										<td GH="100 STD_LOTA04" 	Gcol="text,LOTA04">호기</td>
+										<td GH="100 STD_LOTA06" 	Gcol="text,LOTA06NM">재고상태</td>
+										<td GH="100 STD_LOTA08" 	Gcol="text,LOTA08">국가코드</td>
+										<td GH="150 STD_NATNKYNM"   Gcol="text,LOTA08NM">국가명</td>
+										<td GH="100 STD_LOTA07" 	Gcol="text,LOTA07">MTO판매번호</td>																				
+										<td GH="100 STD_LOTA16" 	Gcol="text,LOTA16">평량</td>
+										<td GH="100 STD_LOTA17" 	Gcol="text,LOTA17">컨테이너유형</td>
+	                                    <td GH="100 STD_LOTA09NM" 	GCol="text,LOTA09NM">거래처코드MTO</td>
+	                                    <td GH="100 STD_LOTA11"     GCol="text,LOTA11" GF="C">제조일자</td>
+	                                    <td GH="100 STD_LOTA12"     GCol="text,LOTA12" GF="C">입고일자</td>	                                    
+	                                    <td GH="100 STD_LOTA13" 	GCol="text,LOTA13" GF="C">유통기한</td>
+	                                    <td GH="100 STD_REMAKS" 	GCol="text,DOCTXT">비고</td>
+	                                    
+	                                    <td GH="100 STD_WAREKY" 	GCol="text,WAREKY">거점</td>
+	                                    <td GH="100 STD_WANAME" 	GCol="text,WAREKYNM">거점명</td>	                                    
+	                                    <td GH="100 STD_SVBELN"     GCol="text,SVBELN">출고오더번호</td>
+	                                    
+	                                    <td GH="100 STD_OWNRNM"     GCol="text,OWNRNM">화주</td>
+	                                    <td GH="100 STD_DOCCAT"     GCol="text,DOCCAT">문서카테고리</td>
+	                                    <td GH="100 STD_DOCCATNM"   GCol="text,DOCCATNM">문서카테고리명</td>
+	                                    <td GH="100 STD_SKUL01"     GCol="text,SKUL01">품목구분</td>
+	                                    
+	                                    <td GH="100 STD_TOTWG" 		GCol="text,TOT" GF="N 20,3">총중량</td>
+	                                    <td GH="100 STD_BOXBAG" 	GCol="text,BOXBAG" GF="N 20,3">BOXBAG</td>
+										<td GH="100 STD_BAGQT" 		GCol="text,BAG" GF="N 20,3">BAG</td>
+										<td GH="100 STD_BOXQT" 		GCol="text,BOX" GF="N 20,3">BOX</td>
+										<td GH="100 STD_PLTQT" 		GCol="text,PLT" GF="N 20,3">Pallet</td>									
+										<td GH="100 STD_SOKQT" 		GCol="text,SOK" GF="N 20,3">속(개/BALE)</td>
+										<td GH="100 STD_EAQTY" 		GCol="text,EA" GF="N 20,3">매(sheet/속)</td>
+										
+										<td GH="100 STD_CREDAT"     GCol="text,CREDAT" GF="C">생성일자</td>
+										<td GH="100 STD_CRETIM"     GCol="text,CRETIM" GF="T">생성시간</td>
+										<td GH="100 STD_CREUSR"     GCol="text,CREUSR">생성자ID</td>
+										<td GH="100 STD_CUSRNM"     GCol="text,CUSRNM">생성자명</td>
+										<td GH="100 STD_LMODAT"     GCol="text,LMODAT" GF="C">수정일자</td>
+										<td GH="100 STD_LMOTIM"     GCol="text,LMOTIM" GF="T">수정시간</td>
+										<td GH="100 STD_LMOUSR"     GCol="text,LMOUSR">수정자ID</td>
+										<td GH="100 STD_LUSRNM"  	GCol="text,LUSRNM">수정자명</td>  
+										<td GH="100 STD_SIGNI"  	GCol="text,SIGNI">컨테이너ID</td>  
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="btn_lit tableUtil">
+                        <button type='button' GBtn="find"></button>
+                        <button type='button' GBtn="sortReset"></button>
+                        <button type='button' GBtn="total"></button>
+                        <button type='button' GBtn="layout"></button>
+                        <button type='button' GBtn="excel"></button>
+                        <button type='button' GBtn="subTotal"></button>
+                        <span class='txt_total' >총 건수 : <span GInfoArea='true'>0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- // content -->
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

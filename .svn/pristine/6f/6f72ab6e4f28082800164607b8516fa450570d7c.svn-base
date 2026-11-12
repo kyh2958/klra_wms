@@ -1,0 +1,118 @@
+package project.common.controller;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+import javax.servlet.AsyncContext;
+import javax.servlet.AsyncEvent;
+import javax.servlet.AsyncListener;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import project.common.task.SseEventManager;
+
+@WebServlet(value = "/api/sse/subscribe", asyncSupported = true)
+public class SseServlet extends HttpServlet {
+
+    // 워커 스레드를 점유하지 않는 소규모 전용 heartbeat 스케줄러
+    // (daemon 스레드라 WAS 종료 시 함께 종료됨)
+    private static final ScheduledExecutorService HEARTBEAT =
+            Executors.newScheduledThreadPool(2, r -> {
+                Thread t = new Thread(r, "sse-heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        // ★ 수정: topic을 final로 선언하고 단일 대입 (삼항 연산자)
+        //   기존 코드는  if (topic == null) topic = "default";  로 재대입해서
+        //   effectively final이 아니었음 → 아래 람다(heartbeat)와
+        //   익명 AsyncListener에서 캡처할 수 없어 컴파일 오류 발생.
+        //   ※ 서블릿 인스턴스 필드로 빼면 요청 스레드 간 공유되어
+        //     동시성 버그가 되므로 절대 하면 안 됨.
+        final String topic = req.getParameter("topic") != null
+                ? req.getParameter("topic") : "default";
+
+        resp.setContentType("text/event-stream");
+        resp.setCharacterEncoding("UTF-8");
+        resp.setHeader("Cache-Control", "no-cache");
+        resp.setHeader("Connection", "keep-alive");
+        // nginx/WAS 버퍼링 방지 (SSE가 지연되거나 끊기지 않게)
+        resp.setHeader("X-Accel-Buffering", "no");
+
+        // ★ 핵심 개선: 비동기 처리로 전환
+        // 기존 while 루프는 doGet을 끝내지 않아 연결당 워커 스레드 1개를 영구 점유
+        // → 연결 250개면 톰캣 maxThreads(기본 200)가 고갈되어
+        //   같은 WAS의 다른 모든 요청(JSP 로딩, 10초 폴링 등)까지 대기 상태가 됨.
+        // startAsync()로 요청 스레드를 즉시 풀에 반환한다.
+        AsyncContext async = req.startAsync();
+        async.setTimeout(0); // 서버 타임아웃 비활성화 (연결 수명은 heartbeat가 관리)
+
+        PrintWriter writer = resp.getWriter();
+
+        // 클라이언트 등록
+        SseEventManager.addClient(topic, writer);
+
+        // 최초 연결 이벤트 (+ 재연결 주기 안내)
+        writer.write("retry: 5000\n");
+        writer.write("event: connected\n");
+        writer.write("data: SSE Connected (" + topic + ")\n\n");
+        writer.flush();
+
+        // ★ 핵심 개선: heartbeat(주석 프레임)로 연결 유지 + 단절 감지
+        // - 주석 줄(": ping")은 브라우저 EventSource가 무시하지만,
+        //   프록시/로드밸런서의 유휴 타임아웃으로 연결이 끊기는 것을 막는다.
+        // - 쓰기 실패를 checkError()로 감지해 죽은 연결을 정리하고
+        //   async.complete()로 요청을 종료한다.
+        //   (기존 코드는 아무것도 쓰지 않아 클라이언트가 끊어져도
+        //    감지하지 못하고 좀비 연결로 계속 남았음 → 세션 누적의 원인)
+        ScheduledFuture<?> hb = HEARTBEAT.scheduleAtFixedRate(() -> {
+            try {
+                synchronized (writer) {
+                    writer.write(": ping\n\n");
+                    writer.flush();
+                }
+                if (writer.checkError()) {
+                    SseEventManager.removeClient(topic, writer);
+                    async.complete();
+                }
+            } catch (Exception e) {
+                SseEventManager.removeClient(topic, writer);
+                async.complete();
+            }
+        }, 15, 15, TimeUnit.SECONDS);
+
+        // 어떤 경로로 종료되든 반드시 정리
+        async.addListener(new AsyncListener() {
+            @Override
+            public void onComplete(AsyncEvent e) {
+                hb.cancel(true);
+                SseEventManager.removeClient(topic, writer);
+            }
+            @Override
+            public void onTimeout(AsyncEvent e) {
+                hb.cancel(true);
+                SseEventManager.removeClient(topic, writer);
+                async.complete();
+            }
+            @Override
+            public void onError(AsyncEvent e) {
+                hb.cancel(true);
+                SseEventManager.removeClient(topic, writer);
+            }
+            @Override
+            public void onStartAsync(AsyncEvent e) {
+                // 필요 시 재시작 처리
+            }
+        });
+    }
+}

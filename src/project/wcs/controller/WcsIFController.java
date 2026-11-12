@@ -1,0 +1,65 @@
+package project.wcs.controller;
+
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.controller.BaseController;
+import project.common.dao.WcsDAO;
+import project.wcs.service.WcsIFService;
+
+@Controller
+public class WcsIFController extends BaseController {
+	private static Logger log = Logger.getLogger(WcsIFController.class);
+	
+	@Autowired
+	private WcsIFService service;	
+	@Autowired
+	public WcsDAO commonDao;
+	
+	@RequestMapping("/WcsIF/list/json/{command}.*")
+	public String list(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("WcsIF", command);
+		
+		List<DataMap> list = service.getList(map);
+		
+		model.put("data", list);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/WcsIF/map/json/{command}.*")
+	public String map(HttpServletRequest request, @PathVariable String command, Map<String, Object> model) throws SQLException{		
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("WcsIF", command);
+
+		DataMap data = service.getMap(map);
+
+		model.put("data", data);
+		
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/WcsIF/datalist/{dataType}/{command}.*")
+	public String datalist(HttpServletRequest request, @PathVariable String command, Map model) throws SQLException, InterruptedException{	
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		map.setModuleCommand("WcsIF", command);
+		
+		String listData = service.getJdbcData(map);
+
+		model.put("data", listData);
+		
+		return TEXT_VIEW;
+	}
+}

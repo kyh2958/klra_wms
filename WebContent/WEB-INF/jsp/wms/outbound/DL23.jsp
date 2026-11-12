@@ -1,0 +1,234 @@
+<%@page import="project.common.airfw.User"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+    pageEncoding="UTF-8"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Grid default</title>
+<%@ include file="/common/include/webdek/head.jsp" %>
+<script type="text/javascript" src="/common/js/ezgencontrol.js"></script>
+<%
+	User user = (User)request.getSession().getAttribute(CommonConfig.SES_USER_OBJECT_KEY);
+%>
+<link rel="stylesheet" type="text/css" href="/common/theme/webdek/css/demo_layout.css?ver=<%=dateTime%>">
+
+
+<script type="text/javascript">
+	var searchFlag = 1;
+	var tabPage = 1;
+	var paramH = new DataMap();
+	
+	$(document).ready(function(){
+	    gridList.setGrid({
+	        id : "gridList",
+	        module : "WmsOutbound",
+	        command : "DL23"
+	    });
+	});
+	function commonBtnClick(btnName){
+	    if(btnName == "Search"){
+	        searchList();
+	    }else if(btnName == "Save"){
+	        saveData();
+	    }
+	}
+	
+	function searchList(){
+	    if(validate.check("searchArea")){
+	        var param = inputList.setRangeParam("searchArea");
+	        param.put("WAREKY", "<%=wareky%>");
+	        param.put("OWNRKY", "<%=ownrky%>");
+	        param.put("LANGKY", "<%=langky%>");
+	        param.put("PROGID", configData.MENU_ID);
+
+	        gridList.resetGrid("gridList");
+
+	        gridList.gridList({
+	            id : "gridList",
+	            param : param
+	        });
+	    }
+	}
+	function saveData(){
+	    var allList = gridList.getGridData("gridList");
+	    var saveList = [];
+
+	    if(!allList || allList.length == 0){
+	        commonUtil.msgBox("조회된 데이터가 없습니다.");
+	        return;
+	    }
+
+	    for(var i = 0; i < allList.length; i++){
+	        var row = allList[i];
+	        if($.trim(row.get("GRowState")) == "U"){
+	            saveList.push(row);
+	        }
+	    }
+
+	    if(saveList.length == 0){
+	        commonUtil.msgBox("변경된 데이터가 없습니다.");
+	        return;
+	    }
+
+	    if(!commonUtil.msgConfirm(configData.MSG_MASTER_SAVE_CONFIRM)){
+	        return;
+	    }
+
+	    var param = new DataMap();
+	    param.put("list", saveList);
+	    param.put("WAREKY", "<%=wareky%>");
+	    param.put("OWNRKY", "<%=ownrky%>");
+	    param.put("LANGKY", "<%=langky%>");
+	    param.put("PROGID", configData.MENU_ID);
+
+	    
+	    var json = netUtil.sendData({
+	        url : "/wms/outbound/json/saveSubDL23.data",
+	        param : param
+	    });
+
+	   
+
+	    if(json && json.data && json.data.RESULT == "S" && Number(json.data.CNT) > 0){
+	        commonUtil.msgBox("저장되었습니다.");
+	        searchList();
+	    }else{
+	        commonUtil.msgBox("저장할 데이터가 없거나 저장에 실패했습니다.");
+	    }
+	}
+	
+
+	var urgentSyncFlag = false;
+
+	function gridListEventColValueChange(gridId, rowNum, colName, colValue){
+	    
+
+	    if(urgentSyncFlag){
+	        return;
+	    }
+
+	    var gridBox = gridList.gridMap.get(gridId);
+	    
+	    if(colName == "URGENT_YN"){
+	        syncUrgentByCarno(gridId, rowNum, colValue);
+	    }else if(colName == "EXCLUDE_YN"){
+	        gridBox.setColValue(rowNum, "GRowState", "U");
+	    }else if(colName == "LOCATION"){
+	        gridBox.setColValue(rowNum, "GRowState", "U");
+	    }
+	}
+
+	function syncUrgentByCarno(gridId, rowNum, colValue){
+	    var list = gridList.getGridData(gridId);
+	    var target = list[rowNum];
+	    var carno = $.trim(target.get("CARNO"));
+	    var checkVal = (colValue == "V" || colValue == "Y" || colValue == "true" || colValue == "1") ? "V" : "";
+
+	    
+
+	    var gridBox = gridList.gridMap.get(gridId);
+
+	    urgentSyncFlag = true;
+
+	    for(var i = 0; i < list.length; i++){
+	        if($.trim(list[i].get("CARNO")) == carno){
+	            gridBox.setColValue(i, "URGENT_YN", checkVal);
+	            gridBox.setColValue(i, "GRowState", "U");
+	        }
+	    }
+
+	    urgentSyncFlag = false;
+	}
+    
+</script>
+</head>
+<body>
+<%@ include file="/common/include/webdek/layout.jsp" %>
+<div class="content_wrap">
+    <div class="content_inner">
+        <%@ include file="/common/include/webdek/title.jsp" %>
+
+        <div class="content_serch" id="searchArea">
+           <div class="btn_wrap">
+			    <div class="fl_r">
+			        <input type="button" CB="Search SEARCH BTN_SEARCH" />
+			        <input type="button" CB="Save SAVE STD_SAVE" />
+			    </div>
+			</div>
+           
+            
+
+            <div class="search_inner">
+                <div class="search_wrap">
+                    <input type="hidden" class="input" name="OWNRKY" value="<%=ownrky%>" />
+
+                    <dl>
+                        <dt>차량번호</dt>
+                        <dd>
+                            <input type="text" class="input" name="CARNO" />
+                        </dd>
+                    </dl>
+
+                    <dl>
+                        <dt>진행상태</dt>
+                        <dd>
+                            <select class="input" name="BOARD_STEP">
+                                <option value="">전체</option>
+                                <option value="ARRIVAL">입차</option>
+                                <option value="PREPARING">상품준비중</option>
+                                <option value="READY">출고준비완료</option>
+                            </select>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="search_next_wrap">
+            <div class="content_layout tabs">
+                <ul class="tab tab_style02">
+                    <li class="btn_zoom_wrap">
+                        <ul>
+                            <li><button class="btn btn_bigger"><span>확대</span></button></li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <div class="table_box section">
+                    <div class="table_list01">
+                        <div class="scroll">
+                            <table class="table_c">
+                                <tbody id="gridList">
+                                    <tr CGRow="true">
+                                        <td GH="40 STD_NUMBER" GCol="rownum">1</td>
+                                        <td GH="120 차량번호" GCol="text,CARNO">차량번호</td>
+                                        <td GH="140 선적번호" GCol="text,STKNUM">선적번호</td>
+                                        <td GH="120 현재단계" GCol="text,BOARD_STEP">현재단계</td>
+                                        <td GH="180 로케이션" GCol="input,LOCATION">로케이션</td>
+                                        <td GH="80 긴급" GCol="check,URGENT_YN">긴급</td>
+                                        <td GH="80 제외" GCol="check,EXCLUDE_YN">제외</td>
+                                        <td GH="100 생성일자" GCol="text,CREDAT">생성일자</td>
+                                        <td GH="100 생성시간" GCol="text,CRETIM">생성시간</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="btn_lit tableUtil">
+                        <button type="button" GBtn="find"></button>
+                        <button type="button" GBtn="sortReset"></button>
+                        <button type="button" GBtn="layout"></button>
+                        <button type="button" GBtn="total"></button>
+                        <button type="button" GBtn="excel"></button>
+                        <span class='txt_total'>총 건수 : <span GInfoArea='true'>0</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<%@ include file="/common/include/webdek/bottom.jsp" %>
+</body>
+</html>

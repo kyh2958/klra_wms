@@ -1,0 +1,2050 @@
+package project.common.airfw;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
+
+import org.apache.log4j.Logger;
+
+import com.sap.conn.jco.AbapException;
+import com.sap.conn.jco.JCoDestination;
+import com.sap.conn.jco.JCoDestinationManager;
+import com.sap.conn.jco.JCoException;
+import com.sap.conn.jco.JCoExtendedFieldMetaData;
+import com.sap.conn.jco.JCoField;
+import com.sap.conn.jco.JCoFieldIterator;
+import com.sap.conn.jco.JCoFunction;
+import com.sap.conn.jco.JCoListMetaData;
+import com.sap.conn.jco.JCoMetaData;
+import com.sap.conn.jco.JCoParameterField;
+import com.sap.conn.jco.JCoParameterFieldIterator;
+import com.sap.conn.jco.JCoParameterList;
+import com.sap.conn.jco.JCoRecordMetaData;
+import com.sap.conn.jco.JCoStructure;
+import com.sap.conn.jco.JCoTable;
+import com.sap.conn.jco.ext.DestinationDataProvider;
+
+import project.common.bean.DataMap;
+
+/**
+ * basic examples for Java to ABAP communication  
+ */
+public class RfcCallClient
+{
+	private static Logger log = Logger.getLogger(RfcCallClient.class);
+	
+	static String ABAP_AS = "ABAP_AS_WITHOUT_POOL";
+    static String ABAP_AS_POOLED = "ABAP_AS_WITH_POOL";
+//	static String ABAP_AS_POOLED = "SAP_SERVER"; //sap 연결명(연결파일명으로 사용됨)
+//	static String ABAP_AS_POOLED = "cvkcepvpap01p"; //sap 연결명(연결파일명으로 사용됨)
+//	static String ABAP_AS_POOLED = "CEP";  //sap 연결명(연결파일명으로 사용됨)
+    
+    private void main(DataMap baseMap)
+    {
+        Properties connectProperties = new Properties();	// 연결프로퍼티 생성
+        connectProperties.setProperty(DestinationDataProvider.JCO_ASHOST, baseMap.getString(DestinationDataProvider.JCO_ASHOST));	 // SAP 호스트 정보
+        connectProperties.setProperty(DestinationDataProvider.JCO_SYSNR,  baseMap.getString(DestinationDataProvider.JCO_SYSNR));	 // 인스턴스번호
+//        connectProperties.setProperty(CommonConfig.SAP_JCO_SYSID,  		  baseMap.getString(CommonConfig.SAP_JCO_SYSID));	 
+        connectProperties.setProperty("jco.client.sysid",  		  baseMap.getString("jco.client.sysid"));	 
+        
+        connectProperties.setProperty(DestinationDataProvider.JCO_CLIENT, baseMap.getString(DestinationDataProvider.JCO_CLIENT));	 // SAP 클라이언트
+        connectProperties.setProperty(DestinationDataProvider.JCO_USER,   baseMap.getString(DestinationDataProvider.JCO_USER));	 // SAP유저명
+        connectProperties.setProperty(DestinationDataProvider.JCO_PASSWD, baseMap.getString(DestinationDataProvider.JCO_PASSWD));	 // SAP 패스워드
+        connectProperties.setProperty(DestinationDataProvider.JCO_LANG,   baseMap.getString(DestinationDataProvider.JCO_LANG));  // 언어
+        
+//    	connectProperties.setProperty(DestinationDataProvider.JCO_POOL_CAPACITY, jcoProperties.getProperty("sap.pool.capacity"));
+//    	connectProperties.setProperty(DestinationDataProvider.JCO_PEAK_LIMIT, jcoProperties.getProperty("sap.pool.limit"));
+//    	connectProperties.setProperty(DestinationDataProvider.JCO_POOL_CAPACITY, "1");
+//    	connectProperties.setProperty(DestinationDataProvider.JCO_PEAK_LIMIT, "2");
+        
+        createDestinationDataFile(ABAP_AS_POOLED, connectProperties);        
+    }
+    
+    //sap 연결파일 생성
+    private void createDestinationDataFile(String destinationName, Properties connectProperties)
+    {
+        File destCfg = new File(destinationName+".jcoDestination");
+        try
+        {
+            FileOutputStream fos = new FileOutputStream(destCfg, false);
+            connectProperties.store(fos, "for tests only !");
+            fos.close();
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("Unable to create the destination files", e);
+        }
+    }
+    
+    /**
+     * map 형태로 넘어온 데이터를 처리한다. 결과값 table 형식
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. paramlist 안에  [FLAG 값 셋팅]
+     * 3. IF_RETBL 수신받을 값 [table name 설정]
+     * 4. table list에 [SECNO 소분류 번호 설정]
+     * 5. 결과값 returnList
+     */
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToTableInbound(DataMap basemap, DataMap map) throws JCoException
+    {
+    	main(basemap);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        // ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(basemap.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+	    	JCoParameterList paramlist = function.getImportParameterList();
+	    	if(paramlist != null){
+	    		Iterator keys = map.keySet().iterator();
+	    		String key = "";
+	    		while(keys.hasNext()){
+	    			key = (String) keys.next();
+	    			paramlist.setValue(key, map.get(key));
+	    		}
+	    	}
+	    
+            //execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        try 
+        {
+	        JCoTable returnTable = function.getTableParameterList().getTable(basemap.getString("IF_RETBL"));
+			
+	        int rfcRowNum = returnTable.getNumRows();
+//	        int rfcRowNum = 1;
+			for(int j = 0; j < rfcRowNum; j++){
+				DataMap returnMap = new DataMap();
+//				returnTable.firstRow();
+				JCoFieldIterator jrfit = returnTable.getFieldIterator();
+				JCoField jField = null;
+				while(jrfit.hasNextField()){
+					jField = jrfit.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", j + 1); // 소분류 번호 설정
+				returnList.add(j, returnMap);
+//				returnTable.deleteRow(0);
+				returnTable.nextRow();
+			}
+
+			////log.debug("[수신결과] "+rfcRowNum+"건 : "+returnList);
+        } 
+        catch (Exception e) {
+        	DataMap returnMap = new DataMap();
+			e.printStackTrace();
+			returnMap.put("ERRMSG", e.toString());
+			returnList.add(0, returnMap);
+		}
+        finally
+        {
+        	return returnList;
+		}
+    }
+    
+    /**
+     * SAP 재고 수신
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+	@SuppressWarnings("finally")
+	public DataMap rfcCallTableSapStock(String pWekrs, DataMap basemap, DataMap map) throws JCoException {
+		main(basemap);
+		
+		JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+		
+		JCoFunction function = destination.getRepository().getFunction(basemap.getString("RFC_NM"));
+		
+		if (function == null) {
+			throw new RuntimeException("FUNCTION not found in SAP.");
+		}
+		
+		DataMap res = new DataMap();
+		
+		try {
+			JCoParameterList paramlist = function.getImportParameterList();
+			if (paramlist != null) {
+				Iterator keys = map.keySet().iterator();
+				String key = "";
+				while (keys.hasNext()) {
+					key = (String) keys.next();
+					paramlist.setValue(key, map.get(key));
+				}
+			}
+			
+			// 수신받을 플랜트 지정
+			JCoTable table = function.getTableParameterList().getTable("IT_WERKS");
+			table.appendRow();
+			table.setValue("WERKS", pWekrs);
+			
+//			for (DataMap data : list) {
+//				data = data.getMap("map");
+//				
+//				table.appendRow();
+//				Iterator listkeys = data.keySet().iterator();
+//				String listkey = "";
+//				while (listkeys.hasNext()) {
+//					listkey = (String) listkeys.next();
+//					table.setValue(listkey, data.get(listkey));
+//				}
+//			}
+
+			function.execute(destination);
+			
+			JCoTable returnHead = function.getTableParameterList().getTable("ET_DATA");
+
+			JCoFieldIterator jcoIter = null;
+			JCoField jField = null;
+			DataMap returnMap = null;
+			
+			List<DataMap> rcvData = new ArrayList<>();
+			int headSize = returnHead.getNumRows();
+			for (int i = 0; i < headSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnHead.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				rcvData.add(i, returnMap);
+				returnHead.nextRow();
+			}
+			
+			res.put("ET_DATA" , rcvData);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.put("ERRMSG", e.toString());
+		} finally {
+			return res;
+		}
+	}
+	
+    /**
+     * 실적전송건 취소
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+	@SuppressWarnings("finally")
+	public DataMap rfcCancel(List<DataMap> list, DataMap basemap, DataMap map) throws JCoException {
+		main(basemap);
+		
+		JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+		
+		JCoFunction function = destination.getRepository().getFunction(basemap.getString("RFC_NM"));
+		
+		if (function == null) {
+			throw new RuntimeException("FUNCTION not found in SAP.");
+		}
+		
+		DataMap res = new DataMap();
+		
+		try {
+			JCoParameterList paramlist = function.getImportParameterList();
+			if (paramlist != null) {
+				Iterator keys = map.keySet().iterator();
+				String key = "";
+				while (keys.hasNext()) {
+					key = (String) keys.next();
+					paramlist.setValue(key, map.get(key));
+				}
+			}
+			
+			JCoTable table = function.getTableParameterList().getTable("T_INDATA");
+			for (DataMap data : list) {
+				data = data.getMap("map");
+				
+				table.appendRow();
+				Iterator listkeys = data.keySet().iterator();
+				String listkey = "";
+				while (listkeys.hasNext()) {
+					listkey = (String) listkeys.next();
+					table.setValue(listkey, data.get(listkey));
+				}
+			}
+
+			function.execute(destination);
+			
+			JCoTable returnHead = function.getTableParameterList().getTable("O_RETURN");
+			
+			////log.debug("###########################################################");
+			////log.debug("rfcCancel.returnHead : " + returnHead);
+			////log.debug("###########################################################");
+			
+			JCoFieldIterator jcoIter = null;
+			JCoField jField = null;
+			DataMap returnMap = null;
+			
+			List<DataMap> headList = new ArrayList<>();
+			int headSize = returnHead.getNumRows();
+			for (int i = 0; i < headSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnHead.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				headList.add(i, returnMap);
+				returnHead.nextRow();
+			}
+			
+			
+			/********************************************************************************************
+			 * 20220809 수입밀롤 RFC 추가 호출을 위해 Z_WMS_DELIVERY_CANCEL MCDATA 객체 파싱 후 Z_WMS_MR_DELIVERY_CANCEL 추가 호출 - START
+			 ********************************************************************************************/
+			List<DataMap> mcDataList = new ArrayList<>();
+			
+			JCoListMetaData jcoListMetaData = function.getFunctionTemplate().getTableParameterList();
+			//JCoParameterList jcoTableList = function.getTableParameterList();
+			
+			boolean mcDataYn = false;
+			int mcDataSize = 0;
+			/*
+			for(int i=0;i<jcoTableList.getFieldCount();i++) {
+				JCoTable jcoTable = jcoTableList.getTable(i);
+				JCoRecordMetaData jmt = jcoTable.getRecordMetaData();
+				String tableNm = jmt.getName();
+				////log.debug("tableNm : " + tableNm);
+				if(tableNm!=null && "ZLES614".equals(tableNm)) {
+					mcDataYn=true;
+				}				
+			}
+			*/
+			for(int i=0;i<jcoListMetaData.getFieldCount();i++) {
+				String tableNm = jcoListMetaData.getName(i);
+				if(tableNm!=null && "O_MCDATA".equals(tableNm)) {
+					mcDataYn=true;
+				}				
+			}
+			
+			if(mcDataYn) {
+				JCoFieldIterator mcJcoIter = null;
+				JCoField mcJField = null;
+				DataMap returnMcMap = null;
+				
+				JCoTable returnMcdata = function.getTableParameterList().getTable("O_MCDATA");
+				
+				////log.debug("###########################################################");
+				////log.debug("rfcCancel.returnMcdata : " + returnMcdata);
+				////log.debug("###########################################################");
+				
+				mcDataSize = returnMcdata.getNumRows();
+				for (int i = 0; i < mcDataSize; i++) {
+					returnMcMap = new DataMap();
+					mcJcoIter = returnMcdata.getFieldIterator();
+					
+					while (mcJcoIter.hasNextField()) {
+						mcJField = mcJcoIter.nextField();
+						returnMcMap.put(mcJField.getName(), mcJField.getValue());
+					}
+					
+					returnMcMap.put("SECNO", i + 1); // 소분류 번호 설정
+					mcDataList.add(i, returnMcMap);
+					returnMcdata.nextRow();
+				}
+			}
+			/********************************************************************************************
+			 * 20220809 수입밀롤 RFC 추가 호출을 위해 Z_WMS_DELIVERY_CANCEL MCDATA 객체 파싱 후 Z_WMS_MR_DELIVERY_CANCEL 추가 호출 - END
+			 ********************************************************************************************/
+			
+			////log.debug("paramlist::"+paramlist);
+			////log.debug("table::"+table);
+			
+			////log.debug("[수신결과 head] " + headSize + "건");
+			////log.debug("[수신결과 headList] " + headList + "건");
+			
+			////log.debug("[수신결과 밀롤 추가 MCDATA size] " + mcDataSize + "건");
+			////log.debug("[수신결과 밀롤 추가 MCDATA List] " + mcDataList );
+			
+			res.put("head" , headList);
+			res.put("mcDataList" , mcDataList);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.put("ERRMSG", e.toString());
+		} finally {
+			return res;
+		}
+	}
+	
+	
+	/**
+     * 20220809 수입밀롤 RFC 추가 호출을 위해 Z_WMS_DELIVERY_CANCEL MCDATA 객체 파싱 후 Z_WMS_MR_DELIVERY_CANCEL 추가 호출
+     * 입력 테이블 T_INDATA > I_INDATA 변경됨.
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+	@SuppressWarnings("finally")
+	public DataMap rfcMrCancel(List<DataMap> list, DataMap basemap, DataMap map) throws JCoException {
+		main(basemap);
+		
+		JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+		
+		JCoFunction function = destination.getRepository().getFunction(basemap.getString("RFC_NM"));
+		
+		if (function == null) {
+			throw new RuntimeException("FUNCTION not found in SAP.");
+		}
+		
+		DataMap res = new DataMap();
+		
+		try {
+			JCoParameterList paramlist = function.getImportParameterList();
+			if (paramlist != null) {
+				Iterator keys = map.keySet().iterator();
+				String key = "";
+				while (keys.hasNext()) {
+					key = (String) keys.next();
+					paramlist.setValue(key, map.get(key));
+				}
+			}
+			
+			
+			JCoListMetaData jcoListMetaData = function.getFunctionTemplate().getTableParameterList();
+			for(int i=0;i<jcoListMetaData.getFieldCount();i++) {
+				String tableNm = jcoListMetaData.getName(i);
+				////log.debug("rfcCancel input tableNm : " + tableNm);				
+			}
+			
+			JCoTable table = function.getTableParameterList().getTable("I_INDATA");
+			for (DataMap data : list) {
+				data = data.getMap("map");
+				
+				table.appendRow();
+				Iterator listkeys = data.keySet().iterator();
+				String listkey = "";
+				while (listkeys.hasNext()) {
+					listkey = (String) listkeys.next();
+					table.setValue(listkey, data.get(listkey));
+				}
+			}
+
+			function.execute(destination);
+			
+			JCoTable returnHead = function.getTableParameterList().getTable("O_RETURN");
+			
+			////log.debug("###########################################################");
+			////log.debug("rfcCancel.returnHead : " + returnHead);
+			////log.debug("###########################################################");
+			
+			JCoFieldIterator jcoIter = null;
+			JCoField jField = null;
+			DataMap returnMap = null;
+			
+			List<DataMap> headList = new ArrayList<>();
+			int headSize = returnHead.getNumRows();
+			for (int i = 0; i < headSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnHead.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				headList.add(i, returnMap);
+				returnHead.nextRow();
+			}
+			
+			
+			////log.debug("paramlist::"+paramlist);
+			////log.debug("table::"+table);
+			
+			////log.debug("[수신결과 head] " + headSize + "건");
+			////log.debug("[수신결과 headList] " + headList + "건");
+			
+			res.put("head" , headList);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.put("ERRMSG", e.toString());
+		} finally {
+			return res;
+		}
+	}
+	
+    /**
+     * [DL08] 출고 완료 - 거래명세서 출력
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. paramlist 안에  [FLAG 값 셋팅]
+     * 3. IF_RETBL 수신받을 값 [table name 설정]
+     * 4. table list에 [SECNO 소분류 번호 설정]
+     * 5. 결과값 returnList
+     */
+	@SuppressWarnings("finally")
+	public DataMap flagToTableDL08(List<DataMap> list, DataMap basemap, DataMap map) throws JCoException {
+		main(basemap);
+		
+		JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+		
+		// ... it always has a reference to a metadata repository
+		JCoFunction function = destination.getRepository().getFunction(basemap.getString("IF_NAME"));
+		
+		if (function == null) {
+			throw new RuntimeException("FUNCTION not found in SAP.");
+		}
+		
+		DataMap res = new DataMap();
+		
+		try {
+			JCoParameterList paramlist = function.getImportParameterList();
+			if (paramlist != null) {
+				Iterator keys = map.keySet().iterator();
+				String key = "";
+				while (keys.hasNext()) {
+					key = (String) keys.next();
+					paramlist.setValue(key, map.get(key));
+				}
+			}
+			
+			JCoTable table = function.getTableParameterList().getTable("I_INDATA");
+			for (DataMap data : list) {
+				data = data.getMap("map");
+				
+				table.appendRow();
+				Iterator listkeys = data.keySet().iterator();
+				String listkey = "";
+				while (listkeys.hasNext()) {
+					listkey = (String) listkeys.next();
+					table.setValue(listkey, data.get(listkey));
+				}
+			}
+			
+			// execute, i.e. send the function to the ABAP system addressed
+			// by the specified destination, which then returns the function result.
+			// All necessary conversions between Java and ABAP data types
+			// are done automatically.
+			function.execute(destination);
+			
+			JCoTable returnHead = function.getTableParameterList().getTable("O_HEAD");
+			JCoTable returnItem = function.getTableParameterList().getTable("O_ITEM");
+			JCoTable returnInfo = function.getTableParameterList().getTable("O_ITEM_INFO");
+			
+			JCoFieldIterator jcoIter = null;
+			JCoField jField = null;
+			DataMap returnMap = null;
+			
+			List<DataMap> headList = new ArrayList<>();
+			int headSize = returnHead.getNumRows();
+			for (int i = 0; i < headSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnHead.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				headList.add(i, returnMap);
+				returnHead.nextRow();
+			}
+			
+			List<DataMap> itemList = new ArrayList<>();
+			int itemSize = returnItem.getNumRows();
+			for (int i = 0; i < itemSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnItem.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				itemList.add(i, returnMap);
+				returnItem.nextRow();
+			}
+			
+			List<DataMap> infoList = new ArrayList<>();
+			int infoSize = returnInfo.getNumRows();
+			for (int i = 0; i < infoSize; i++) {
+				returnMap = new DataMap();
+				jcoIter = returnInfo.getFieldIterator();
+				
+				while (jcoIter.hasNextField()) {
+					jField = jcoIter.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", i + 1); // 소분류 번호 설정
+				infoList.add(i, returnMap);
+				returnInfo.nextRow();
+			}
+			
+			////log.debug("[수신결과 head] " + headSize + "건");
+			////log.debug("[수신결과 item] " + itemSize + "건");
+			////log.debug("[수신결과 info] " + infoSize + "건");
+			
+			res.put("head" , headList);
+			res.put("item" , itemList);
+			res.put("info" , infoList);
+		} catch (Exception e) {
+			e.printStackTrace();
+			res.put("ERRMSG", e.toString());
+		} finally {
+			return res;
+		}
+	}
+    
+    /**
+     * SAP 호출후 수신데이터 처리가 정상처리되면 그 결과를 SAP에 송신
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToTableInboundRTN(DataMap basemap, DataMap map) throws JCoException
+    {
+    	main(basemap);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        JCoFunction function = destination.getRepository().getFunction(basemap.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+	    
+        try
+        {
+	    	JCoParameterList paramlist = function.getImportParameterList();
+	    	if(paramlist != null){
+	    		Iterator keys = map.keySet().iterator();
+	    		String key = "";
+	    		while(keys.hasNext()){
+	    			key = (String) keys.next();
+	    			paramlist.setValue(key, map.get(key));
+	    		}
+	    	}
+	    
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        try 
+        {
+//	        JCoStructure returnStructure = function.getExportParameterList().getStructure("E_RETURN");
+	        
+        	JCoParameterList returnStructure = function.getExportParameterList();
+
+        	DataMap returnMapStr = new DataMap();
+        	JCoFieldIterator jrfitStr = returnStructure.getFieldIterator();
+        	JCoField jFieldStr = null;
+        	while(jrfitStr.hasNextField()){
+        		jFieldStr = jrfitStr.nextField();
+        		returnMapStr.put(jFieldStr.getName(), jFieldStr.getValue());
+			}
+        	
+        	returnList.add(0, returnMapStr);
+        } 
+        catch (Exception e) {
+        	DataMap returnMap = new DataMap();
+			e.printStackTrace();
+			returnMap.put("ERRMSG", e.toString());
+			returnList.add(0, returnMap);
+		}
+        finally
+        {
+        	return returnList;
+		}
+    }
+    
+    /**
+     * map 형태로 넘어온 데이터를 처리한다. 결과값 table 형식
+     * @param map
+     * @return 
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. paramlist 안에  [FLAG 값 셋팅]
+     * 3. IF_RETBL 수신받을 값 [table name 설정]
+     * 4. table list에 [SECNO 소분류 번호 설정]
+     * 5. 결과값 returnList
+     */
+    @SuppressWarnings("finally")
+	public DataMap flagToTableInboundMulti(DataMap basemap, DataMap map) throws JCoException
+    {
+    	main(basemap);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	List<DataMap> returnList2 = new ArrayList();
+    	
+    	DataMap resultMap = new DataMap();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        JCoFunction function = destination.getRepository().getFunction(basemap.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+
+        try
+        {
+	    	JCoParameterList paramlist = function.getImportParameterList();
+	    	if(paramlist != null){
+	    		Iterator keys = map.keySet().iterator();
+	    		String key = "";
+	    		while(keys.hasNext()){
+	    			key = (String) keys.next();
+	    			paramlist.setValue(key, map.get(key));
+	    		}
+	    	}
+	    
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return resultMap;
+        }
+        
+        try 
+        {
+	        JCoTable returnTable = function.getTableParameterList().getTable(basemap.getString("IF_RETBL"));
+			
+	        int rfcRowNum = returnTable.getNumRows();
+
+			DataMap returnMap = new DataMap();
+			JCoFieldIterator jrfit = null;
+			JCoField jField = null;
+	        for(int j = 0; j < rfcRowNum; j++){
+//				returnTable.firstRow();
+	        	returnMap = new DataMap();
+				jrfit = returnTable.getFieldIterator();
+				while(jrfit.hasNextField()){
+					jField = jrfit.nextField();
+					returnMap.put(jField.getName(), jField.getValue());
+				}
+				
+				returnMap.put("SECNO", j + 1); // 소분류 번호 설정
+				returnList.add(j, returnMap);
+//				returnTable.deleteRow(0);
+				returnTable.nextRow();
+//				////log.debug(j);
+			}
+        	resultMap.put(basemap.getString("IF_RETBL"),returnList);
+        	returnTable.clear();
+
+	        ////log.debug("품목 수신건수 : "+returnList.size());
+	        
+			JCoTable returnTable2 = function.getTableParameterList().getTable(basemap.getString("IF_RETBL2"));
+			
+	        int rfcRowNum2 = returnTable2.getNumRows();
+
+			DataMap returnMap2 = new DataMap();
+			JCoFieldIterator jrfit2 = null;
+			JCoField jField2 = null;
+	        for(int j2 = 0; j2 < rfcRowNum2; j2++){
+				returnTable2.firstRow();
+	        	returnMap2 = new DataMap();
+				jrfit2 = returnTable2.getFieldIterator();
+				while(jrfit2.hasNextField()){
+					jField2 = jrfit2.nextField();
+					returnMap2.put(jField2.getName(), jField2.getValue());
+				}
+				
+				returnMap2.put("SECNO", j2 + 1); // 소분류 번호 설정
+				returnList2.add(j2, returnMap2);
+				returnTable2.deleteRow(0);
+//				returnTable2.nextRow();
+//				////log.debug(j2);
+			}
+        	////log.debug("단위구성 수신건수1 : "+returnList2.size());
+//        	returnTable2.clear();
+        	resultMap.put(basemap.getString("IF_RETBL2"),returnList2);
+
+        	////log.debug("단위구성 수신건수2 : "+returnList2.size());
+
+//        	////log.debug("\n[수신결과 "+basemap.getString("IF_RETBL") +"] "+rfcRowNum +"건 : "+returnList);
+//        	////log.debug("\n[수신결과 "+basemap.getString("IF_RETBL2")+"] "+rfcRowNum2+"건 : "+returnList2);
+
+        } 
+        catch (Exception e) {
+			e.printStackTrace();
+			resultMap.put("ERRMSG", e.toString());
+		}
+        finally
+        {
+        	return resultMap;
+		}
+    }
+    
+    /**
+     * list 데이터를 테이블에 담아 SAP에 송신한다. flagToTableInbound 메소드 결과에 대한 송신 및 
+     * @param list
+     * @param map
+     * @param paramMap
+     * @return
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. paramlist 안에  [FLAG 값 셋팅]
+     * 3. IF_RETBL 송신할 값 [table name 설정]
+     * 4. table에 값 송신
+     * 
+     * ======= [S] 결과값 받지 않을 경우 =========
+     * 5. REP_FLAG 값 S로 강제 설정
+     * ======= [E] 결과값 받지 않을 경우 =========
+     * 
+     * ======= [S] 결과값 받을 경우 ============
+     * 5. IF_RESTR 수신받을 값 [structure name 설정]
+     * 6. REP_FLAG 값 에러유무 체크
+     * 7-1. 에러시에 IF_RETBL 수신받을 값 [table name 설정]
+     * 7-2. 정상시에 REP_FLAG 값 returnList에 설정
+     * ======= [E] 결과값 받을 경우 ============
+     * 
+     * 8. 결과값 returnList
+     */
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToTableInboundResult(List<DataMap> list, DataMap map, DataMap paramMap) throws JCoException
+    {
+    	main(map);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+    	// ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(map.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+        	JCoParameterList param = function.getImportParameterList();
+        	Iterator keys = paramMap.keySet().iterator();
+	    	String key = "";
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				param.setValue(key, paramMap.get(key));
+			}
+	    	
+	    	JCoTable table = function.getTableParameterList().getTable(map.getString("IF_RETBL"));
+	    	Map<String, String> reqMap = new DataMap();
+//	    	List<DataMap> item = new ArrayList<DataMap>();
+	    	List<Map<String, String>> item = new ArrayList();
+	    	item = list.get(0).getList("list");
+			for(int i = 0; i < item.size(); i++){
+				table.appendRow();
+				reqMap = item.get(i);
+		        
+		        Iterator listkeys = reqMap.keySet().iterator();
+		    	String listkey = "";
+		    	while(listkeys.hasNext()){
+		    		listkey = (String) listkeys.next();
+		    		table.setValue(listkey, reqMap.get(listkey));
+				}
+			}
+	    	
+	    	//execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        try 
+        {
+            // ====================== 1. 결과값 받지 않을 경우 ======================
+//            DataMap returnMapStr = new DataMap();
+//            returnMapStr.put("REP_FLAG","S"); // 무조건 정상처리
+//            returnList.add(returnMapStr);
+        	
+            
+            // ====================== 2. 결과값 받을 경우 ======================
+        	// 리턴받을 Structure 명 설정
+//        	JCoStructure returnStructure = function.getExportParameterList().getStructure(map.getString("IF_RESTR"));
+//        	
+//        	DataMap returnMapStr = new DataMap();
+//        	JCoFieldIterator jrfitStr = returnStructure.getFieldIterator();
+//        	JCoField jFieldStr = null;
+//        	while(jrfitStr.hasNextField()){
+//        		jFieldStr = jrfitStr.nextField();
+//        		returnMapStr.put(jFieldStr.getName(), jFieldStr.getValue());
+//			}
+//        	
+//        	// Structure REP_FLAG 컬럼의 값이 E 일때 상세 table 내역 조회
+//        	if (returnMapStr.getString("REP_FLAG").equals("E")){
+        		
+        		// 리턴받을 Table 명 설정
+        		JCoTable returnTable = function.getTableParameterList().getTable(map.getString("IF_RESTR"));
+//        		JCoTable returnTable = function.getTableParameterList().getTable("O_RETURN");
+//    	        returnList.add(0, returnMapStr);
+    			int rfcRowNum = returnTable.getNumRows();
+				returnTable.firstRow();
+    			for(int j = 0; j < rfcRowNum; j++){
+    				DataMap returnMap = new DataMap();
+    				
+    				JCoFieldIterator jrfit = returnTable.getFieldIterator();
+    				JCoField jField = null;
+    				while(jrfit.hasNextField()){
+    					jField = jrfit.nextField();
+    					returnMap.put(jField.getName(), jField.getValue());
+    				}
+    	
+    				returnList.add(j, returnMap);
+    				returnTable.nextRow();
+//    				returnTable.deleteRow(0);
+    			}
+//        	} else {
+//        		// Structure REP_FLAG 컬럼의 값이 S 일때 리턴값 저장
+//        		returnList.add(returnMapStr);
+//        	}
+        	
+        } 
+        catch (Exception e) {
+			e.printStackTrace();
+		}
+        finally
+        {
+        	return returnList;
+		}
+		
+    }
+
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToTableResultHEADITEM(List<DataMap> list, DataMap map, DataMap paramMap) throws JCoException
+    {
+    	main(map);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        JCoFunction function = destination.getRepository().getFunction(map.getString("IF_NAME"));
+    
+        if(function == null) throw new RuntimeException("FUNCTION not found in SAP.");
+	    
+        try
+        {
+        	JCoParameterList param = function.getImportParameterList();
+        	Iterator keys = paramMap.keySet().iterator();
+	    	String key = "";
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				param.setValue(key, paramMap.get(key));
+			}
+	    	
+			
+			JCoStructure tableH = function.getImportParameterList().getStructure(map.getString("IF_HEADTBL"));
+			Map<String, String> reqMapH = new DataMap();
+			List<Map<String, String>> dataH = new ArrayList();
+			dataH = list.get(0).getList("HEAD");
+			for (int i = 0; i < dataH.size(); i++) { 
+				
+				reqMapH = dataH.get(i);
+				Iterator listkeys = reqMapH.keySet().iterator();
+				String listkey = "";
+				while (listkeys.hasNext()) {
+					listkey = (String) listkeys.next();
+					tableH.setValue(listkey, reqMapH.get(listkey));
+				}
+			}
+			 	 
+			JCoTable tableI = function.getTableParameterList().getTable(map.getString("IF_ITEMTBL"));
+			Map<String, String> reqMapI = new DataMap();
+			List<Map<String, String>> dataI = new ArrayList();
+			dataI = list.get(0).getList("ITEM");
+			for (int i = 0; i < dataI.size(); i++) {
+				tableI.appendRow();
+				reqMapI = dataI.get(i);
+
+				Iterator listkeys = reqMapI.keySet().iterator();
+				String listkey = "";
+				while (listkeys.hasNext()) {
+					listkey = (String) listkeys.next();
+					tableI.setValue(listkey, reqMapI.get(listkey));
+				}
+			}
+			
+			////log.debug("HEAD::"+tableH);
+			////log.debug("ITEM::"+tableI);
+			
+		
+				function.execute(destination);
+			
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        try 
+        {
+//	        JCoStructure returnStructure = function.getExportParameterList().getStructure("E_RETURN");
+	        
+        	JCoParameterList returnStructure = function.getExportParameterList();
+
+        	DataMap returnMapStr = new DataMap();
+        	JCoFieldIterator jrfitStr = returnStructure.getFieldIterator();
+        	JCoField jFieldStr = null;
+        	while(jrfitStr.hasNextField()){
+        		jFieldStr = jrfitStr.nextField();
+        		returnMapStr.put(jFieldStr.getName(), jFieldStr.getValue());
+			}
+        	
+        	returnList.add(0, returnMapStr);
+        } 
+        catch (Exception e) {
+        	DataMap returnMap = new DataMap();
+			e.printStackTrace();
+			returnMap.put("ERRMSG", e.toString());
+			returnList.add(0, returnMap);
+		}
+        finally
+        {
+        	return returnList;
+		}
+		
+    }
+    
+    /**
+     * list 데이터를 테이블에 담아 SAP에 송신한다. SAP에 확정 및 결과 송신
+     * @param list
+     * @param map
+     * @param paramMap
+     * @return
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. IF_RETBL 송신할 값 [table name 설정]
+     * 3. table에 값 송신
+     * 
+     * ======= [S] 결과값 받지 않을 경우 =========
+     * 4. REP_FLAG 값 S로 강제 설정
+     * ======= [E] 결과값 받지 않을 경우 =========
+     * 
+     * ======= [S] 결과값 받을 경우 ============
+     * 4. IF_RESTR 수신받을 값 [structure name 설정]
+     * 5. REP_FLAG 값 에러유무 체크
+     * 6-1. 에러시에 IF_RETBL 수신받을 값 [table name 설정]
+     * 6-2. 정상시에 REP_FLAG 값 returnList에 설정
+     * ======= [E] 결과값 받을 경우 ============
+     * 
+     * 7. 결과값 returnList
+     */
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToTableOutbound(List<DataMap> list, DataMap map) throws JCoException
+    {
+    	main(map);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+    	// ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(map.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+	    	JCoTable table = function.getTableParameterList().getTable(map.getString("IF_RETBL"));
+	    	DataMap reqMap = new DataMap();
+			for(int i = 0; i < list.size(); i++){
+				table.appendRow();
+				reqMap = list.get(i);
+		        
+		        Iterator listkeys = reqMap.keySet().iterator();
+		    	String listkey = "";
+		    	while(listkeys.hasNext()){
+		    		listkey = (String) listkeys.next();
+		    		table.setValue(listkey, reqMap.get(listkey));
+				}
+			}
+	    	
+	    	//execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        try 
+        {
+        	/*
+        	// =============== 1. 결과값 받지 않을 경우 ===============
+            DataMap returnMapStr = new DataMap();
+            returnMapStr.put("REP_FLAG","S"); // 무조건 정상처리
+            returnList.add(returnMapStr);
+        	*/
+        	
+        	// =============== 2. 결과값 받을 경우 ================
+        	// 리턴받을 Structure 명 설정
+        	JCoStructure returnStructure = function.getExportParameterList().getStructure(map.getString("IF_RESTR"));
+        	
+        	DataMap returnMapStr = new DataMap();
+        	JCoFieldIterator jrfitStr = returnStructure.getFieldIterator();
+        	JCoField jFieldStr = null;
+        	while(jrfitStr.hasNextField()){
+        		jFieldStr = jrfitStr.nextField();
+        		returnMapStr.put(jFieldStr.getName(), jFieldStr.getValue());
+			}
+        	
+        	// Structure REP_FLAG 컬럼의 값이 S가 아닐때 상세 table 내역 조회
+        	if (!returnMapStr.getString("REP_FLAG").equals("S")){
+        		
+        		// 리턴받을 Table 명 설정
+        		JCoTable returnTable = function.getTableParameterList().getTable(map.getString("IF_RETBL"));
+    	        
+    			int rfcRowNum = returnTable.getNumRows();
+    			// Structure REP_FLAG 컬럼의 값이 E 일때 리턴값 첫줄에 저장
+        		returnList.add(0, returnMapStr);
+        		
+    			for(int j = 0; j < rfcRowNum; j++){
+    				DataMap returnMap = new DataMap();
+    				returnTable.firstRow();
+    				JCoFieldIterator jrfit = returnTable.getFieldIterator();
+    				JCoField jField = null;
+    				while(jrfit.hasNextField()){
+    					jField = jrfit.nextField();
+    					returnMap.put(jField.getName(), jField.getValue());
+    				}
+    	
+    				returnList.add(j + 1, returnMap);
+    				returnTable.deleteRow(0);
+    			}
+        	} else {
+        		// Structure REP_FLAG 컬럼의 값이 S 일때 리턴값 저장
+        		returnList.add(returnMapStr);
+        	}
+        } 
+        catch (Exception e) {
+			e.printStackTrace();
+		}
+        finally
+        {
+        	return returnList;
+		}
+        
+    }
+    
+    /**
+     * map 형태로 넘어온 데이터를 처리한다. 송수신 structure 형식
+     * @param map
+     * @return
+     * @throws JCoException
+     */
+    /*
+     * 순서
+     * 1. IF_NAME [function name 설정]
+     * 2. paramlist 안에  [FLAG 값 셋팅] 후 SAP 송신
+     * 3. IF_RESTR 수신받을 값 [Structure name 설정]
+     * 4. returnList에  Structure 값 셋팅
+     * 5. 결과값 returnList
+     */
+    @SuppressWarnings("finally")
+	public List<DataMap> flagToStructureInOutbound(DataMap basemap, DataMap map) throws JCoException
+    {
+    	main(basemap);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        // ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(basemap.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+        	// 요청 flag 값들 송신
+	    	JCoParameterList paramlist = function.getImportParameterList();
+        	Iterator keys = map.keySet().iterator();
+	    	String key = "";
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				paramlist.setValue(key, map.get(key));
+			}
+	    
+            //execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        try 
+        {
+        	// 요청에 따른 리턴 Structure name 설정
+	        JCoStructure returnStructure = function.getExportParameterList().getStructure(basemap.getString("IF_RESTR"));
+
+	        DataMap returnMap = new DataMap();
+			JCoFieldIterator jrfit = returnStructure.getFieldIterator();
+			JCoField jField = null;
+			while(jrfit.hasNextField()){
+				jField = jrfit.nextField();
+				returnMap.put(jField.getName(), jField.getValue());
+			}
+			// returnList 값에  Structure값들 셋팅 
+			returnList.add(returnMap);
+			returnStructure.clear();
+        } 
+        catch (Exception e) {
+			e.printStackTrace();
+		}
+        finally
+        {
+        	return returnList;
+		}
+    }
+    
+    /**
+     * 단일 IMPORT + INPUT TABLE + OUTPUT TABLE RFC 호출 전용
+     * (예: Z_SD_WEB_ATP_CHECK)
+     *
+     * @param baseMap        RFC 접속정보 + IF_NAME
+     * @param importMap     IMPORT 파라미터 (ex. I_MODE)
+     * @param inputTableNm  입력 TABLE 명 (ex. T_INPUT)
+     * @param inputList     입력 TABLE 데이터 (VBELN, POSNR ...)
+     * @param outputTableNm 출력 TABLE 명 (ex. T_OUTPUT)
+     * @return              결과 TABLE List<DataMap>
+     */
+    @SuppressWarnings("finally")
+    public List<DataMap> callSimpleImportTableRfc(DataMap baseMap, DataMap importMap, String inputTableNm, List<DataMap> inputList, String outputTableNm) throws JCoException {
+
+        // 1. Destination 설정
+        main(baseMap);
+
+        List<DataMap> resultList = new ArrayList<>();
+
+        JCoDestination destination =
+                JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+        JCoFunction function =
+                destination.getRepository().getFunction(baseMap.getString("IF_NAME"));
+
+        if (function == null) {
+            throw new RuntimeException("FUNCTION not found in SAP : "
+                    + baseMap.getString("IF_NAME"));
+        }
+
+        try {
+            /* ===============================
+             * 2. IMPORT 파라미터 세팅
+             * =============================== */
+            if (importMap != null && !importMap.isEmpty()) {
+                JCoParameterList imports = function.getImportParameterList();
+                if (imports != null) {
+                    for (Object keyObj : importMap.keySet()) {
+                        String key = (String) keyObj;
+                        imports.setValue(key, importMap.get(key));
+                    }
+                }
+            }
+
+            /* ===============================
+             * 3. INPUT TABLE 세팅
+             * =============================== */
+            if (inputTableNm != null && inputList != null && !inputList.isEmpty()) {
+                JCoTable inputTable =
+                        function.getTableParameterList().getTable(inputTableNm);
+
+                for (DataMap row : inputList) {
+                    inputTable.appendRow();
+                    for (Object keyObj : row.keySet()) {
+                        String key = (String) keyObj;
+                        inputTable.setValue(key, row.get(key));
+                    }
+                }
+            }
+
+            /* ===============================
+             * 4. RFC 실행
+             * =============================== */
+            function.execute(destination);
+
+            /* ===============================
+             * 5. OUTPUT TABLE 수신
+             * =============================== */
+            if (outputTableNm != null) {
+                JCoTable outputTable =
+                        function.getTableParameterList().getTable(outputTableNm);
+
+                int rowCnt = outputTable.getNumRows();
+                for (int i = 0; i < rowCnt; i++) {
+                    DataMap rowMap = new DataMap();
+
+                    JCoFieldIterator it = outputTable.getFieldIterator();
+                    while (it.hasNextField()) {
+                        JCoField field = it.nextField();
+                        rowMap.put(field.getName(), field.getValue());
+                    }
+
+                    rowMap.put("SECNO", i + 1);
+                    resultList.add(rowMap);
+                    outputTable.nextRow();
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            DataMap err = new DataMap();
+            err.put("ERRMSG", e.toString());
+            resultList.add(err);
+        } finally {
+            return resultList;
+        }
+    }
+
+    
+    /**
+     * list 로 넘어온 데이터를 테이블에 담아 처리한다.
+     * @param list
+     * @param map
+     * @return
+     * @throws JCoException
+     */
+    public List<DataMap> tableExecute(ArrayList<DataMap> list, DataMap map) throws JCoException
+    {
+    	main(map);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+    	// ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(map.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+	    	JCoTable table = function.getTableParameterList().getTable(map.getString("IF_RETBL"));
+	    	
+	    	DataMap reqMap = new DataMap();
+	    	for(int i = 0; i < list.size(); i++){
+		        table.appendRow();
+	        	//JCoParameterList paramlist = function.getImportParameterList();
+		        reqMap = list.get(i);
+		        
+		        Iterator keys = reqMap.keySet().iterator();
+		    	String key = "";
+		    	while(keys.hasNext()){
+					key = (String) keys.next();
+					table.setValue(key, reqMap.get(key));
+				}
+	    	}
+	    	
+	    	//execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+        
+        JCoTable returnTable = function.getTableParameterList().getTable(map.getString("IF_RETBL"));
+        
+		int rfcRowNum = returnTable.getNumRows();
+		for(int j = 0; j < rfcRowNum; j++){
+			DataMap returnMap = new DataMap();
+			returnTable.firstRow();
+			JCoFieldIterator jrfit = returnTable.getFieldIterator();
+			JCoField jField = null;
+			while(jrfit.hasNextField()){
+				jField = jrfit.nextField();
+				returnMap.put(jField.getName(), jField.getValue());
+			}
+
+			returnList.add(j, returnMap);
+			returnTable.deleteRow(0);
+		}
+        
+        return returnList;
+    }
+    
+    
+    
+    /**
+     * table / map 사용
+     * @param baseMap
+     * @param paramMap
+     * @param paramList2
+     * @return
+     * @throws JCoException
+     */
+    public List<DataMap> dualListExecute(DataMap baseMap, DataMap paramMap, List<DataMap> paramList) throws JCoException
+    {
+    	main(baseMap);
+    	
+    	List<DataMap> returnList = new ArrayList();
+    	JCoDestination destination = JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+    	
+        // ... it always has a reference to a metadata repository
+        JCoFunction function = destination.getRepository().getFunction(baseMap.getString("IF_NAME"));
+    
+        if(function == null)
+            throw new RuntimeException("FUNCTION not found in SAP.");
+       // List<HashMap> list = new ArrayList();
+	   // HashMap paramMap = new HashMap();
+	    
+        try
+        {
+        	JCoParameterList param = function.getImportParameterList();
+        	Iterator keys = paramMap.keySet().iterator();
+	    	String key = "";
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				param.setValue(key, paramMap.get(key));
+			}
+	    	
+	    	JCoTable table = function.getTableParameterList().getTable(baseMap.getString("IF_FRTBL"));
+	    	DataMap reqMap = new DataMap();
+			for(int i = 0; i < paramList.size(); i++){
+				table.appendRow();
+				reqMap = paramList.get(i);
+		        
+		        Iterator listkeys = reqMap.keySet().iterator();
+		    	String listkey = "";
+		    	while(listkeys.hasNext()){
+		    		listkey = (String) listkeys.next();
+		    		table.setValue(listkey, reqMap.get(listkey));
+				}
+			}
+		
+            //execute, i.e. send the function to the ABAP system addressed 
+            //by the specified destination, which then returns the function result.
+            //All necessary conversions between Java and ABAP data types
+            //are done automatically.
+            function.execute(destination);
+        }
+        catch(AbapException e)
+        {
+        	return returnList;
+        }
+       
+        JCoTable returnTable = function.getTableParameterList().getTable(baseMap.getString("IF_RETBL"));
+        
+        int rfcRowNum = returnTable.getNumRows();
+		for(int j = 0; j < rfcRowNum; j++){
+			DataMap returnMap = new DataMap();
+			returnTable.firstRow();
+			JCoFieldIterator jrfit = returnTable.getFieldIterator();
+			JCoField jField = null;
+			while(jrfit.hasNextField()){
+				jField = jrfit.nextField();
+				returnMap.put(jField.getName(), jField.getValue());
+			}
+
+			returnList.add(j, returnMap);
+			returnTable.deleteRow(0);
+		}
+		
+        return returnList;
+    }
+    
+    public List<DataMap> dummyMapExecute(DataMap map)
+    {
+    	List<DataMap> returnList = new ArrayList();
+    	
+		Iterator keys = map.keySet().iterator();
+    	String key = "";
+    	DataMap returnMap = new DataMap();
+    	while(keys.hasNext()){
+			key = (String) keys.next();
+			returnMap.put(key, map.get(key));
+			returnMap.put("CODE", "00");
+			returnMap.put("MESSAGE", "Not Connected SAP");
+			returnMap.put("MTSNR", "999999999X");
+		}
+    	returnList.add(0, returnMap);
+    	
+        return returnList;
+    }
+    
+	public List<DataMap> dummayTableExecute(ArrayList<DataMap> list, DataMap map)
+    {
+    	List<DataMap> returnList = new ArrayList();
+    	
+    	DataMap rsMap = new DataMap();
+    	for(int i = 0; i < list.size(); i++){
+    		rsMap = list.get(i);
+    		Iterator keys = rsMap.keySet().iterator();
+        	String key = "";
+        	DataMap returnMap = new DataMap();
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				returnMap.put(key, rsMap.get(key));
+				returnMap.put("CODE", "00");
+				returnMap.put("MESSAGE", "Not Connected SAP");
+				returnMap.put("MTSNR", "999999999X");
+			}
+	    	returnList.add(i, returnMap);
+    	}
+    	
+        return returnList;
+    }
+	
+	public List<DataMap> dummyDualListExecute(DataMap baseMap, DataMap paramMap, List<DataMap> list)
+    {
+		List<DataMap> returnList = new ArrayList();
+    	
+    	DataMap rsMap = new DataMap();
+    	for(int i = 0; i < list.size(); i++){
+    		rsMap = list.get(i);
+    		Iterator keys = rsMap.keySet().iterator();
+        	String key = "";
+        	DataMap returnMap = new DataMap();
+	    	while(keys.hasNext()){
+				key = (String) keys.next();
+				returnMap.put(key, rsMap.get(key));
+				returnMap.put("CODE", "00");
+				returnMap.put("MESSAGE", "Not Connected SAP");
+				returnMap.put("MTSNR", "999999999X");
+			}
+	    	returnList.add(i, returnMap);
+    	}
+    	return returnList;
+    }
+	
+	public DataMap callZ_MM_ROH2_GR_FROM_PDA(DataMap baseMap, DataMap importMap)
+	        throws JCoException {
+
+	    // 1. Destination 등록 (중요)
+	    main(baseMap);
+
+	    DataMap result = new DataMap();
+
+	    // 2. Destination 획득 (POOL 기반)
+	    JCoDestination destination =
+	            JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+	    // 3. RFC Function
+	    JCoFunction function =
+	            destination.getRepository()
+	                       .getFunction(baseMap.getString("IF_NAME"));
+
+	    if (function == null) {
+	        throw new RuntimeException(
+	            "FUNCTION not found : " + baseMap.getString("IF_NAME")
+	        );
+	    }
+
+	    /* ===============================
+	     * 4. IMPORT 파라미터 세팅
+	     * =============================== */
+	    JCoParameterList imports = function.getImportParameterList();
+	    if (imports != null && importMap != null) {
+	        for (Object keyObj : importMap.keySet()) {
+	            String key = (String) keyObj;
+	            imports.setValue(key, importMap.get(key));
+	        }
+	    }
+
+	    /* ===============================
+	     * 5. RFC 실행
+	     * =============================== */
+	    function.execute(destination);
+
+	    /* ===============================
+	     * 6. EXPORT 파라미터 수신
+	     * =============================== */
+	    JCoParameterList exports = function.getExportParameterList();
+	    if (exports != null) {
+	        for (JCoField field : exports) {
+	            result.put(field.getName(), field.getValue());
+	        }
+	    }
+
+	    return result;
+	}
+	
+	// 종이자원 출고 RFC
+	public DataMap callZ_MM_ROH2_GI_FROM_PDA(DataMap baseMap, DataMap importMap, List<DataMap> itemList) throws JCoException {
+
+	    main(baseMap);
+
+	    DataMap result = new DataMap();
+	    List<DataMap> returnList = new ArrayList<>();
+
+	    JCoDestination destination =
+	            JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+	    JCoFunction function =
+	            destination.getRepository()
+	                       .getFunction("Z_MM_ROH2_GI_FROM_PDA");
+
+	    if (function == null) {
+	        throw new RuntimeException("FUNCTION not found : Z_MM_ROH2_GI_FROM_PDA");
+	    }
+
+	    /* =========================
+	     * 1. IMPORT 세팅
+	     * ========================= */
+	    JCoParameterList imports = function.getImportParameterList();
+
+	    if (imports != null && importMap != null) {
+	        for (Object keyObj : importMap.keySet()) {
+	            String key = (String) keyObj;
+	            imports.setValue(key, importMap.get(key));
+	        }
+	    }
+
+	    /* =========================
+	     * 2. I_TABLE 세팅
+	     * ========================= */
+	    if (itemList != null && !itemList.isEmpty()) {
+
+	        JCoTable inputTable =
+	                function.getTableParameterList().getTable("I_TABLE");
+
+	        for (DataMap row : itemList) {
+	            inputTable.appendRow();
+
+	            for (Object keyObj : row.keySet()) {
+	                String key = (String) keyObj;
+	                inputTable.setValue(key, row.get(key));
+	            }
+	        }
+	    }
+
+	    /* =========================
+	     * 3. RFC 실행
+	     * ========================= */
+	    function.execute(destination);
+
+	    /* =========================
+	     * 4. O_RETURN 분석
+	     * ========================= */
+	    JCoTable returnTable =
+	            function.getTableParameterList().getTable("O_RETURN");
+
+	    boolean isError = false;
+	    StringBuilder msgBuilder = new StringBuilder();
+	    String successDoc = null;
+
+	    int rowCnt = returnTable.getNumRows();
+
+	    for (int i = 0; i < rowCnt; i++) {
+
+	        DataMap rowMap = new DataMap();
+
+	        JCoFieldIterator it = returnTable.getFieldIterator();
+	        while (it.hasNextField()) {
+	            JCoField field = it.nextField();
+	            rowMap.put(field.getName(), field.getValue());
+	        }
+
+	        returnList.add(rowMap);
+
+	        String type = rowMap.getString("TYPE");
+	        String message = rowMap.getString("MESSAGE");
+
+	        if ("E".equals(type)) {
+	            isError = true;
+	            msgBuilder.append(message).append(" | ");
+	        }
+
+	        if ("S".equals(type) && successDoc == null) {
+	            successDoc = message;   // "MBLNR,MJAHR"
+	        }
+
+	        returnTable.nextRow();
+	    }
+
+	    result.put("O_RETURN", returnList);
+
+	    /* =========================
+	     * 5. EV_RCODE / EV_RMSG 생성
+	     * ========================= */
+	    if (isError) {
+
+	        result.put("EV_RCODE", "E");
+	        result.put("EV_RMSG", msgBuilder.toString());
+
+	    } else {
+
+	        result.put("EV_RCODE", "S");
+	        result.put("EV_RMSG", successDoc);
+
+	        if (successDoc != null && successDoc.contains(",")) {
+	            String[] split = successDoc.split(",");
+	            result.put("EV_MBLNR", split[0]);
+	            result.put("EV_MJAHR", split[1]);
+	        }
+	    }
+
+	    return result;
+	}
+
+
+
+	// 종이자원 출고취소 RFC
+	public DataMap callZ_MM_ROH2_GI_CANCEL(DataMap baseMap, DataMap importMap) throws JCoException {
+
+		main(baseMap);
+
+	    DataMap result = new DataMap();
+	    List<DataMap> returnList = new ArrayList<>();
+
+	    JCoDestination destination =
+	            JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+	    JCoFunction function =
+	            destination.getRepository()
+	                       .getFunction("Z_MM_ROH2_GI_FROM_PDA");
+
+	    if (function == null) {
+	        throw new RuntimeException("FUNCTION not found : Z_MM_ROH2_GI_FROM_PDA");
+	    }
+
+	    /* =========================
+	     * 1. IMPORT 세팅
+	     * ========================= */
+	    JCoParameterList imports = function.getImportParameterList();
+
+	    if (imports != null && importMap != null) {
+	        for (Object keyObj : importMap.keySet()) {
+	            String key = (String) keyObj;
+	            imports.setValue(key, importMap.get(key));
+	        }
+	    }
+
+	    /* =========================
+	     * 2. RFC 실행
+	     * ========================= */
+	    function.execute(destination);
+
+	    /* =========================
+	     * 3. O_RETURN 분석
+	     * ========================= */
+	    JCoTable returnTable =
+	            function.getTableParameterList().getTable("O_RETURN");
+
+	    boolean isError = false;
+	    StringBuilder msgBuilder = new StringBuilder();
+	    String successDoc = null;
+
+	    int rowCnt = returnTable.getNumRows();
+
+	    for (int i = 0; i < rowCnt; i++) {
+
+	        DataMap rowMap = new DataMap();
+
+	        JCoFieldIterator it = returnTable.getFieldIterator();
+	        while (it.hasNextField()) {
+	            JCoField field = it.nextField();
+	            rowMap.put(field.getName(), field.getValue());
+	        }
+
+	        rowMap.put("SECNO", i + 1);
+	        returnList.add(rowMap);
+
+	        String type = rowMap.getString("TYPE");
+	        String message = rowMap.getString("MESSAGE");
+
+	        if ("E".equals(type)) {
+	            isError = true;
+	            msgBuilder.append(message).append(" | ");
+	        }
+
+	        if ("S".equals(type) && successDoc == null) {
+	            successDoc = message;  // "MBLNR,MJAHR"
+	        }
+
+	        returnTable.nextRow();
+	    }
+
+	    result.put("O_RETURN", returnList);
+
+	    /* =========================
+	     * 4. EV_RCODE / EV_RMSG 생성
+	     * ========================= */
+	    if (isError) {
+
+	        result.put("EV_RCODE", "E");
+	        result.put("EV_RMSG", msgBuilder.toString());
+
+	    } else {
+
+	        result.put("EV_RCODE", "S");
+	        result.put("EV_RMSG", successDoc);
+
+	        if (successDoc != null && successDoc.contains(",")) {
+	            String[] split = successDoc.split(",");
+	            result.put("EV_MBLNR", split[0]);
+	            result.put("EV_MJAHR", split[1]);
+	        }
+	    }
+
+	    return result;
+	}
+	
+	public DataMap callZ_IM_ROH2_GR_FROM_PDA(DataMap baseMap, DataMap importMap, List<DataMap> itemList) throws JCoException {
+
+	    main(baseMap);
+
+	    DataMap result = new DataMap();
+	    List<DataMap> returnList = new ArrayList<>();
+
+	    JCoDestination destination =
+	            JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+	    JCoFunction function =
+	            destination.getRepository()
+	                       .getFunction("Z_IM_ROH2_GR_FROM_PDA");
+
+	    if (function == null) {
+	        throw new RuntimeException("FUNCTION not found : Z_IM_ROH2_GR_FROM_PDA");
+	    }
+
+	    /* =========================
+	     * 1IMPORT 세팅
+	     * ========================= */
+	    JCoParameterList imports = function.getImportParameterList();
+
+	    if (imports != null && importMap != null) {
+	        for (Object keyObj : importMap.keySet()) {
+	            String key = (String) keyObj;
+	            imports.setValue(key, importMap.get(key));
+	        }
+	    }
+
+	    /* =========================
+	     * I_TABLE 세팅
+	     * ========================= */
+	    if (itemList != null && !itemList.isEmpty()) {
+
+	        JCoTable inputTable =
+	                function.getTableParameterList().getTable("I_TABLE");
+
+	        for (DataMap row : itemList) {
+
+	            inputTable.appendRow();
+
+	            for (Object keyObj : row.keySet()) {
+	                String key = (String) keyObj;
+	                inputTable.setValue(key, row.get(key));
+	            }
+	        }
+	    }
+
+	    /* =========================
+	     * RFC 실행
+	     * ========================= */
+	    function.execute(destination);
+
+	    /* =========================
+	     * O_RETURN 분석
+	     * ========================= */
+	    JCoTable returnTable =
+	            function.getTableParameterList().getTable("O_RETURN");
+
+	    boolean isError = false;
+	    StringBuilder msgBuilder = new StringBuilder();
+
+	    int rowCnt = returnTable.getNumRows();
+
+	    for (int i = 0; i < rowCnt; i++) {
+
+	        DataMap rowMap = new DataMap();
+
+	        JCoFieldIterator it = returnTable.getFieldIterator();
+	        while (it.hasNextField()) {
+	            JCoField field = it.nextField();
+	            rowMap.put(field.getName(), field.getValue());
+	        }
+
+	        returnList.add(rowMap);
+
+	        String type = rowMap.getString("TYPE");
+	        String message = rowMap.getString("MESSAGE");
+
+	        if ("E".equals(type)) {
+	            isError = true;
+	        }
+
+	        msgBuilder.append(message).append(" | ");
+
+	        returnTable.nextRow();
+	    }
+
+	    result.put("O_RETURN", returnList);
+
+	    if (isError) {
+	        result.put("EV_RCODE", "E");
+	        result.put("EV_RMSG", msgBuilder.toString());
+	    } else {
+	        result.put("EV_RCODE", "S");
+	        result.put("EV_RMSG", "입고 성공");
+	    }
+
+	    return result;
+	}
+	
+	public DataMap callZ_IM_ROH2_CANCEL_FROM_PDA(
+	        DataMap baseMap,
+	        DataMap importMap
+	) throws JCoException {
+
+	    main(baseMap);
+
+	    DataMap result = new DataMap();
+	    List<DataMap> returnList = new ArrayList<>();
+
+	    JCoDestination destination =
+	            JCoDestinationManager.getDestination(ABAP_AS_POOLED);
+
+	    JCoFunction function =
+	            destination.getRepository()
+	                       .getFunction("Z_IM_ROH2_CANCEL_FROM_PDA");
+
+	    if (function == null) {
+	        throw new RuntimeException(
+	                "FUNCTION not found : Z_IM_ROH2_CANCEL_FROM_PDA"
+	        );
+	    }
+
+	    /* =========================
+	     * 1. IMPORT 세팅
+	     * ========================= */
+	    JCoParameterList imports = function.getImportParameterList();
+
+	    if (imports != null && importMap != null) {
+	        for (Object keyObj : importMap.keySet()) {
+	            String key = (String) keyObj;
+	            imports.setValue(key, importMap.get(key));
+	        }
+	    }
+
+	    /* =========================
+	     * 2. RFC 실행
+	     * ========================= */
+	    function.execute(destination);
+
+	    /* =========================
+	     * 3. O_RETURN 수신
+	     * ========================= */
+	    JCoTable returnTable =
+	            function.getTableParameterList()
+	                    .getTable("O_RETURN");
+
+	    boolean isError = false;
+	    StringBuilder msgBuilder = new StringBuilder();
+
+	    int rowCnt = returnTable.getNumRows();
+
+	    for (int i = 0; i < rowCnt; i++) {
+
+	        DataMap rowMap = new DataMap();
+
+	        JCoFieldIterator it = returnTable.getFieldIterator();
+	        while (it.hasNextField()) {
+	            JCoField field = it.nextField();
+	            rowMap.put(field.getName(), field.getValue());
+	        }
+
+	        returnList.add(rowMap);
+
+	        String type = rowMap.getString("TYPE");
+	        String message = rowMap.getString("MESSAGE");
+
+	        if ("E".equals(type)) {
+	            isError = true;
+	            msgBuilder.append(message).append(" | ");
+	        }
+
+	        returnTable.nextRow();
+	    }
+
+	    result.put("O_RETURN", returnList);
+
+	    /* =========================
+	     * 4. EV_RCODE / EV_RMSG 생성
+	     * ========================= */
+	    if (isError) {
+	        result.put("EV_RCODE", "E");
+	        result.put("EV_RMSG", msgBuilder.toString());
+	    } else {
+	        result.put("EV_RCODE", "S");
+	        result.put("EV_RMSG", "입고 취소 성공");
+	    }
+
+	    return result;
+	}
+
+
+}

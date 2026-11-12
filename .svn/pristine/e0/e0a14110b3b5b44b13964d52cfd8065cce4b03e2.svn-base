@@ -1,0 +1,44 @@
+package project.common.task;
+
+import java.sql.SQLException;
+
+import org.apache.log4j.Logger;
+
+import project.common.bean.DataMap;
+import project.wms.service.IFService;
+
+public class batchInterfaceThread implements Runnable {
+	private static Logger log = Logger.getLogger(InterfaceSchedule.class);	
+
+	public batchInterfaceThread(DataMap masterInfo) {
+		// TODO Auto-generated constructor stub
+		log.debug("\n\nbatch start : " + masterInfo);
+		
+		IFService sv = new IFService();
+		
+		try {
+			sv.receive_START(masterInfo);
+
+			if(masterInfo.get("IFID").equals("WMS_IF_101")) {
+				Thread.sleep(60000);
+			}
+
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+	public void run(DataMap masterInfo) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void run() {
+		// TODO Auto-generated method stub
+		
+	}
+
+}

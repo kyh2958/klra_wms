@@ -1,0 +1,176 @@
+package project.wms.controller;
+
+import java.sql.SQLException;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import project.common.bean.CommonConfig;
+import project.common.bean.DataMap;
+import project.common.controller.BaseController;
+import project.common.service.CommonService;
+import project.wms.service.InventoryService;
+
+@Controller
+public class InventoryController extends BaseController {
+	
+	private static Logger log = Logger.getLogger(InventoryController.class);
+	
+	@Autowired
+	private InventoryService inventoryService;
+	
+	@Autowired
+	private CommonService commonService;
+	
+	@RequestMapping("/wms/inventory/json/saveStock.*")
+	public String saveStock(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.saveStock(map); //ERP 전송
+		//DataMap data = inventoryService.saveStock_X(map); //ERP 전송X
+		
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	//바코드 분할 20240226 
+	@RequestMapping("/wms/inventory/json/barcodePartition.*")
+	public String barcodePartition(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.barcodePartition(map); //ERP 전송X
+		
+		
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	//바코드 병합 20240226 
+	@RequestMapping("/wms/inventory/json/barcodeMerger.*")
+	public String barcodeMerger(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.barcodeMerger(map); //ERP 전송X
+		
+		
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	@RequestMapping("/wms/inventory/json/saveSD09.*")
+	public String saveSD09(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.saveSD09(map);
+		
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	
+	@RequestMapping("/wms/inventory/json/savePDSJ01.*")
+	public String savePDSJ01(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.savePDSJ01(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/* 재고 이동 로케이션 추천 */
+	@RequestMapping("/wms/inventory/json/RecommendLocation.*")
+	public String MV01RecommendLocation(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.RecommendLocation(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** 재고 이동 */
+	@RequestMapping("/wms/inventory/json/MV01CreatTaskOrder.*")
+	public String MV01CreatTaskOrder(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.MV01CreatTaskOrder(map);
+		model.putAll(data);
+		return JSON_VIEW;
+	}
+
+	/** 재고 이동완료 */
+	@RequestMapping("/wms/inventory/json/MV02CreatTaskOrder.*")
+	public String MV02CreatTaskOrder(HttpServletRequest request, Map model) throws Exception{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		DataMap data = inventoryService.MV02CreatTaskOrder(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** 재고실사지시 */
+	@RequestMapping("/wms/inventory/json/saveIP01.*")
+	public String saveIP01(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.saveIP01(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** 재고실사 > 중간 저장 */
+	@RequestMapping("/wms/inventory/json/saveIP02.*")
+	public String saveIP02(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.saveIP02(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** 재고실사 > 조사 완료 */
+	@RequestMapping("/wms/inventory/json/confirmIP02.*")
+	public String confirmIP02(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.confirmIP02(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** 재고실사 > 엑셀업로드 */
+	@RequestMapping("/wms/inventory/json/saveIP02POP.*")
+	public String saveIP02POP(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.saveIP02POP(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** PDA재고실사 > 저장 */
+	@RequestMapping("/wms/inventory/json/savePDPC01.*")
+	public String savePDPC01(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		Object data = inventoryService.savePDPC01(map);
+		model.put("data", data);
+		return JSON_VIEW;
+	}
+	
+	/** PDA재고실사 > 등록 > 저장 */
+	@RequestMapping("/wms/inventory/json/savePDPC01new.*")
+	public String savePDPC01New(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		model.put("data", inventoryService.savePDPC01New(map));
+		return JSON_VIEW;
+	}
+	
+	/** PDA재고실사 테스트 > 등록 > 저장 */
+	@RequestMapping("/wms/inventory/json/savePDPC02new.*")
+	public String savePDPC02New(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		model.put("data", inventoryService.savePDPC02New(map));
+		return JSON_VIEW;
+	}
+	
+	/** 재고조정내역 > 재고조정취소 */
+	@RequestMapping("/wms/inventory/json/cancelAdjust.*")
+	public String cancelAdjust(HttpServletRequest request, Map model) throws SQLException{
+		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
+		model.put("data", inventoryService.cancelAdjust(map));
+		return JSON_VIEW;
+	}
+	
+
+}

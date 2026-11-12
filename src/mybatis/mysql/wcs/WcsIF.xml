@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="WcsIF">
+
+	<resultMap id="UPDATE_TB_PLT_STOCK" type="project.common.bean.DataMap">
+	    <result property="p_RESULT" column="p_RESULT"/>
+	    <result property="p_RESULT_MSG" column="p_RESULT_MSG"/>
+	    <result property="p_SCNT" column="p_SCNT"/>
+	    <result property="p_FCNT" column="p_FCNT"/>
+	</resultMap>
+	<select id="CALL_UPDATE_TB_PLT_STOCK_MAP" parameterType="Map" statementType="CALLABLE" resultMap="UPDATE_TB_PLT_STOCK">
+    	CALL SP_UPDATE_TB_PLT_STOCK(
+	        	IFNULL(TRIM(#{ORD_TYPE}),'NONE'),
+	        	IFNULL(TRIM(#{IND_BCD}),'0'),
+	            #{p_RESULT, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_RESULT_MSG, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_SCNT, mode=OUT, jdbcType=INTEGER, javaType=Integer},
+		        #{p_FCNT, mode=OUT, jdbcType=INTEGER, javaType=Integer}
+	        )
+	</select>
+	
+	<resultMap id="INSERT_TB_PLT_STOCK" type="project.common.bean.DataMap">
+	    <result property="p_RESULT" column="p_RESULT"/>
+	    <result property="p_RESULT_MSG" column="p_RESULT_MSG"/>
+	</resultMap>
+	<select id="CALL_INSERT_TB_PLT_STOCK_MAP" parameterType="Map" statementType="CALLABLE" resultMap="INSERT_TB_PLT_STOCK">
+    	CALL SP_INSERT_TB_PLT_STOCK(
+	        	IFNULL(TRIM(#{ORD_NO}),'0'),
+	        	IFNULL(TRIM(#{ORD_TYPE}),'IN'),
+	        	IFNULL(TRIM(#{PLANT_CD}),'0'),
+	        	IFNULL(TRIM(#{MATNR}),'0'),
+	        	IFNULL(TRIM(#{MATNR_NM}),'0'),
+	        	IFNULL(TRIM(#{LOT_NO}),'0'),
+	        	IFNULL(TRIM(#{IND_BCD}),'0'),
+	        	IFNULL(TRIM(#{UNIT}),'0'),
+	        	IFNULL(TRIM(#{QTY}),'0'),
+	        	IFNULL(TRIM(#{MACH_CD}),'0'),
+	            #{p_RESULT, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_RESULT_MSG, mode=OUT, jdbcType=VARCHAR, javaType=String}
+	        )
+	</select>
+	
+	<resultMap id="INSERT_TB_PLT_STOCK_MNL" type="project.common.bean.DataMap">
+	    <result property="p_RESULT" column="p_RESULT"/>
+	    <result property="p_RESULT_MSG" column="p_RESULT_MSG"/>
+	</resultMap>
+	<select id="CALL_INSERT_TB_PLT_STOCK_MNL_MAP" parameterType="Map" statementType="CALLABLE" resultMap="INSERT_TB_PLT_STOCK_MNL">
+    	CALL SP_INSERT_TB_PLT_STOCK_MNL(
+	        	IFNULL(TRIM(#{ORD_NO}),'0'),
+	        	IFNULL(TRIM(#{ORD_TYPE}),'IN'),
+	        	IFNULL(TRIM(#{LOC_CD}),''),
+	        	IFNULL(TRIM(#{LOC_LV}),''),
+	        	IFNULL(TRIM(#{PLANT_CD}),'0'),
+	        	IFNULL(TRIM(#{MATNR}),'0'),
+	        	IFNULL(TRIM(#{MATNR_NM}),'0'),
+	        	IFNULL(TRIM(#{LOT_NO}),'0'),
+	        	IFNULL(TRIM(#{IND_BCD}),'0'),
+	        	IFNULL(TRIM(#{UNIT}),'0'),
+	        	IFNULL(TRIM(#{QTY}),'0'),
+	        	IFNULL(TRIM(#{MACH_CD}),'0'),
+	            #{p_RESULT, mode=OUT, jdbcType=VARCHAR, javaType=String},
+		        #{p_RESULT_MSG, mode=OUT, jdbcType=VARCHAR, javaType=String}
+	        )
+	</select>
+	
+	<select id="VW_LOC_GROUP_LIST" parameterType="Map" resultType="DataMap" fetchSize="1000">
+		SELECT 
+			WLG.PLANT_CD AS LOTA02
+			, WLG.LOC_GRP_CD AS LOC_GRPCD
+			, WLG.LOC_GRP_NM AS LOC_GRPNM
+			, SUM(WLG.CNT_STATE_3) AS CNT_STATE3
+			, SUM(WLG.CNT_STATE_1) AS CNT_STATE1
+			, COUNT(WLI.CARGO_CD) EXIST_BARCOD
+		FROM VW_LOC_GROUP_MAP WLG 
+		LEFT JOIN VW_LOC_INFO WLI ON (WLG.LOC_GRP_CD = WLI.LOC_GRP_CD AND WLG.PLANT_CD = WLI.PLANT_CD AND WLG.LOC_STRG_LINE = WLI.LOC_STRG_LINE AND (WLI.CARGO_CD = #{BARCOD} OR WLI.MATNR = #{SKUKEY})) 
+		GROUP BY 
+			WLG.PLANT_CD
+			, WLG.LOC_GRP_CD 
+			, WLG.LOC_GRP_NM 
+		ORDER BY LPAD(WLG.LOC_GRP_CD, 3, '1000') 
+	</select>
+	
+	<select id="VW_LOC_INFO_LIST" parameterType="Map" resultType="DataMap" fetchSize="1000">
+		SELECT 
+			PLANT_CD AS LOTA02
+			, LOC_GRP_CD AS LOC_GRPCD
+			, LOC_GRP_NM AS LOC_GRPNM
+			, LOC_STRG_LINE AS LOC_LINE
+			, LOC_CD AS LOC_CD
+			, LOC_NM AS LOC_NM
+			, LOC_LV AS LOC_LV
+			, LOC_STATE AS LOC_STATE
+			, LOC_HIGH AS LOC_HIGH
+			, CARGO_CD AS LOTA14
+			, MAKE_DT AS LOTA11
+			, MATNR AS SKUKEY
+			, MATNR_NM AS DESC01
+			, QTY AS QTSIWH
+			, LOC_FLAG_NM AS LOC_FLAG_NM
+			, CREATE_BY AS CREATE_BY
+			, CREATE_DT AS CREATE_DT
+			, UPDATE_DT AS UPDATE_DT
+			, ' ' AS LOCAKY 
+		FROM VW_LOC_INFO 
+		WHERE 1=1 
+		<if test="LOCGRPCD != null and LOCGRPCD != ''">
+			AND LOC_GRP_CD = #{LOCGRPCD}
+		</if>
+		<if test="BARCOD != null and BARCOD != ''">
+			AND CARGO_CD = #{BARCOD} 
+		</if>
+		<if test="LOTA14 != null and  'EMPTY'.equals(LOTA14)">
+			AND CARGO_CD = '' 
+		</if>
+		<if test="LOC_FLAG != null and LOC_FLAG != ''">
+			AND LOC_FLAG = #{LOC_FLAG} 
+		</if>
+		
+		ORDER BY LOC_CD, LOC_LV
+	</select>
+</mapper>
