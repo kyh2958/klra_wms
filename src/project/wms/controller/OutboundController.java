@@ -1234,17 +1234,6 @@ public class OutboundController extends BaseController {
 		return JSON_VIEW;
 	}
 	
-	@RequestMapping("/wms/outbound/json/test.*")
-	public String test(HttpServletRequest request, Map model) throws SQLException{
-		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
-		
-		DataMap rsMap = outboundService.test(map);				
-		
-		model.put("data", rsMap);
-		
-		return JSON_VIEW;
-	}
-	
 	@RequestMapping("/wms/outbound/json/sendDL04StknumInfo.*")
 	public String sendDL04StknumInfo(HttpServletRequest request, Map model) throws Exception{
 		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);

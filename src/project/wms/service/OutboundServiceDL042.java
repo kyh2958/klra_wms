@@ -1437,26 +1437,6 @@ public class OutboundServiceDL042 {
 		return rsMap;
 	}
 
-	public DataMap test(DataMap map) throws SQLException {
-
-		DataMap rsMap = new DataMap();
-		String MSG = "OK";
-		int count = 0;
-
-		int headModifyIndex = -1;
-		List<DataMap> itemList = null;
-
-		try {
-			Thread.sleep(180000); // 50초 대기
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		rsMap.put("ERRNUM", 0);
-
-		return rsMap;
-	}
-
 	/**
 	* @methodName   DL042sendStknumInfo
 	* @description  선적제한해제 로직 수행
