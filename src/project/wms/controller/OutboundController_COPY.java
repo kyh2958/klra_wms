@@ -1214,14 +1214,4 @@ public class OutboundController_COPY extends BaseController {
 		return JSON_VIEW;
 	}
 	
-	@RequestMapping("/wms/outbound_COPY/json/test.*")
-	public String test(HttpServletRequest request, Map model) throws SQLException{
-		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
-		
-		DataMap rsMap = outboundService.test(map);				
-		
-		model.put("data", rsMap);
-		
-		return JSON_VIEW;
-	}
 }

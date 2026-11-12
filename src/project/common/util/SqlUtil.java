@@ -145,6 +145,7 @@ public class SqlUtil {
 		try{
 			conn = dataSource.getConnection();
 			psmt = conn.prepareStatement(sql);
+			psmt.setFetchSize(1000);
 			rs = psmt.executeQuery();
 			
 			ResultSetMetaData rsmd = rs.getMetaData();
@@ -216,6 +217,7 @@ public class SqlUtil {
 		try{
 			conn = dataSource.getConnection();
 			psmt = conn.prepareStatement(pdata.getString("sql"));
+			psmt.setFetchSize(1000);
 			List paramValueList = (List)pdata.get("paramValueList");
 			Object param;
 			for(int i=0;i<paramValueList.size();i++){
@@ -340,6 +342,9 @@ public class SqlUtil {
 				if(cols.length != 3){
 					continue;
 				}
+				if(!cols[2].equals("OR") && !cols[2].equals("AND")){
+					cols[2] = "OR";
+				}
 				if(i!=0){
 					sb.append(' ').append(cols[2]).append(' ');
 					paramSb.append(' ').append(cols[2]).append(' ');
@@ -347,9 +352,6 @@ public class SqlUtil {
 				String fromVal = cols[1];
 				fromVal = rangeData.sqlFilter(fromVal);
 				String operVal = operMap.getString(cols[0]);
-				if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-					cols[2] = "OR";
-				}
 				sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 				sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 				sMap.put(CommonConfig.RNAGE_SINGLE_DATA_KEY, fromVal);
@@ -558,6 +560,9 @@ public class SqlUtil {
 							cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
 						}
 						
+						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
+							cols[2] = "OR";
+						}
 						if(i!=0){
 							sb.append(' ').append(cols[2]).append(' ');
 							paramSb.append(' ').append(cols[2]).append(' ');
@@ -565,9 +570,6 @@ public class SqlUtil {
 						String fromVal = cols[1];
 						fromVal = rangeData.sqlFilter(fromVal);
 						String operVal = operMap.getString(cols[0]);
-						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-							cols[2] = "OR";
-						}
 						sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 						sMap.put(CommonConfig.RNAGE_SINGLE_DATA_KEY, fromVal);
@@ -682,15 +684,15 @@ public class SqlUtil {
 					for(int i=0;i<rows.length;i++){		
 						DataMap sMap = new DataMap();
 						String[] cols = rows[i].split(CommonConfig.DATA_COL_SEPARATOR);
+						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
+							cols[2] = "OR";
+						}
 						if(i!=0){
 							sb.append(" ").append(cols[2]).append(" ");
 						}
 						String fromVal = cols[1];
 						fromVal = sqlFilter(fromVal);
 						String operVal = operMap.getString(cols[0]);
-						if(!cols[2].equals("OR") && !cols[2].equals("AND")){
-							cols[2] = "OR";
-						}
 						sMap.put(CommonConfig.RNAGE_LOGICAL_OPERATOR_KEY, cols[2]);
 						sMap.put(CommonConfig.RNAGE_OPERATOR_KEY, operVal);
 						sMap.put(CommonConfig.RNAGE_SINGLE_DATA_KEY, fromVal);

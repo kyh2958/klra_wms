@@ -333,17 +333,6 @@ public class OutboundControllerDL041 extends BaseController {
 		return JSON_VIEW;
 	}
 	
-	@RequestMapping("/wms/outbound/json/test041.*")
-	public String test(HttpServletRequest request, Map model) throws SQLException{
-		DataMap map = (DataMap)request.getAttribute(CommonConfig.PARAM_ATT_KEY);
-		
-		DataMap rsMap = DL041outboundService.test(map);				
-		
-		model.put("data", rsMap);
-		
-		return JSON_VIEW;
-	}
-
 	/**
 	* @methodName   sendStknumInfoDL041
 	* @description  선적제한해제 서비스 호출

@@ -101,7 +101,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE : EXCEPTION ", e);
 				}
 			});
 		}
@@ -193,7 +193,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("TMS_SCHEDULE_C3012 : EXCEPTION " + e.getMessage());
+					log.error("TMS_SCHEDULE_C3012 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -239,7 +239,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("TMS_SCHEDULE_C3012 : EXCEPTION " + e.getMessage());
+					log.error("TMS_SCHEDULE_C3012 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -286,7 +286,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("TMS_SCHEDULE_C206 : EXCEPTION " + e.getMessage());
+					log.error("TMS_SCHEDULE_C206 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -332,7 +332,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("TMS_SCHEDULE_B206 : EXCEPTION " + e.getMessage());
+					log.error("TMS_SCHEDULE_B206 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -379,7 +379,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_C301 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_C301 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -425,7 +425,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_B301 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_B301 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -471,7 +471,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_C302 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_C302 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -517,7 +517,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_B302 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_B302 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -563,7 +563,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_C206 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_C206 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -609,7 +609,7 @@ public class InterfaceSchedule {
 						}
 					}
 				} catch (SQLException e) {
-					log.debug("WMS_SCHEDULE_B206 : EXCEPTION " + e.getMessage());
+					log.error("WMS_SCHEDULE_B206 : EXCEPTION ", e);
 				}
 			});
 		}
@@ -622,7 +622,7 @@ public class InterfaceSchedule {
 				log.debug("batchStart-sub1");
 			});
 		} catch (Exception e) {
-			log.debug("WMS_SCHEDULE1 : EXCEPTION " + e.getMessage());
+			log.error("WMS_SCHEDULE1 : EXCEPTION ", e);
 		}
 	}
 	
@@ -633,7 +633,7 @@ public class InterfaceSchedule {
 				log.debug("batchStart-sub2");
 			});
 		} catch (Exception e) {
-			log.debug("WMS_SCHEDULE2 : EXCEPTION " + e.getMessage());
+			log.error("WMS_SCHEDULE2 : EXCEPTION ", e);
 		}
 	}
 	

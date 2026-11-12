@@ -9319,27 +9319,6 @@ public DataMap sendEcmsOneConn(DataMap map) throws SQLException {
 
 	}	
 
-	public DataMap test(DataMap map) throws SQLException {
-		
-		DataMap rsMap = new DataMap();
-		String MSG = "OK";
-		int count = 0;
-		
-		int headModifyIndex = -1;
-		List < DataMap > itemList = null;
-		
-		try {
-			Thread.sleep(180000); //50초 대기
-		}catch(Exception e) {
-			e.printStackTrace();
-		}
-		
-		
-		rsMap.put("ERRNUM", 0);
-		
-		return rsMap;
-	}
-	
 	@Transactional(rollbackFor = Exception.class)
 	public DataMap sendDL04StknumInfo(DataMap map) throws Exception {				
 			
